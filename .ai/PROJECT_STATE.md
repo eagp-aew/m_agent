@@ -9,7 +9,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 - Milestone: Bootstrap Codex multi-agent direction workflow
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: WP-0002-clean-bootstrap-placeholders
+- Active work package: none (latest accepted: WP-0004-master-operating-contract)
 
 ## Important constraints
 
@@ -29,6 +29,7 @@ The repo is organized around Codex-native orchestration:
 - `.agents/skills/direction-guide/SKILL.md` is the local skill that drives multi-agent orchestration, with supporting references under `.agents/skills/direction-guide/references/`.
 - `.ai/` is the durable memory layer for mission, state, queue, decisions, test matrix, risks, integration log, work packages, and agent/automation report locations.
 - `.ai/MASTER_MODULES.md` defines the seven master-thread control modules used to move from intake through memory updates before and after delegation.
+- `.ai/MASTER_CONTRACT.md` defines the strict operating contract that all multi-agent workflows must satisfy, including master permissions, stop conditions, approval gates, report acceptance rules, and context pollution controls.
 
 ## Known risky areas
 
@@ -46,6 +47,7 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-06 | WP-0000-bootstrap | Verified scaffold presence and identified repo-specific memory gaps | Manual scaffold inspection passed with memory follow-up |
 | 2026-05-06 | WP-0001-repo-memory-specificity | Made project state, task queue, and test matrix specific to this direction-system repo | Scaffold checks and YAML parse passed |
 | 2026-05-06 | WP-0003-master-control-modules | Defined seven explicit master control modules and wired them into `direction-guide` delegation flow | Scaffold checks and Markdown review passed |
+| 2026-05-06 | WP-0004-master-operating-contract | Added a strict master operating contract and required `direction-guide` workflows to comply with it | Scaffold checks and Markdown review passed |
 
 ## Open questions
 
@@ -53,6 +55,6 @@ The repo is organized around Codex-native orchestration:
 
 ## Next recommended work
 
-1. Verify and accept WP-0002 after placeholder cleanup.
-2. Decide whether the next work package should add a lightweight scaffold validator or continue refining the written protocol.
-3. Exercise the seven control modules on the next real work package and tighten the protocol if it proves too ceremonial.
+1. Decide whether the next work package should add a lightweight scaffold validator or continue refining the written protocol.
+2. Exercise the master contract and seven control modules on the next real delegated task.
+3. Tighten the protocol if the contract proves too ceremonial or leaves routing gaps.

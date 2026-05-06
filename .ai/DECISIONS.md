@@ -30,9 +30,25 @@
   - Verification, integration, and memory updates remain owned by the master thread.
   - The protocol gains structure that should be tested against real small work packages to avoid excess ceremony.
 
+## DEC-0003: Adopt a strict master operating contract
+
+- Date: 2026-05-06
+- Status: accepted
+- Context:
+  - The master-agent workflow needs an explicit boundary between orchestration and implementation.
+  - The master should control scope, routing, verification, integration, and durable memory instead of becoming the default code implementer.
+- Decision:
+  - Add `.ai/MASTER_CONTRACT.md` as the binding operating contract for all multi-agent workflows.
+  - Require `direction-guide` to read and comply with the contract before planning, delegation, or direct implementation.
+- Consequences:
+  - Master authority and stop conditions are clearer.
+  - Subagent reports become evidence that the master must accept or reject, not automatic truth.
+  - The protocol gains another required document that should be kept concise and tested against real work packages.
+
 ## Decision log
 
 | ID | Date | Status | Title |
 |---|---|---|---|
 | DEC-0001 | 2026-05-06 | accepted | Adopt Codex multi-agent direction protocol |
 | DEC-0002 | 2026-05-06 | accepted | Use seven master control modules |
+| DEC-0003 | 2026-05-06 | accepted | Adopt a strict master operating contract |

@@ -43,6 +43,17 @@ queue:
     acceptance_summary: "MASTER_MODULES defines seven control modules and direction-guide requires the master to route work through them before delegation."
     work_package_path: null
     verifier_report_path: null
+  - task_id: WP-0004-master-operating-contract
+    title: "Create strict master operating contract"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0003-master-control-modules
+    acceptance_summary: "MASTER_CONTRACT defines strict master-agent permissions, stop rules, approval gates, report acceptance rules, and context pollution controls; direction-guide requires compliance."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0004-master-operating-contract.yaml"
+    verifier_report_path: null
 
 status_values:
   - DRAFT

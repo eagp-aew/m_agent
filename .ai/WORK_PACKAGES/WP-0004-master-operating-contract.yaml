@@ -1,0 +1,73 @@
+task_id: WP-0004-master-operating-contract
+status: ACCEPTED
+objective: "Create a strict master operating contract and require direction-guide workflows to comply with it."
+why: "The direction system needs an explicit contract that keeps the master focused on scope, routing, verification, integration, and memory instead of becoming the default implementer."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - ".ai/MASTER_CONTRACT.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".ai/WORK_PACKAGES/WP-0004-master-operating-contract.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "src/**"
+  - "app/**"
+  - "lib/**"
+  - "database/**"
+  - "package.json"
+  - "package-lock.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+
+inputs:
+  - "User request on 2026-05-06"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".ai/MASTER_MODULES.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+
+acceptance_criteria:
+  - ".ai/MASTER_CONTRACT.md exists."
+  - "The contract includes the eight requested sections."
+  - "The contract states the master is not the default code implementer."
+  - "The contract defines master duties around scope, routing, verification, integration, and memory."
+  - "direction-guide requires multi-agent workflows to comply with .ai/MASTER_CONTRACT.md."
+  - "No application source code is modified."
+  - "Durable project memory is updated after accepted work."
+
+validation_commands:
+  - "test -f .ai/MASTER_CONTRACT.md"
+  - "rg -n \"^## [1-8]\\.\" .ai/MASTER_CONTRACT.md"
+  - "rg -n \"not the default code implementer|scope, routing, verification, integration, and memory\" .ai/MASTER_CONTRACT.md .agents/skills/direction-guide/SKILL.md"
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "git status --short"
+
+rollback_plan:
+  - "Revert the contract, direction-guide linkage, and WP-0004 memory entries if the contract is rejected."
+
+human_approval_required:
+  required: false
+  reason: "The user explicitly requested scaffold/protocol documentation changes and no application source changes are needed."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - contract_summary
+  - validation_evidence
+  - remaining_gaps
+  - next_action

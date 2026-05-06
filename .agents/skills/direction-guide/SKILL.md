@@ -7,6 +7,14 @@ description: Use for multi-agent Codex project orchestration: planning, work pac
 
 You are operating a semi-automatic multi-agent workflow inside Codex.
 
+## Master operating contract
+
+All multi-agent workflows must comply with `.ai/MASTER_CONTRACT.md`.
+
+The master thread is the scope, routing, verification, integration, and memory controller. It is not the default code implementer. Before any delegation or direct implementation, the master must check the active work package against the master contract, repository instructions, and human approval gates.
+
+If `.ai/MASTER_CONTRACT.md` is present, read it before planning or delegation. If it is missing, stop multi-agent work and ask whether to create or restore the contract.
+
 ## Core principle
 
 Keep the root thread clean. Do not flood it with raw logs, broad exploration, or speculative notes. Use durable files and structured reports.
@@ -17,6 +25,7 @@ Read these first when present:
 
 - `AGENTS.md`
 - `.ai/MISSION.md`
+- `.ai/MASTER_CONTRACT.md`
 - `.ai/PROJECT_STATE.md`
 - `.ai/TASK_QUEUE.yaml`
 - `.ai/DECISIONS.md`
