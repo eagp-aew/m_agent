@@ -1,42 +1,40 @@
 # File Manifest
 
+## Root files
+
+- `AGENTS.md` — Codex project instructions.
+- `START_HERE.md` — first-run instructions.
+- `INSTALLATION.md` — setup and verification steps.
+- `README.md` — scaffold overview.
+- `.gitignore` — excludes Mac/system clutter and logs.
+
+## Codex config
+
+- `.codex/config.toml`
+- `.codex/agents/explorer.toml`
+- `.codex/agents/implementer.toml`
+- `.codex/agents/verifier.toml`
+- `.codex/agents/fixer.toml`
+- `.codex/agents/integrator.toml`
+- `.codex/agents/security-reviewer.toml`
+
+## Skill
+
 - `.agents/skills/direction-guide/SKILL.md`
+- `.agents/skills/direction-guide/references/work-package-template.yaml`
 - `.agents/skills/direction-guide/references/agent-report-template.md`
 - `.agents/skills/direction-guide/references/failure-taxonomy.md`
 - `.agents/skills/direction-guide/references/review-rubric.md`
-- `.agents/skills/direction-guide/references/work-package-template.md`
-- `.ai/AGENT_REPORTS/AGENT_REPORT_TEMPLATE.md`
-- `.ai/DECISIONS.md`
-- `.ai/INTEGRATION_LOG.md`
+
+## Durable project memory
+
 - `.ai/MISSION.md`
 - `.ai/PROJECT_STATE.md`
-- `.ai/RISK_REGISTER.md`
-- `.ai/RUNBOOKS/failure-protocol.md`
-- `.ai/RUNBOOKS/integration-protocol.md`
-- `.ai/RUNBOOKS/master-protocol.md`
-- `.ai/RUNBOOKS/verification-protocol.md`
-- `.ai/TASK_QUEUE.md`
+- `.ai/TASK_QUEUE.yaml`
+- `.ai/DECISIONS.md`
 - `.ai/TEST_MATRIX.md`
-- `.ai/WORK_PACKAGES/WORK_PACKAGE_TEMPLATE.md`
-- `.codex-markdown/README.md`
-- `.codex-markdown/agents/explorer.toml.md`
-- `.codex-markdown/agents/fixer.toml.md`
-- `.codex-markdown/agents/implementer.toml.md`
-- `.codex-markdown/agents/integrator.toml.md`
-- `.codex-markdown/agents/security-reviewer.toml.md`
-- `.codex-markdown/agents/verifier.toml.md`
-- `.codex-markdown/config.toml.md`
-- `00-system-overview.md`
-- `01-codex-app-integration.md`
-- `02-operating-model.md`
-- `03-agent-role-design.md`
-- `04-context-and-memory.md`
-- `05-failure-routing.md`
-- `06-human-gates-and-stop-rules.md`
-- `07-mvp-build-plan.md`
-- `08-prompt-library.md`
-- `09-review-and-integration.md`
-- `10-sources-and-research-notes.md`
-- `AGENTS.md`
-- `README.md`
-- `START_HERE.md`
+- `.ai/RISK_REGISTER.md`
+- `.ai/INTEGRATION_LOG.md`
+- `.ai/WORK_PACKAGES/WP-0000-bootstrap.yaml`
+- `.ai/AGENT_REPORTS/README.md`
+- `.ai/AUTOMATION_REPORTS/README.md`

@@ -1,128 +1,38 @@
 # 07 — MVP Build Plan
 
-## Build the smallest useful version
+## Goal
 
-Do not begin with a dozen agents, hooks, dashboards, automations, and recursive trees. Build the minimum loop first.
-
-## MVP components
+Complete one small task with:
 
 ```text
-1. AGENTS.md
-2. direction-guide skill
-3. .ai memory files
-4. explorer agent
-5. implementer agent
-6. verifier agent
-7. fixer agent
-8. master kickoff prompt
+one work package
+  → one scoped implementer
+  → one verifier
+  → one memory update
+  → one reviewable diff
 ```
 
-## Phase 1 — Bootstrap files
+## Do first
 
-Goal:
+- Verify scaffold.
+- Fill project-specific memory.
+- Identify one small work package.
+- Run in a Worktree thread.
 
-```text
-Create the repo-local operating system.
-```
+## Do not do yet
 
-Tasks:
+- recursive subagents;
+- automatic merging;
+- broad automations;
+- huge role systems;
+- multiple write agents;
+- dependency upgrades.
 
-```text
-- commit this starter kit
-- materialize .codex/config.toml
-- materialize .codex/agents/*.toml
-- check that $direction-guide appears in Codex skill selector
-- initialize .ai/PROJECT_STATE.md for your actual project
-```
+## Success criteria
 
-Success:
-
-```text
-Codex can read AGENTS.md and use $direction-guide.
-```
-
-## Phase 2 — First safe task
-
-Goal:
-
-```text
-Run one full work package loop.
-```
-
-Pick one:
-
-```text
-- add one missing test
-- update docs for one command
-- fix one deterministic bug
-- add one non-breaking utility
-```
-
-Success:
-
-```text
-- explorer report exists if needed
-- work package exists
-- implementation completed
-- verifier passed or produced useful failure
-- memory updated
-```
-
-## Phase 3 — Add review/integration discipline
-
-Goal:
-
-```text
-Make accepted changes PR-ready.
-```
-
-Add:
-
-```text
-- integrator agent
-- integration log
-- PR summary template
-- review rubric
-```
-
-Success:
-
-```text
-Every accepted package can be reviewed without reading the whole thread.
-```
-
-## Phase 4 — Add safety automation
-
-Only after the manual loop works, add hooks or automations.
-
-Good first automations:
-
-```text
-- stale task audit
-- missing verifier report audit
-- risk register audit
-- test matrix drift audit
-```
-
-Bad first automations:
-
-```text
-- automatic merges
-- autonomous dependency upgrades
-- broad refactors
-- recursive task generation
-```
-
-## The first serious metric
-
-Measure this:
-
-```text
-How many accepted changes can be understood from only:
-- the work package
-- the agent reports
-- the final diff
-- the integration log
-```
-
-If the answer is “not many,” your handoff format is still too weak.
+- Root thread stayed clean.
+- Work package was clear.
+- Implementer respected scope.
+- Verifier produced evidence.
+- Memory was updated.
+- Diff was small.

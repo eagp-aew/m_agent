@@ -1,0 +1,69 @@
+task_id: WP-0000-bootstrap
+status: READY
+objective: "Verify the Codex multi-agent direction scaffold is present and internally consistent."
+why: "This confirms Codex can see the direction-guide skill, custom agents, and durable memory before any application-code changes."
+scope_type: setup
+priority: P1
+
+allowed_files:
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - ".ai/**"
+  - "README.md"
+  - "START_HERE.md"
+  - "INSTALLATION.md"
+  - "FILE_MANIFEST.md"
+
+forbidden_files:
+  - "src/**"
+  - "app/**"
+  - "lib/**"
+  - "database/**"
+  - "package.json"
+  - "package-lock.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+
+inputs:
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".codex/config.toml"
+  - ".codex/agents/*.toml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+
+acceptance_criteria:
+  - "direction-guide skill exists at .agents/skills/direction-guide/SKILL.md."
+  - "Custom agent files exist under .codex/agents/."
+  - "Each custom agent file has name, description, and developer_instructions."
+  - ".ai project memory files exist."
+  - "No application code is modified during scaffold verification."
+
+validation_commands:
+  - "test -f .agents/skills/direction-guide/SKILL.md"
+  - "test -f .codex/config.toml"
+  - "test -f .codex/agents/explorer.toml"
+  - "test -f .ai/PROJECT_STATE.md"
+  - "git status --short"
+
+rollback_plan:
+  - "Remove AGENTS.md, .codex/, .agents/, and .ai/ if scaffold is rejected."
+
+human_approval_required:
+  required: false
+  reason: "Scaffold-only verification; no application code should be touched."
+
+assigned_agent: master
+
+attempts:
+  implement: 0
+  fix: 0
+  verify: 0
+
+output_required:
+  - scaffold_issues_found
+  - suggested_fixes
+  - proposed_first_real_work_package
+  - human_approval_required

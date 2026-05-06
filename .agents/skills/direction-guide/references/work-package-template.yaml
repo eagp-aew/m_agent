@@ -1,0 +1,44 @@
+task_id: WP-0001
+status: READY
+objective: ""
+why: ""
+scope_type: exploration | implementation | verification | fix | integration | setup
+priority: P0 | P1 | P2 | P3
+
+allowed_files:
+  - ""
+
+forbidden_files:
+  - ""
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+
+acceptance_criteria:
+  - ""
+
+validation_commands:
+  - ""
+
+rollback_plan:
+  - ""
+
+human_approval_required:
+  required: false
+  reason: ""
+
+assigned_agent: null
+
+attempts:
+  implement: 0
+  fix: 0
+  verify: 0
+
+output_required:
+  - summary
+  - files_changed
+  - tests_run
+  - risks
+  - follow_up_tasks

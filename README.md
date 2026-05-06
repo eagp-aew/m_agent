@@ -1,86 +1,78 @@
-# Codex Multi-Agent Direction Guide Starter Kit
+# Codex Multi-Agent Direction Guide — Complete Scaffold
 
-This starter kit turns the multi-agent direction-guide idea into a concrete Codex workflow. It is designed for a semi-automatic software-building system where a master thread decomposes work, spawns bounded subagents, receives compressed reports, routes failures, and keeps durable project memory in the repository.
+This is the corrected, Codex-ready scaffold.
 
-The design goal is not to create an uncontrolled swarm. The design goal is to create a disciplined software-delivery protocol inside Codex:
+It includes the actual hidden directories Codex expects:
 
 ```text
-Codex app project
-  └── Master milestone thread
-        ├── direction-guide skill
-        ├── durable .ai project memory
-        ├── custom subagent definitions
-        ├── work packages
-        ├── verification gates
-        └── Git / review / worktree flow
+.codex/
+.agents/
+.ai/
 ```
+
+If you are using macOS Finder, hidden folders starting with `.` may not show up. Press:
+
+```text
+Command + Shift + .
+```
+
+to toggle hidden files/folders.
 
 ## What is included
 
 ```text
-AGENTS.md                                      # Repo-level Codex operating rules
-START_HERE.md                                  # First actions to bootstrap the system
-00-system-overview.md                          # Architecture and design logic
-01-codex-app-integration.md                    # How to use this inside Codex app
-02-operating-model.md                          # Master state machine and control loop
-03-agent-role-design.md                        # Agent roles, permissions, and boundaries
-04-context-and-memory.md                       # Durable memory and context compression
-05-failure-routing.md                          # Failure taxonomy and retry routing
-06-human-gates-and-stop-rules.md               # Human approval points and hard stops
-07-mvp-build-plan.md                           # Minimal build sequence
-08-prompt-library.md                           # Copy/paste prompts for Codex
-09-review-and-integration.md                   # Review, PR, and integration discipline
-10-sources-and-research-notes.md               # Source notes and implementation assumptions
-
-.ai/                                           # Durable project memory templates
-.agents/skills/direction-guide/SKILL.md        # Repo-scoped Codex skill
-.codex-markdown/                               # Markdown copies of config/agent TOML snippets
-```
-
-## Important note about this zip
-
-This package is intentionally markdown-first. The `.codex-markdown/` files contain copyable TOML snippets for actual Codex config files. Once you are ready, ask Codex to materialize those snippets into real files under `.codex/`.
-
-The only files you should treat as directly repo-ready on day one are:
-
-```text
 AGENTS.md
-.agents/skills/direction-guide/SKILL.md
-.ai/**/*.md
+START_HERE.md
+INSTALLATION.md
+FILE_MANIFEST.md
+.gitignore
+
+.codex/
+  config.toml
+  agents/
+    explorer.toml
+    implementer.toml
+    verifier.toml
+    fixer.toml
+    integrator.toml
+    security-reviewer.toml
+
+.agents/
+  skills/
+    direction-guide/
+      SKILL.md
+      references/
+        work-package-template.yaml
+        agent-report-template.md
+        failure-taxonomy.md
+        review-rubric.md
+
+.ai/
+  MISSION.md
+  PROJECT_STATE.md
+  TASK_QUEUE.yaml
+  DECISIONS.md
+  TEST_MATRIX.md
+  RISK_REGISTER.md
+  INTEGRATION_LOG.md
+  WORK_PACKAGES/
+    WP-0000-bootstrap.yaml
+  AGENT_REPORTS/
+    README.md
+  AUTOMATION_REPORTS/
+    README.md
 ```
 
-## Core principle
+## Core idea
 
-Use agents for bounded work, not for vague ownership.
+Use Codex app threads and worktrees for project-level isolation, use Codex subagents for bounded tactical work, and use durable repo files for memory.
+
+Do not build a swarm. Build a controlled software-delivery protocol:
 
 ```text
-Bad:
-"Subagent, fix the project."
-
-Good:
-"Verifier, inspect WP-0007 against these acceptance criteria and return PASS/FAIL with evidence. Do not edit files."
+work package → bounded agent → structured report → verifier → classified fix → integration → memory update
 ```
 
-## Recommended first test
+## First action
 
-Do not test this system on a mission-critical refactor. Test it on a small, reversible change:
-
-```text
-- add one missing unit test
-- update one API response field
-- fix one well-scoped bug
-- document one existing command
-- improve one internal utility
-```
-
-A successful first run means:
-
-```text
-- master thread stays clean
-- one work package is created
-- implementation is scoped
-- verifier checks the result
-- failure handling is explicit if needed
-- .ai project memory is updated
-- final diff is reviewable
-```
+Read `START_HERE.md`, then open this repo in Codex app and paste the prompt from that file.

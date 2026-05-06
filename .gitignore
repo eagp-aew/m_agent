@@ -1,0 +1,9 @@
+.DS_Store
+*.log
+.ai/**/raw-logs/
+.ai/**/tmp/
+.env
+.env.*
+!.env.example
+node_modules/
+.DS_Store

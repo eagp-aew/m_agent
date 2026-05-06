@@ -1,0 +1,28 @@
+version: 1
+updated_at: YYYY-MM-DD
+
+queue:
+  - task_id: WP-0000-bootstrap
+    title: "Verify Codex multi-agent direction scaffold"
+    status: READY
+    priority: P1
+    scope_type: setup
+    assigned_agent: master
+    blocked_by: []
+    acceptance_summary: "Codex can see AGENTS.md, .codex custom agents, .agents skill, and .ai memory files."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0000-bootstrap.yaml"
+    verifier_report_path: null
+
+status_values:
+  - DRAFT
+  - READY
+  - ASSIGNED
+  - IMPLEMENTED
+  - VERIFY_FAIL
+  - VERIFIED
+  - ACCEPTED
+  - INTEGRATED
+  - DONE
+  - BLOCKED
+  - CANCELLED
+  - ESCALATED
