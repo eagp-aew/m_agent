@@ -1,16 +1,47 @@
 version: 1
-updated_at: YYYY-MM-DD
+updated_at: 2026-05-06
 
 queue:
   - task_id: WP-0000-bootstrap
     title: "Verify Codex multi-agent direction scaffold"
-    status: READY
+    status: ACCEPTED
     priority: P1
     scope_type: setup
     assigned_agent: master
     blocked_by: []
     acceptance_summary: "Codex can see AGENTS.md, .codex custom agents, .agents skill, and .ai memory files."
     work_package_path: ".ai/WORK_PACKAGES/WP-0000-bootstrap.yaml"
+    verifier_report_path: null
+  - task_id: WP-0001-repo-memory-specificity
+    title: "Make project memory specific to the direction-system repo"
+    status: IMPLEMENTED
+    priority: P1
+    scope_type: memory
+    assigned_agent: master
+    blocked_by: []
+    acceptance_summary: "PROJECT_STATE, TASK_QUEUE, and TEST_MATRIX describe this repo as a Codex master-agent structure refinement scaffold rather than an application repo."
+    work_package_path: null
+    verifier_report_path: null
+  - task_id: WP-0002-clean-bootstrap-placeholders
+    title: "Remove remaining bootstrap placeholders from durable memory"
+    status: IMPLEMENTED
+    priority: P2
+    scope_type: memory
+    assigned_agent: master
+    blocked_by:
+      - WP-0001-repo-memory-specificity
+    acceptance_summary: "MISSION, DECISIONS, and INTEGRATION_LOG use concrete dates and wording for this direction-system scaffold."
+    work_package_path: null
+    verifier_report_path: null
+  - task_id: WP-0003-master-control-modules
+    title: "Define seven master-agent control modules"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by: []
+    acceptance_summary: "MASTER_MODULES defines seven control modules and direction-guide requires the master to route work through them before delegation."
+    work_package_path: null
     verifier_report_path: null
 
 status_values:

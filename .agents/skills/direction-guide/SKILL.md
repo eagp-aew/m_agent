@@ -22,25 +22,43 @@ Read these first when present:
 - `.ai/DECISIONS.md`
 - `.ai/TEST_MATRIX.md`
 - `.ai/RISK_REGISTER.md`
+- `.ai/MASTER_MODULES.md`
+
+## Master control modules
+
+The master thread must operate through the seven control modules defined in `.ai/MASTER_MODULES.md`:
+
+1. Intake Controller
+2. Scope Controller
+3. Context Controller
+4. Routing Controller
+5. Verification Controller
+6. Integration Controller
+7. Memory Controller
+
+Before delegating work, the master must complete Intake, Scope, Context, and Routing. It must also define how Verification, Integration, and Memory will be satisfied for the work package. Do not delegate directly from a user request, a raw state-machine step, or an informal plan.
+
+The modules own control decisions; subagents only perform bounded assigned work. The master must keep module outputs concise and durable when they affect the work package, project memory, or future routing.
 
 ## State machine
 
 For each work package:
 
-1. INTAKE
-2. PLAN
-3. SCOUT
-4. PACKAGE
-5. IMPLEMENT
-6. VERIFY
-7. FIX_OR_ACCEPT
-8. INTEGRATE
-9. UPDATE_MEMORY
-10. NEXT_PACKAGE
+1. INTAKE: Intake Controller normalizes the request and approval constraints.
+2. PLAN: Scope Controller bounds the work package and acceptance criteria.
+3. SCOUT: Context Controller gathers only the context needed.
+4. PACKAGE: Scope Controller records allowed files, forbidden files, validation, and rollback.
+5. ROUTE: Routing Controller decides master-direct work or bounded delegation.
+6. IMPLEMENT: The master or assigned implementer performs only the packaged work.
+7. VERIFY: Verification Controller checks acceptance criteria and evidence.
+8. FIX_OR_ACCEPT: Verification Controller classifies failures before any fixer assignment.
+9. INTEGRATE: Integration Controller confirms scope, dirty worktree safety, and readiness.
+10. UPDATE_MEMORY: Memory Controller updates durable `.ai/` state after accepted work.
+11. NEXT_PACKAGE: Scope Controller recommends the next bounded package when useful.
 
 ## Delegation rules
 
-Use subagents only when the work is bounded.
+Use subagents only when the Routing Controller has a bounded work package and the relevant module outputs are available.
 
 - Use explorer agents for read-only codebase mapping.
 - Use implementer agents only for explicit work packages.
@@ -49,6 +67,8 @@ Use subagents only when the work is bounded.
 - Use integrator agents only after implementation and verification are complete.
 
 Do not run parallel write-heavy subagents unless their `allowed_files` are disjoint.
+
+Delegation prompts must include the active work package, allowed files, forbidden files, acceptance criteria, validation expectations, and required report format. The master remains responsible for final verification, integration, and memory updates.
 
 ## Work package required fields
 
