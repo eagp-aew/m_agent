@@ -197,6 +197,17 @@ queue:
     acceptance_summary: "Quoted the direction-guide skill description and added validator coverage for parseable SKILL.md metadata."
     work_package_path: ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
+  - task_id: WP-0018-protocol-enforcement-hardening
+    title: "Harden protocol enforcement boundaries"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0017-direction-guide-skill-metadata
+    acceptance_summary: "Added enforceable tool-policy, trust-boundary, report-path, and lightweight secret-scan checks to the protocol validator and scaffold docs."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0018-protocol-enforcement-hardening.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0018-verifier.md"
 
 status_values:
   - DRAFT

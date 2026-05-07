@@ -8,21 +8,51 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0017-direction-guide-skill-metadata
-  title: "Fix direction-guide skill metadata validation"
+  task_id: WP-0018-protocol-enforcement-hardening
+  title: "Harden protocol enforcement boundaries"
   status: ACCEPTED
   scope_type: validation
   assigned_agent: master
-  work_package_path: ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
+  work_package_path: ".ai/WORK_PACKAGES/WP-0018-protocol-enforcement-hardening.yaml"
 
 current_state_machine_state: DONE
 
-active_agent_runs: []
+active_agent_runs:
+  - agent_run_id: "019e002a-4f3c-7453-9229-6ac2057562d9"
+    nickname: Mendel
+    role: implementer
+    task_id: WP-0018-protocol-enforcement-hardening
+    shard_id: docs-policy
+    worktree_id: codex-wp0018-docs-policy
+    status: COMPLETE
+    report_path: ".ai/AGENT_REPORTS/WP-0018-docs-implementer.md"
+  - agent_run_id: "019e002a-4f5f-7f60-857c-f9660f5ddb70"
+    nickname: Lovelace
+    role: implementer
+    task_id: WP-0018-protocol-enforcement-hardening
+    shard_id: validator-enforcement
+    worktree_id: codex-wp0018-validator-enforcement
+    status: COMPLETE
+    report_path: ".ai/AGENT_REPORTS/WP-0018-validator-implementer.md"
 
 active_parallel_batch: null
-file_reservations: []
-worktree_assignments: []
-effective_parallel_write_agents: 1
+file_reservations:
+  - shard_id: docs-policy
+    files:
+      - ".agents/skills/direction-guide/SKILL.md"
+      - ".agents/skills/direction-guide/references/context-packet-schema.md"
+      - ".agents/skills/direction-guide/references/agent-report-template.md"
+      - ".agents/skills/direction-guide/references/tool-policy.md"
+      - ".ai/TEST_MATRIX.md"
+  - shard_id: validator-enforcement
+    files:
+      - "scripts/validate_protocol.py"
+worktree_assignments:
+  - shard_id: docs-policy
+    worktree_id: codex-wp0018-docs-policy
+  - shard_id: validator-enforcement
+    worktree_id: codex-wp0018-validator-enforcement
+effective_parallel_write_agents: 2
 parallel_write_conflicts: 0
 
 child_agent_requests: []
@@ -53,6 +83,9 @@ open_decisions:
     resolution: "Add scripts/validate_protocol.py as a no-dependency lightweight validator."
 
 failure_counts_by_task:
+  WP-0018-protocol-enforcement-hardening:
+    verify: 0
+    fix: 0
   WP-0017-direction-guide-skill-metadata:
     verify: 0
     fix: 0
@@ -109,16 +142,16 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0017-direction-guide-skill-metadata
+    work_package_id: WP-0018-protocol-enforcement-hardening
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
     verifier_mapped_acceptance_criteria: true
     tests_run_or_not_run_reason_documented: true
     memory_files_updated: true
-    exact_file_reservations_recorded: null
-    isolated_worktrees_required: null
-    effective_parallel_write_agents: 1
+    exact_file_reservations_recorded: true
+    isolated_worktrees_required: true
+    effective_parallel_write_agents: 2
     parallel_write_conflicts: 0
     child_agent_requests_require_master_approval: true
     child_agent_requests_approved: 0
@@ -129,38 +162,45 @@ quality_metrics:
     recursive_delegation_violations: 0
     fix_attempts: 0
     repeated_failure_detected: false
-    human_approval_required: true
+    human_approval_required: false
     human_approval_obtained: true
     diff_size:
       files: null
       insertions: null
       deletions: null
-      note: "Repository already had broad uncommitted scaffold changes, so exact WP-0017-only insertion/deletion counts are not isolated."
+      note: "See git diff --stat for WP-0018 scoped scaffold, validator, report, and memory changes."
     files_changed:
       - ".agents/skills/direction-guide/SKILL.md"
+      - ".agents/skills/direction-guide/references/context-packet-schema.md"
+      - ".agents/skills/direction-guide/references/agent-report-template.md"
+      - ".agents/skills/direction-guide/references/tool-policy.md"
       - "scripts/validate_protocol.py"
       - ".ai/TEST_MATRIX.md"
+      - ".ai/AGENT_REPORTS/WP-0015-fallback-verification.md"
       - ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
+      - ".ai/AGENT_REPORTS/WP-0018-docs-implementer.md"
+      - ".ai/AGENT_REPORTS/WP-0018-validator-implementer.md"
+      - ".ai/AGENT_REPORTS/WP-0018-verifier.md"
+      - ".ai/WORK_PACKAGES/WP-0018-protocol-enforcement-hardening.yaml"
+      - ".ai/TASK_QUEUE.yaml"
       - ".ai/MASTER_LEDGER.yaml"
       - ".ai/PROJECT_STATE.md"
-      - ".ai/TASK_QUEUE.yaml"
       - ".ai/DECISIONS.md"
       - ".ai/INTEGRATION_LOG.md"
-      - ".ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
-      - ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
+      - ".ai/RISK_REGISTER.md"
   scope_check:
     status: PASS
-    evidence: "WP-0017 touched direction-guide skill metadata, validator coverage, test matrix guidance, work-package/report artifacts, and durable memory only; no application source code was changed."
+    evidence: "WP-0018 touched only scaffold policy, validation, report artifacts, and durable memory; no application source, dependency manifest, production config, new role, recursion expansion, or parallelism expansion was changed."
   validation:
     status: PASS
     commands:
-      - "ruby -e 'require \"yaml\"; text=File.read(\".agents/skills/direction-guide/SKILL.md\"); fm=text[/\\A---\\n(.*?)\\n---/m,1]; p YAML.safe_load(fm)'"
-      - "python3 -c 'import importlib.util; spec=importlib.util.spec_from_file_location(\"validator\", \"scripts/validate_protocol.py\"); module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); original=module.read_text; module.read_text=lambda path: \"---\\nname: direction-guide\\ndescription: Use for multi-agent Codex project orchestration: planning\\n---\\n\" if path == \".agents/skills/direction-guide/SKILL.md\" else original(path); result=module.check_direction_guide_skill_metadata(); print((\"PASS\" if not result.ok else \"FAIL\"), result.message); raise SystemExit(0 if not result.ok and \"quote metadata values\" in result.message else 1)'"
       - "python3 scripts/validate_protocol.py"
+      - "python3 -m py_compile scripts/validate_protocol.py"
       - "git diff --check"
+      - "git status --short --untracked-files=all"
   verifier_status:
     status: PASS
-    evidence: "Master-direct fallback verification produced PASS evidence for WP-0017: SKILL.md frontmatter parses, invalid metadata root cause is recorded, validator enforces the metadata check, test matrix points at the validator, and scope/forbidden-file checks passed."
+    evidence: "Master fallback verifier recorded PASS evidence in .ai/AGENT_REPORTS/WP-0018-verifier.md after all 20 protocol validator checks passed."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

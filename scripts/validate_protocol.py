@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import subprocess
 import sys
 
 
@@ -155,6 +156,83 @@ VERIFICATION_REPORT_MARKERS = [
     "risks_recorded",
 ]
 
+TOOL_POLICY_PATH = ".agents/skills/direction-guide/references/tool-policy.md"
+
+TOOL_POLICY_REQUIREMENTS = [
+    ("command classes", r"command class|command classification|classify commands"),
+    ("destructive-command handling", r"destructive"),
+    ("network/escalation handling", r"network.*escalation|escalation.*network|network access"),
+    ("path boundary language", r"path boundary|repo boundary|workspace boundary|allowed_files"),
+    ("report audit expectations", r"report audit|audit expectations|commands_run|tests_run|evidence"),
+]
+
+TRUST_BOUNDARY_FIELDS = [
+    "trust_boundary",
+    "external_inputs",
+    "tool_outputs",
+    "durable_memory",
+    "trust_level",
+    "untrusted_reference",
+    "observed_evidence",
+    "repo_controlled",
+]
+
+REPORT_PATH_MARKER_PREFIXES = (
+    "external:",
+    "runtime:",
+    "user:",
+    "generated:",
+    "not_applicable:",
+)
+
+REPORT_PATH_MARKERS = {
+    "None",
+    "NOT_RUN",
+    "not run",
+    "manual",
+}
+
+REPORT_PATH_ALLOWED_SCHEMES = ("http://", "https://")
+
+SCAFFOLD_SCAN_ROOTS = [
+    "AGENTS.md",
+    "README.md",
+    "INSTALLATION.md",
+    "scripts",
+    ".agents",
+    ".ai",
+    ".codex",
+]
+
+SECRET_SCAN_EXCLUDED_PARTS = {
+    ".git",
+    "__pycache__",
+    ".mypy_cache",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".cache",
+    "cache",
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "secrets",
+}
+
+SECRET_PATTERNS = [
+    ("private key", re.compile(r"-----BEGIN (?:[A-Z]+ )?PRIVATE KEY-----")),
+    ("aws access key", re.compile(r"\b(?:AKIA|ASIA)[0-9A-Z]{16}\b")),
+    ("github token", re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{30,}\b")),
+    ("openai api key", re.compile(r"\bsk-[A-Za-z0-9]{20,}\b")),
+    (
+        "assigned secret",
+        re.compile(
+            r"(?i)\b(?:api[_-]?key|secret|token|password)\b\s*[:=]\s*"
+            r"[\"']?[A-Za-z0-9_./+=-]{20,}"
+        ),
+    ),
+]
+
 NON_BASELINE_ROLE_PATTERN = re.compile(
     r"Route:\s*.*performance reviewer|agent_role:\s*\".*"
     r"(architect|product-manager|frontend-agent|backend-agent|database-agent|"
@@ -260,6 +338,94 @@ def extract_table_task_ids(path: str) -> set[str]:
     return task_ids
 
 
+def is_under_root(path: Path) -> bool:
+    try:
+        path.relative_to(ROOT)
+    except ValueError:
+        return False
+    return True
+
+
+def report_files() -> list[Path]:
+    reports_dir = ROOT / ".ai/AGENT_REPORTS"
+    if not reports_dir.is_dir():
+        return []
+    return sorted(path for path in reports_dir.glob("*.md") if path.is_file())
+
+
+def clean_report_path_candidate(value: str) -> str:
+    return value.strip().rstrip(".,;:)]}")
+
+
+def looks_like_report_path(value: str) -> bool:
+    if not value or any(char.isspace() for char in value):
+        return False
+    if value in REPORT_PATH_MARKERS:
+        return False
+    lowered = value.lower()
+    if lowered.startswith(REPORT_PATH_MARKER_PREFIXES):
+        return False
+    if lowered.startswith(REPORT_PATH_ALLOWED_SCHEMES):
+        return False
+    if value.startswith((".", "/", "~")):
+        return True
+    if "/" in value:
+        return True
+    return re.fullmatch(r"[A-Za-z0-9_.-]+\.(?:md|txt|yaml|yml|toml|json|py|sh|rb)", value) is not None
+
+
+def extract_report_path_candidates(text: str) -> list[str]:
+    candidates = []
+    for match in re.finditer(r"`([^`]+)`", text):
+        candidate = clean_report_path_candidate(match.group(1))
+        if looks_like_report_path(candidate):
+            candidates.append(candidate)
+    return candidates
+
+
+def git_tracked_files() -> list[Path]:
+    try:
+        result = subprocess.run(
+            ["git", "ls-files"],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    paths = []
+    for line in result.stdout.splitlines():
+        candidate = (ROOT / line).resolve()
+        if is_under_root(candidate) and candidate.is_file():
+            paths.append(candidate)
+    return paths
+
+
+def fallback_scaffold_files() -> list[Path]:
+    paths = []
+    for root_name in SCAFFOLD_SCAN_ROOTS:
+        root_path = ROOT / root_name
+        if root_path.is_file():
+            paths.append(root_path)
+        elif root_path.is_dir():
+            paths.extend(path for path in root_path.rglob("*") if path.is_file())
+    return sorted(paths)
+
+
+def is_scaffold_scan_target(path: Path) -> bool:
+    rel_path = rel(path)
+    if any(part in SECRET_SCAN_EXCLUDED_PARTS for part in path.relative_to(ROOT).parts):
+        return False
+    return any(rel_path == root or rel_path.startswith(root + "/") for root in SCAFFOLD_SCAN_ROOTS)
+
+
+def scaffold_scan_files() -> list[Path]:
+    tracked = git_tracked_files()
+    candidates = tracked if tracked else fallback_scaffold_files()
+    return sorted(path for path in candidates if is_scaffold_scan_target(path))
+
+
 def parse_skill_frontmatter(path: str) -> tuple[dict[str, str], list[str]]:
     text = read_text(path)
     errors = []
@@ -296,6 +462,27 @@ def check_required_files() -> CheckResult:
         "required scaffold files",
         not missing,
         "all required scaffold files exist" if not missing else f"missing: {', '.join(missing)}",
+    )
+
+
+def check_tool_policy_reference() -> CheckResult:
+    if not file_exists(TOOL_POLICY_PATH):
+        return CheckResult(
+            "tool policy reference",
+            False,
+            f"missing {TOOL_POLICY_PATH}",
+        )
+    missing = [
+        label
+        for label, pattern in TOOL_POLICY_REQUIREMENTS
+        if not contains(TOOL_POLICY_PATH, pattern, re.IGNORECASE | re.DOTALL)
+    ]
+    return CheckResult(
+        "tool policy reference",
+        not missing,
+        "tool policy covers command classes, destructive commands, network/escalation, path boundaries, and report audit expectations"
+        if not missing
+        else "tool policy missing: " + ", ".join(missing),
     )
 
 
@@ -484,6 +671,26 @@ def check_packet_fields() -> CheckResult:
     )
 
 
+def check_trust_boundary_fields() -> CheckResult:
+    targets = [
+        ".agents/skills/direction-guide/references/context-packet-schema.md",
+        ".agents/skills/direction-guide/SKILL.md",
+    ]
+    missing = []
+    for path in targets:
+        text = read_text(path)
+        for field in TRUST_BOUNDARY_FIELDS:
+            if field not in text:
+                missing.append(f"{path}:{field}")
+    return CheckResult(
+        "trust boundary fields",
+        not missing,
+        "trust-boundary labels for external inputs, tool outputs, and durable memory are named in skill and schema"
+        if not missing
+        else "missing trust-boundary field references: " + ", ".join(missing),
+    )
+
+
 def check_recursive_packet_fields() -> CheckResult:
     targets = [
         ".agents/skills/direction-guide/references/context-packet-schema.md",
@@ -570,6 +777,68 @@ def check_verification_evidence_paths() -> CheckResult:
         "accepted/verified queue items link to durable verification evidence with required gate markers"
         if ok
         else f"verification evidence drift; missing paths: {', '.join(missing) or 'none'}; incomplete reports: {' | '.join(incomplete) or 'none'}",
+    )
+
+
+def validate_report_path_candidate(candidate: str) -> str | None:
+    if candidate.startswith("~"):
+        return "uses home-relative path"
+    if candidate.startswith("/"):
+        absolute = Path(candidate).resolve()
+        if not is_under_root(absolute):
+            return "escapes repository"
+        return None if absolute.exists() else "does not exist"
+    if candidate.startswith("../") or "/../" in candidate or candidate == "..":
+        return "escapes repository"
+
+    if any(char in candidate for char in "*?[]"):
+        matches = list(ROOT.glob(candidate))
+        if not matches:
+            return "glob has no replayable matches"
+        escaped = [path for path in matches if not is_under_root(path.resolve())]
+        if escaped:
+            return "glob escapes repository"
+        return None
+
+    path = (ROOT / candidate).resolve()
+    if not is_under_root(path):
+        return "escapes repository"
+    return None if path.exists() else "does not exist"
+
+
+def check_report_referenced_paths() -> CheckResult:
+    errors = []
+    for report_path in report_files():
+        for candidate in extract_report_path_candidates(report_path.read_text(encoding="utf-8")):
+            error = validate_report_path_candidate(candidate)
+            if error:
+                errors.append(f"{rel(report_path)}:`{candidate}` {error}")
+    return CheckResult(
+        "report referenced paths",
+        not errors,
+        "repo-relative paths referenced in agent reports are replayable or explicitly marked external/runtime/user"
+        if not errors
+        else "unreplayable report paths: " + " | ".join(errors),
+    )
+
+
+def check_lightweight_secret_scan() -> CheckResult:
+    findings = []
+    for path in scaffold_scan_files():
+        try:
+            text = path.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for line_number, line in enumerate(text.splitlines(), start=1):
+            for label, pattern in SECRET_PATTERNS:
+                if pattern.search(line):
+                    findings.append(f"{rel(path)}:{line_number}:{label}")
+    return CheckResult(
+        "lightweight scaffold secret scan",
+        not findings,
+        "no obvious tracked secret patterns found in scaffold files"
+        if not findings
+        else "obvious secret patterns found without printing values: " + ", ".join(findings),
     )
 
 
@@ -677,6 +946,7 @@ def check_no_non_baseline_roles() -> CheckResult:
 def run_checks() -> list[CheckResult]:
     return [
         check_required_files(),
+        check_tool_policy_reference(),
         check_direction_guide_skill_metadata(),
         check_approved_root_doc_pruning(),
         check_baseline_agents(),
@@ -685,13 +955,16 @@ def run_checks() -> list[CheckResult]:
         check_guarded_parallel_policy(),
         check_context_packet_requirement(),
         check_packet_fields(),
+        check_trust_boundary_fields(),
         check_recursive_packet_fields(),
         check_report_fields(),
         check_verifier_gate(),
         check_verification_evidence_paths(),
+        check_report_referenced_paths(),
         check_status_consistency(),
         check_repeated_failure_escalation(),
         check_no_non_baseline_roles(),
+        check_lightweight_secret_scan(),
     ]
 
 

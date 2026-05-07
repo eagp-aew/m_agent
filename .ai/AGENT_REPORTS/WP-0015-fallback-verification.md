@@ -49,7 +49,7 @@ Durable verification evidence paths are now required for accepted, verified, or 
 
 - acceptance_criteria_mapping: PASS - every queue item with status `ACCEPTED` now has `verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"`, and WP-0015 will point to this report when marked `VERIFIED`.
 - acceptance_criteria_mapping: PASS - `scripts/validate_protocol.py` now checks `ACCEPTED`, `VERIFIED`, and `DONE` tasks for a non-null evidence path, existing report file, task id presence, and verification-gate markers.
-- acceptance_criteria_mapping: PASS - `.ai/AGENT_REPORTS/README.md` and `verification-gate.md` document fallback verification as valid durable evidence only when it uses the same evidence fields and score schema.
+- acceptance_criteria_mapping: PASS - `.ai/AGENT_REPORTS/README.md` and `.agents/skills/direction-guide/references/verification-gate.md` document fallback verification as valid durable evidence only when it uses the same evidence fields and score schema.
 - files_inspected: `scripts/validate_protocol.py`, `.ai/TASK_QUEUE.yaml`, `.ai/AGENT_REPORTS/historical-fallback-verification.md`, `.ai/AGENT_REPORTS/README.md`, `.agents/skills/direction-guide/references/verification-gate.md`, `.ai/MASTER_LEDGER.yaml`, `.ai/WORK_PACKAGES/WP-0015-durable-verification-evidence.yaml`.
 - validation_or_reason_not_run: All Section 2 validation commands ran and passed.
 - regression_risks: Historical accepted tasks share one backfilled evidence bundle; future accepted tasks should prefer per-work-package reports.

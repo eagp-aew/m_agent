@@ -9,7 +9,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 - Milestone: Bootstrap Codex multi-agent direction workflow
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: none (latest accepted: WP-0017-direction-guide-skill-metadata)
+- Active work package: none (latest accepted: WP-0018-protocol-enforcement-hardening)
 
 ## Important constraints
 
@@ -64,6 +64,8 @@ The repo is organized around Codex-native orchestration:
   - Mitigation: Validate status consistency across those artifacts in `scripts/validate_protocol.py`.
 - Risk: Skill metadata can look correct in a visual scan while still failing YAML parsing.
   - Mitigation: Quote metadata values containing `: ` and make `scripts/validate_protocol.py` validate `direction-guide` skill metadata.
+- Risk: Tool-use and prompt-injection safety can remain voluntary if command policy, trust boundaries, and evidence paths are only described in prose.
+  - Mitigation: Keep `.agents/skills/direction-guide/references/tool-policy.md` canonical and make `scripts/validate_protocol.py` check tool-policy coverage, trust-boundary fields, report referenced paths, and lightweight scaffold secret patterns.
 
 ## Recent accepted changes
 
@@ -87,6 +89,7 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-07 | WP-0015-durable-verification-evidence | Added durable verifier/fallback evidence path enforcement and backfilled historical verification evidence | Validator, YAML parse, and diff check passed |
 | 2026-05-07 | WP-0016-status-consistency-validation | Added validator coverage for status consistency across queue, work-package files, project state, integration log, and live ledger | Protocol validator, YAML parse, and diff check passed |
 | 2026-05-07 | WP-0017-direction-guide-skill-metadata | Fixed invalid `direction-guide` skill metadata and added validator coverage for skill frontmatter | Ruby YAML frontmatter parse, protocol validator, and diff check passed |
+| 2026-05-07 | WP-0018-protocol-enforcement-hardening | Added canonical tool policy, required trust-boundary packet fields, report-path audit rules, and validator checks for tool policy, report path replayability, and lightweight scaffold secret patterns | Protocol validator, validator py_compile, and diff check passed |
 
 ## Open questions
 
@@ -94,6 +97,6 @@ The repo is organized around Codex-native orchestration:
 
 ## Next recommended work
 
-1. Exercise guarded parallel implementation on a small documentation-only work package with two exact-file shards before using it on application code.
+1. Add negative fixtures for malformed reports, unreplayable report paths, prompt injection, tool-policy violations, overlapping reservations, and obvious secret patterns.
 2. Exercise one read-only child explorer request and one denied child request in manual eval scenarios before allowing child implementers on application code.
-3. Keep `scripts/validate_protocol.py` aligned with any future routing, recursion, or concurrency policy refinements.
+3. Keep `scripts/validate_protocol.py` aligned with any future routing, recursion, trust-boundary, or tool-policy refinements.

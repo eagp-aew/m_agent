@@ -18,9 +18,9 @@ The invalid `direction-guide` skill metadata was fixed and is now covered by the
 
 ## files_read
 
-- `review_fix/README.md` - checked the required review/fix workflow.
-- `review_fix/01_codex_agent_review_prompt.md` - checked review scope.
-- `review_fix/02_agent_review_checklist.md` - checked master-agent runtime review criteria.
+- `external:review_fix/README.md` - checked the required review/fix workflow from the user-provided review bundle.
+- `external:review_fix/01_codex_agent_review_prompt.md` - checked review scope from the user-provided review bundle.
+- `external:review_fix/02_agent_review_checklist.md` - checked master-agent runtime review criteria from the user-provided review bundle.
 - `.agents/skills/direction-guide/SKILL.md` - inspected invalid metadata.
 - `scripts/validate_protocol.py` - checked validator coverage.
 - `.ai/TEST_MATRIX.md` - checked validation guidance.
@@ -52,12 +52,12 @@ The invalid `direction-guide` skill metadata was fixed and is now covered by the
 
 ## evidence
 
-- acceptance_criteria_mapping: PASS - `SKILL.md` frontmatter now parses with `name: direction-guide` and a quoted `description`.
+- acceptance_criteria_mapping: PASS - `.agents/skills/direction-guide/SKILL.md` frontmatter now parses with `name: direction-guide` and a quoted `description`.
 - acceptance_criteria_mapping: PASS - root cause recorded: the prior unquoted description contained `orchestration: planning`, and YAML rejected the `: ` sequence in a plain scalar.
 - acceptance_criteria_mapping: PASS - `scripts/validate_protocol.py` now validates the skill metadata block and rejects unquoted metadata values containing `: `.
 - acceptance_criteria_mapping: PASS - `.ai/TEST_MATRIX.md` now uses the protocol validator for skill metadata validation.
 - acceptance_criteria_mapping: PASS - WP-0016 is accepted with existing PASS fallback verification so the review/fix sequence has no half-open validated section.
-- files_inspected: `review_fix/README.md`, review checklist/prompt files, `.agents/skills/direction-guide/SKILL.md`, `scripts/validate_protocol.py`, `.ai/TEST_MATRIX.md`, `.ai/TASK_QUEUE.yaml`, `.ai/MASTER_LEDGER.yaml`, `.ai/PROJECT_STATE.md`, `.ai/INTEGRATION_LOG.md`.
+- files_inspected: `external:review_fix/README.md`, external review checklist/prompt files, `.agents/skills/direction-guide/SKILL.md`, `scripts/validate_protocol.py`, `.ai/TEST_MATRIX.md`, `.ai/TASK_QUEUE.yaml`, `.ai/MASTER_LEDGER.yaml`, `.ai/PROJECT_STATE.md`, `.ai/INTEGRATION_LOG.md`.
 - validation_or_reason_not_run: All WP-0017 validation commands ran and passed.
 - regression_risks: The validator intentionally implements a narrow frontmatter check for the expected `name` and `description` fields rather than a full YAML parser, to keep the validator dependency-free.
 - scope_violation_check: PASS - changes are limited to the direction-guide skill, validator, test matrix, work package, report, and durable memory.

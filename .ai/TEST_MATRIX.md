@@ -19,6 +19,7 @@ This repository is a Codex multi-agent direction-system scaffold, not an applica
 | Agent definitions | `test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml` | Changes under `.codex/agents/` | Confirms the MVP role set exists. |
 | Skill metadata | `python3 scripts/validate_protocol.py` | Changes to `direction-guide` | Confirms `SKILL.md` frontmatter is parseable and includes `name` and `description`. |
 | Protocol validator | `python3 scripts/validate_protocol.py` | Protocol scaffold, role-agent, config, or memory changes | Preferred repeatable check for master-agent protocol consistency. |
+| Tool policy alignment | `python3 scripts/validate_protocol.py` | Changes to command, trust-boundary, or report-audit policy | Confirms the canonical tool policy, packet schema, report template, and direction guide stay aligned. |
 | Placeholder scan | `rg -n "TODO|Replace this section|YYYY-MM-DD|TBD" .ai AGENTS.md .codex .agents/skills/direction-guide -g '!.ai/TEST_MATRIX.md'` | Before accepting memory/scaffold changes | Remaining placeholders must be intentional or queued. |
 | Scope check | `git status --short` | Before final review | Ensure only intended scaffold/memory files changed. |
 
@@ -31,6 +32,7 @@ Files checked:
 - `.agents/skills/direction-guide/SKILL.md`
 - `.agents/skills/direction-guide/references/context-packet-schema.md`
 - `.agents/skills/direction-guide/references/agent-report-template.md`
+- `.agents/skills/direction-guide/references/tool-policy.md`
 - `.codex/agents/explorer.toml`
 - `.codex/agents/implementer.toml`
 - `.codex/agents/verifier.toml`
@@ -40,15 +42,18 @@ Files checked:
 
 Checks:
 
-1. Verify `SKILL.md` and `context-packet-schema.md` list the same required context packet fields: `task_id`, `agent_role`, `objective`, `source_of_truth`, `must_read`, `may_read`, `do_not_read`, `allowed_files`, `forbidden_files`, `acceptance_criteria`, `validation_commands`, `output_schema`, `stop_conditions`, and `max_context_notes`.
+1. Verify `SKILL.md` and `context-packet-schema.md` list the same required context packet fields: `task_id`, `agent_role`, `objective`, `source_of_truth`, `trust_boundary`, `must_read`, `may_read`, `do_not_read`, `allowed_files`, `forbidden_files`, `acceptance_criteria`, `validation_commands`, `output_schema`, `stop_conditions`, and `max_context_notes`.
 2. Verify every `.codex/agents/*.toml` file states that `context_packet` is the source of truth.
 3. Verify every `.codex/agents/*.toml` file requires `BLOCKED` when required packet fields are missing or packet fields conflict.
 4. Verify every `.codex/agents/*.toml` file references all read-scope fields: `must_read`, `may_read`, and `do_not_read`.
 5. Verify every `.codex/agents/*.toml` file references all write-scope fields: `allowed_files` and `forbidden_files`.
-6. Verify `agent-report-template.md`, `context-packet-schema.md`, and `SKILL.md` list the same required common report fields: `task_id`, `agent_role`, `status`, `one_sentence_result`, `files_read`, `files_changed`, `commands_run`, `tests_run`, `evidence`, `risks`, `assumptions`, and `recommended_next_action`.
-7. Verify role-specific report sections appear only as optional extras after the common required fields.
-8. Verify Security Reviewer has role-specific packet guidance.
-9. Verify runtime fallback behavior is documented in `SKILL.md` and `context-packet-schema.md`.
+6. Verify context packet trust-boundary coverage includes instruction priority, external inputs, tool outputs, durable memory, and quarantine behavior.
+7. Verify `agent-report-template.md`, `context-packet-schema.md`, and `SKILL.md` list the same required common report fields: `task_id`, `agent_role`, `status`, `one_sentence_result`, `files_read`, `files_changed`, `commands_run`, `tests_run`, `evidence`, `risks`, `assumptions`, `recommended_next_action`, `child_agent_requests`, and `child_report_bundle`.
+8. Verify `agent-report-template.md` requires command policy classification and referenced evidence paths or explicit external markers.
+9. Verify `tool-policy.md` defines command classes, destructive-command handling, network/escalation handling, path boundaries, trust-boundary handling, and report audit expectations.
+10. Verify role-specific report sections appear only as optional extras after the common required fields.
+11. Verify Security Reviewer has role-specific packet guidance.
+12. Verify runtime fallback behavior is documented in `SKILL.md` and `context-packet-schema.md`.
 
 Expected result: PASS only if all protocol, schema, role-agent, and report-template requirements are aligned.
 
@@ -75,6 +80,23 @@ Checks:
 Expected result: PASS only if the checks support the current guarded parallel baseline and no application source files are modified.
 
 Preferred command: `python3 scripts/validate_protocol.py`.
+
+## Tool Policy and Trust Boundary Check
+
+Purpose: Ensure tool-use rules and prompt-injection boundaries are explicit, auditable, and linked from the core protocol surfaces.
+
+Checks:
+
+1. Verify `.agents/skills/direction-guide/references/tool-policy.md` exists.
+2. Verify the tool policy defines these command classes: `read_only`, `workspace_write`, `network_or_escalated`, `destructive`, and `approval_gated`.
+3. Verify destructive-command handling forbids recursive or batch deletion and requires explicit approval for narrow destructive actions.
+4. Verify network/escalation handling requires approval and treats external tool output as evidence rather than instruction.
+5. Verify path-boundary handling references read scope, write scope, reserved files, forbidden files, and worktree boundaries.
+6. Verify context packets require `trust_boundary` fields for instruction priority, external inputs, tool outputs, durable memory, and quarantine rules.
+7. Verify report templates require command policy classification and referenced evidence paths or explicit external markers.
+8. Verify `SKILL.md` points future agents to the canonical tool policy before tool-sensitive delegation, verification, or integration.
+
+Expected result: PASS only if the command policy and trust-boundary language are present in the canonical reference and required protocol surfaces.
 
 ## Guarded Parallel Implementer Check
 

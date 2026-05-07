@@ -30,9 +30,18 @@ Use `None` if no files were changed.
 
 ## commands_run
 
-- `<command>` - `<result>`
+- `<command>` - `class: read_only | workspace_write | network_or_escalated | destructive | approval_gated` - `scope/target` - `approval: not_required | approved | denied | not_requested` - `<result>`
 
 Use `None` if no commands were run.
+
+Each command entry must include or make clear:
+
+- `class`: `read_only | workspace_write | network_or_escalated | destructive | approval_gated`
+- `scope`: repo path, external target, or reason no path applies
+- `approval`: `not_required | approved | blocked | not_requested`
+- `evidence`: concise result, durable evidence path, or not-run reason
+
+Commands skipped because they were destructive, network/escalated, approval-gated, or outside the packet scope must be listed with the blocking reason.
 
 ## tests_run
 
@@ -43,6 +52,10 @@ Use `None` if no tests were run.
 ## evidence
 
 - `<specific evidence supporting the status>`
+
+When evidence references files, use replayable repo-relative paths such as `.ai/AGENT_REPORTS/example.md`, or mark non-repo evidence with `external:`, `runtime:`, `user:`, `generated:`, or `not_applicable:`.
+
+Evidence that depends on files must include a referenced repo path, line/path target when useful, or an explicit `external:` marker for evidence outside the repository. Long logs should be summarized and linked by path instead of pasted.
 
 ## risks
 

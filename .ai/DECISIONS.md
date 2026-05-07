@@ -257,6 +257,23 @@
   - Future changes to the local skill metadata are covered by the default validator.
   - The validator intentionally checks the simple expected metadata shape rather than becoming a general YAML parser.
 
+## DEC-0017: Make tool policy and trust boundaries validator-enforced
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The repository review found that tool-calling safety, prompt-injection boundaries, and evidence replayability were mostly voluntary prose.
+  - The protocol already required context packets and verification reports, but it did not validate command policy coverage, trust labels, stale report paths, or obvious tracked secrets.
+- Decision:
+  - Add `.agents/skills/direction-guide/references/tool-policy.md` as the canonical command and tool-use policy.
+  - Require context packets to include `trust_boundary` labels for external inputs, tool outputs, durable memory, instruction priority, and quarantine behavior.
+  - Require reports to classify commands and mark non-repo evidence paths explicitly.
+  - Extend `scripts/validate_protocol.py` with checks for tool-policy coverage, trust-boundary field coverage, replayable report referenced paths, and lightweight scaffold secret patterns.
+- Consequences:
+  - Future accepted work is easier to audit from durable artifacts.
+  - External content and tool output are treated as evidence, not instructions.
+  - The validator remains lightweight and dependency-free, so deeper semantic enforcement should come from future negative fixtures and protocol-gate work rather than a large framework.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -277,3 +294,4 @@
 | DEC-0014 | 2026-05-07 | accepted | Require durable verification evidence paths |
 | DEC-0015 | 2026-05-07 | accepted | Validate status consistency across durable memory |
 | DEC-0016 | 2026-05-07 | accepted | Validate direction-guide skill metadata |
+| DEC-0017 | 2026-05-07 | accepted | Make tool policy and trust boundaries validator-enforced |
