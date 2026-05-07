@@ -1,0 +1,72 @@
+task_id: WP-0017-direction-guide-skill-metadata
+status: ACCEPTED
+objective: "Fix invalid direction-guide SKILL.md metadata and add validator coverage for skill frontmatter."
+why: "The review found that .agents/skills/direction-guide/SKILL.md was invalid because its unquoted description contained ': ', which YAML parsers reject."
+scope_type: validation
+priority: P0
+
+allowed_files:
+  - ".agents/skills/direction-guide/SKILL.md"
+  - "scripts/validate_protocol.py"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
+  - ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
+  - ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "new agent roles"
+  - "file deletions"
+  - "recursive or parallelism policy expansion"
+
+inputs:
+  - "User objective to review/fix the master-agent structure and inspect the invalid direction-guide SKILL.md."
+  - "Ruby YAML parser failure: mapping values are not allowed in this context at line 2 column 61."
+  - ".agents/skills/direction-guide/SKILL.md"
+  - "scripts/validate_protocol.py"
+  - ".ai/TEST_MATRIX.md"
+
+acceptance_criteria:
+  - "SKILL.md frontmatter parses as valid YAML-equivalent metadata for name and description."
+  - "The invalidity root cause is recorded in durable verification evidence."
+  - "The protocol validator fails on malformed direction-guide metadata and passes on the fixed file."
+  - "The test matrix points skill metadata validation at the validator rather than visual inspection only."
+  - "Previously verified WP-0016 status consistency work is accepted so the review/fix sequence has no half-open validated section."
+  - "No application source code, dependencies, new agent roles, production config, or file deletions are introduced."
+
+validation_commands:
+  - "ruby -e 'require \"yaml\"; text=File.read(\".agents/skills/direction-guide/SKILL.md\"); fm=text[/\\A---\\n(.*?)\\n---/m,1]; p YAML.safe_load(fm)'"
+  - "python3 -c 'import importlib.util; spec=importlib.util.spec_from_file_location(\"validator\", \"scripts/validate_protocol.py\"); module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); original=module.read_text; module.read_text=lambda path: \"---\\nname: direction-guide\\ndescription: Use for multi-agent Codex project orchestration: planning\\n---\\n\" if path == \".agents/skills/direction-guide/SKILL.md\" else original(path); result=module.check_direction_guide_skill_metadata(); print((\"PASS\" if not result.ok else \"FAIL\"), result.message); raise SystemExit(0 if not result.ok and \"quote metadata values\" in result.message else 1)'"
+  - "python3 scripts/validate_protocol.py"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+rollback_plan:
+  - "If rejected, restore the prior unquoted metadata and remove the validator metadata check in a scoped revert."
+
+human_approval_required:
+  required: false
+  reason: "The change is limited to fixing invalid skill metadata, validation, and durable memory; it does not delete files or touch approval-gated areas."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - invalid_skill_root_cause
+  - files_changed
+  - validations_run
+  - risks
+  - next_action

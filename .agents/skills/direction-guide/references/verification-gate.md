@@ -17,6 +17,8 @@ Verifier reports and runtime fallback verification must provide evidence that in
 - forbidden files check
 - recommendation: `PASS`, `PARTIAL`, or `FAIL`
 
+The evidence must be durable for every work package that reaches `ACCEPTED`, `VERIFIED`, or `DONE`. Record the verifier report or master-direct fallback verification record under `.ai/AGENT_REPORTS/`, then link that file from `verifier_report_path` in `.ai/TASK_QUEUE.yaml`. Fallback verification is allowed when no verifier subagent ran, but it must use the same evidence fields and score schema as a verifier report.
+
 ## Verifier Score Schema
 
 Every verifier report or fallback verification record must include this score schema:

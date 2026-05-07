@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-05-06
+updated_at: 2026-05-07
 
 active_milestone:
   id: M-0001
@@ -8,12 +8,12 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0013-depth-2-child-agent-requests
-  title: "Enable depth-2 child-agent request policy"
+  task_id: WP-0017-direction-guide-skill-metadata
+  title: "Fix direction-guide skill metadata validation"
   status: ACCEPTED
-  scope_type: protocol
+  scope_type: validation
   assigned_agent: master
-  work_package_path: ".ai/WORK_PACKAGES/WP-0013-depth-2-child-agent-requests.yaml"
+  work_package_path: ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
 
 current_state_machine_state: DONE
 
@@ -53,6 +53,18 @@ open_decisions:
     resolution: "Add scripts/validate_protocol.py as a no-dependency lightweight validator."
 
 failure_counts_by_task:
+  WP-0017-direction-guide-skill-metadata:
+    verify: 0
+    fix: 0
+  WP-0016-status-consistency-validation:
+    verify: 0
+    fix: 0
+  WP-0015-durable-verification-evidence:
+    verify: 0
+    fix: 0
+  WP-0014-root-doc-pruning-alignment:
+    verify: 0
+    fix: 0
   WP-0013-depth-2-child-agent-requests:
     verify: 0
     fix: 0
@@ -97,7 +109,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0013-depth-2-child-agent-requests
+    work_package_id: WP-0017-direction-guide-skill-metadata
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -120,60 +132,35 @@ quality_metrics:
     human_approval_required: true
     human_approval_obtained: true
     diff_size:
-      files: 32
+      files: null
       insertions: null
       deletions: null
-      note: "Repository already had broad uncommitted scaffold changes, so exact WP-0013-only insertion/deletion counts are not isolated."
+      note: "Repository already had broad uncommitted scaffold changes, so exact WP-0017-only insertion/deletion counts are not isolated."
     files_changed:
-      - "scripts/validate_protocol.py"
-      - ".codex/config.toml"
-      - "AGENTS.md"
       - ".agents/skills/direction-guide/SKILL.md"
-      - ".agents/skills/direction-guide/references/agent-report-template.md"
-      - ".agents/skills/direction-guide/references/config-policy.md"
-      - ".agents/skills/direction-guide/references/context-packet-schema.md"
-      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
-      - ".agents/skills/direction-guide/references/pre-spawn-checklist.md"
-      - ".agents/skills/direction-guide/references/routing-matrix.md"
-      - ".agents/skills/direction-guide/references/work-package-template.yaml"
-      - ".codex/agents/explorer.toml"
-      - ".codex/agents/fixer.toml"
-      - ".codex/agents/implementer.toml"
-      - ".codex/agents/integrator.toml"
-      - ".codex/agents/security-reviewer.toml"
-      - ".codex/agents/verifier.toml"
+      - "scripts/validate_protocol.py"
+      - ".ai/TEST_MATRIX.md"
+      - ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
+      - ".ai/MASTER_LEDGER.yaml"
+      - ".ai/PROJECT_STATE.md"
+      - ".ai/TASK_QUEUE.yaml"
       - ".ai/DECISIONS.md"
       - ".ai/INTEGRATION_LOG.md"
-      - ".ai/MASTER_CONTRACT.md"
-      - ".ai/MASTER_LEDGER.yaml"
-      - ".ai/MASTER_MODULES.md"
-      - ".ai/METRICS.md"
-      - ".ai/PROJECT_STATE.md"
-      - ".ai/RISK_REGISTER.md"
-      - ".ai/TASK_QUEUE.yaml"
-      - ".ai/TEST_MATRIX.md"
-      - ".ai/EVALS/EVAL-005-child-agent-requests.md"
-      - ".ai/WORK_PACKAGES/WP-0013-depth-2-child-agent-requests.yaml"
-      - "FILE_MANIFEST.md"
-      - "07-mvp-build-plan.md"
-      - "08-prompt-library.md"
+      - ".ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
+      - ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
   scope_check:
     status: PASS
-    evidence: "Only protocol docs, validator checks, agent role instructions, config, work package metadata, root operating instructions, and durable memory files were modified for WP-0013; no application source code was changed."
+    evidence: "WP-0017 touched direction-guide skill metadata, validator coverage, test matrix guidance, work-package/report artifacts, and durable memory only; no application source code was changed."
   validation:
     status: PASS
     commands:
+      - "ruby -e 'require \"yaml\"; text=File.read(\".agents/skills/direction-guide/SKILL.md\"); fm=text[/\\A---\\n(.*?)\\n---/m,1]; p YAML.safe_load(fm)'"
+      - "python3 -c 'import importlib.util; spec=importlib.util.spec_from_file_location(\"validator\", \"scripts/validate_protocol.py\"); module=importlib.util.module_from_spec(spec); spec.loader.exec_module(module); original=module.read_text; module.read_text=lambda path: \"---\\nname: direction-guide\\ndescription: Use for multi-agent Codex project orchestration: planning\\n---\\n\" if path == \".agents/skills/direction-guide/SKILL.md\" else original(path); result=module.check_direction_guide_skill_metadata(); print((\"PASS\" if not result.ok else \"FAIL\"), result.message); raise SystemExit(0 if not result.ok and \"quote metadata values\" in result.message else 1)'"
       - "python3 scripts/validate_protocol.py"
-      - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
-      - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
-      - "Run the placeholder scan from .ai/TEST_MATRIX.md"
-      - "test -f .ai/EVALS/EVAL-005-child-agent-requests.md"
-      - "Parse touched YAML memory files"
       - "git diff --check"
-      - "git status --short"
   verifier_status:
     status: PASS
-    evidence: "Master-direct fallback verification produced PASS evidence for WP-0013: acceptance criteria mapped, changed files inspected, validation commands run, bounded recursion policy checks passed, child-agent request gate checks passed, scope violation check passed, forbidden files check passed, and recommendation PASS."
+    evidence: "Master-direct fallback verification produced PASS evidence for WP-0017: SKILL.md frontmatter parses, invalid metadata root cause is recorded, validator enforces the metadata check, test matrix points at the validator, and scope/forbidden-file checks passed."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

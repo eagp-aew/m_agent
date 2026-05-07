@@ -1,6 +1,6 @@
-# Codex Multi-Agent Direction Guide — Complete Scaffold
+# Codex Multi-Agent Direction Guide
 
-This is the corrected, Codex-ready scaffold.
+This is the Codex-ready direction-system scaffold. The root is intentionally lean: durable protocol detail lives under `.agents/skills/direction-guide/` and `.ai/`, while root docs stay limited to setup and repository entrypoints.
 
 It includes the actual hidden directories Codex expects:
 
@@ -22,10 +22,11 @@ to toggle hidden files/folders.
 
 ```text
 AGENTS.md
-START_HERE.md
 INSTALLATION.md
-FILE_MANIFEST.md
+README.md
 .gitignore
+scripts/
+  validate_protocol.py
 
 .codex/
   config.toml
@@ -44,7 +45,9 @@ FILE_MANIFEST.md
       references/
         work-package-template.yaml
         agent-report-template.md
+        context-packet-schema.md
         failure-taxonomy.md
+        routing-matrix.md
         review-rubric.md
 
 .ai/
@@ -75,4 +78,8 @@ work package → bounded agent → structured report → verifier → classified
 
 ## First action
 
-Read `START_HERE.md`, then open this repo in Codex app and paste the prompt from that file.
+Open this repo in Codex app, read `AGENTS.md`, then use `$direction-guide` for multi-step workflow work. For a repeatable scaffold check, run:
+
+```bash
+python3 scripts/validate_protocol.py
+```

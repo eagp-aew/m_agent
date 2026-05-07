@@ -9,7 +9,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 - Milestone: Bootstrap Codex multi-agent direction workflow
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: none (latest accepted: WP-0013-depth-2-child-agent-requests)
+- Active work package: none (latest accepted: WP-0017-direction-guide-skill-metadata)
 
 ## Important constraints
 
@@ -23,7 +23,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 
 The repo is organized around Codex-native orchestration:
 
-- Root Markdown files explain the system, installation flow, operating model, role design, context/memory policy, failure routing, human gates, MVP build plan, prompts, review/integration, and research notes.
+- Root Markdown files are intentionally lean after approved pruning: `README.md`, `INSTALLATION.md`, and `AGENTS.md` provide entrypoint and setup guidance, while detailed protocol rules live in `.agents/skills/direction-guide/` and `.ai/`.
 - `AGENTS.md` defines repository-level operating rules and approval gates.
 - `.codex/config.toml` sets conservative Codex defaults, while `.codex/agents/*.toml` defines the explorer, implementer, verifier, fixer, integrator, and security-reviewer roles.
 - `.agents/skills/direction-guide/SKILL.md` is the local skill that drives multi-agent orchestration, with supporting references under `.agents/skills/direction-guide/references/`.
@@ -56,6 +56,14 @@ The repo is organized around Codex-native orchestration:
   - Mitigation: Require isolated worktrees, exact file reservations, dynamic write-agent caps, shard verification, combined integration review, and `parallel_write_conflicts = 0`.
 - Risk: Recursive child-agent requests may hide scope expansion or turn implementers into uncontrolled routers.
   - Mitigation: Limit recursion to depth 2, require master approval for every child request, deny scope expansion, require child report bundles, and track recursive delegation violations.
+- Risk: Approved root-doc pruning can leave stale references in setup docs or validation if the slimmer scaffold shape is not checked.
+  - Mitigation: Keep `README.md` aligned with the lean root layout and make `scripts/validate_protocol.py` check that approved pruned root docs remain absent from active entrypoint docs.
+- Risk: Accepted work can become non-replayable if verifier or fallback verification evidence stays only in chat or memory summaries.
+  - Mitigation: Require `verifier_report_path` for accepted, verified, or done queue items and validate that the linked report contains verification-gate evidence markers.
+- Risk: Project memory can contradict itself when queue status, work-package status, project state, integration log, and live ledger are updated independently.
+  - Mitigation: Validate status consistency across those artifacts in `scripts/validate_protocol.py`.
+- Risk: Skill metadata can look correct in a visual scan while still failing YAML parsing.
+  - Mitigation: Quote metadata values containing `: ` and make `scripts/validate_protocol.py` validate `direction-guide` skill metadata.
 
 ## Recent accepted changes
 
@@ -63,6 +71,7 @@ The repo is organized around Codex-native orchestration:
 |---|---|---|---|
 | 2026-05-06 | WP-0000-bootstrap | Verified scaffold presence and identified repo-specific memory gaps | Manual scaffold inspection passed with memory follow-up |
 | 2026-05-06 | WP-0001-repo-memory-specificity | Made project state, task queue, and test matrix specific to this direction-system repo | Scaffold checks and YAML parse passed |
+| 2026-05-06 | WP-0002-clean-bootstrap-placeholders | Removed remaining bootstrap placeholders from durable memory | Scaffold checks, placeholder scan, and YAML parse passed |
 | 2026-05-06 | WP-0003-master-control-modules | Defined seven explicit master control modules and wired them into `direction-guide` delegation flow | Scaffold checks and Markdown review passed |
 | 2026-05-06 | WP-0004-master-operating-contract | Added a strict master operating contract and required `direction-guide` workflows to comply with it | Scaffold checks and Markdown review passed |
 | 2026-05-06 | WP-0005-master-ledger | Added live master execution ledger and required `direction-guide` workflows to update it at key control points | Scaffold checks and Markdown review passed |
@@ -74,10 +83,14 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-06 | WP-0011-lightweight-protocol-validator | Added a no-dependency Python validator for repeatable master-agent protocol consistency checks | Validator, scaffold, YAML, diff, placeholder, and scope checks passed |
 | 2026-05-06 | WP-0012-guarded-parallel-implementers | Replaced the one-writer baseline with a guarded parallel implementer policy using isolated worktrees, exact file reservations, dynamic caps, and conflict tracking | Validator, scaffold, placeholder, diff, YAML, and scope checks passed |
 | 2026-05-06 | WP-0013-depth-2-child-agent-requests | Enabled bounded depth-2 child-agent requests from implementers with master approval, child packet limits, child report bundles, and recursion metrics | Validator, scaffold, recursive policy scan, child-request eval, diff, YAML, and scope checks passed |
+| 2026-05-07 | WP-0014-root-doc-pruning-alignment | Aligned the scaffold with human-approved root guide file pruning | Validator, YAML parse, and diff check passed |
+| 2026-05-07 | WP-0015-durable-verification-evidence | Added durable verifier/fallback evidence path enforcement and backfilled historical verification evidence | Validator, YAML parse, and diff check passed |
+| 2026-05-07 | WP-0016-status-consistency-validation | Added validator coverage for status consistency across queue, work-package files, project state, integration log, and live ledger | Protocol validator, YAML parse, and diff check passed |
+| 2026-05-07 | WP-0017-direction-guide-skill-metadata | Fixed invalid `direction-guide` skill metadata and added validator coverage for skill frontmatter | Ruby YAML frontmatter parse, protocol validator, and diff check passed |
 
 ## Open questions
 
-- Should the repo add a lightweight scaffold validation script later, or keep validation as documented shell commands?
+- None.
 
 ## Next recommended work
 

@@ -25,6 +25,9 @@ BASELINE_AGENTS = {
 
 CORE_FILES = [
     "AGENTS.md",
+    "README.md",
+    "INSTALLATION.md",
+    "scripts/validate_protocol.py",
     ".codex/config.toml",
     ".agents/skills/direction-guide/SKILL.md",
     ".agents/skills/direction-guide/references/agent-report-template.md",
@@ -45,6 +48,29 @@ CORE_FILES = [
     ".ai/TEST_MATRIX.md",
     ".ai/RISK_REGISTER.md",
     ".ai/EVALS/EVAL-005-child-agent-requests.md",
+]
+
+APPROVED_PRUNED_ROOT_DOCS = [
+    "00-system-overview.md",
+    "01-codex-app-integration.md",
+    "02-operating-model.md",
+    "03-agent-role-design.md",
+    "04-context-and-memory.md",
+    "05-failure-routing.md",
+    "06-human-gates-and-stop-rules.md",
+    "07-mvp-build-plan.md",
+    "08-prompt-library.md",
+    "09-review-and-integration.md",
+    "10-sources-and-research-notes.md",
+    "FILE_MANIFEST.md",
+    "START_HERE.md",
+]
+
+ACTIVE_ROOT_DOCS = [
+    "README.md",
+    "INSTALLATION.md",
+    "AGENTS.md",
+    ".ai/PROJECT_STATE.md",
 ]
 
 PACKET_FIELDS = [
@@ -96,6 +122,39 @@ RECURSIVE_PACKET_FIELDS = [
     "child_report_bundle_required",
 ]
 
+VERIFICATION_EVIDENCE_STATUSES = {"ACCEPTED", "VERIFIED", "DONE"}
+HISTORICAL_EVIDENCE_PATH = ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+FINISHED_STATUSES = {"ACCEPTED", "DONE"}
+ACTIVE_STATUSES = {"DRAFT", "READY", "ASSIGNED", "IMPLEMENTED", "VERIFY_FAIL", "VERIFIED", "INTEGRATED", "BLOCKED", "CANCELLED", "ESCALATED"}
+CURRENT_STATE_TO_STATUS = {
+    "INTAKE": {"READY", "ASSIGNED"},
+    "PLAN": {"READY", "ASSIGNED"},
+    "SCOUT": {"READY", "ASSIGNED"},
+    "PACKAGE": {"READY", "ASSIGNED"},
+    "IMPLEMENT": {"ASSIGNED", "IMPLEMENTED"},
+    "VERIFY": {"IMPLEMENTED", "VERIFIED"},
+    "FIX_OR_ACCEPT": {"VERIFY_FAIL", "VERIFIED"},
+    "INTEGRATE": {"VERIFIED", "INTEGRATED"},
+    "UPDATE_MEMORY": {"VERIFIED", "INTEGRATED", "ACCEPTED"},
+    "DONE": {"ACCEPTED", "DONE"},
+    "BLOCKED": {"BLOCKED"},
+    "ESCALATED": {"ESCALATED"},
+}
+
+VERIFICATION_REPORT_MARKERS = [
+    "acceptance_criteria_mapping",
+    "files_inspected",
+    "validation_or_reason_not_run",
+    "regression_risks",
+    "scope_violation_check",
+    "forbidden_files_check",
+    "recommendation",
+    "acceptance_criteria_checked",
+    "tests_or_reason_present",
+    "forbidden_files_checked",
+    "risks_recorded",
+]
+
 NON_BASELINE_ROLE_PATTERN = re.compile(
     r"Route:\s*.*performance reviewer|agent_role:\s*\".*"
     r"(architect|product-manager|frontend-agent|backend-agent|database-agent|"
@@ -132,12 +191,147 @@ def all_contain(paths: list[str], pattern: str, flags: int = 0) -> tuple[bool, l
     return not missing, missing
 
 
+def clean_scalar(value: str) -> str:
+    value = value.strip()
+    if value in {"", "null", "None"}:
+        return ""
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        return value[1:-1]
+    return value
+
+
+def parse_task_queue() -> list[dict[str, str]]:
+    tasks: list[dict[str, str]] = []
+    current: dict[str, str] | None = None
+    for line in read_text(".ai/TASK_QUEUE.yaml").splitlines():
+        task_match = re.match(r"\s{2}- task_id:\s*(.+?)\s*$", line)
+        if task_match:
+            if current is not None:
+                tasks.append(current)
+            current = {"task_id": clean_scalar(task_match.group(1))}
+            continue
+        if current is None:
+            continue
+        field_match = re.match(r"\s{4}([a-z_]+):\s*(.*?)\s*$", line)
+        if field_match:
+            current[field_match.group(1)] = clean_scalar(field_match.group(2))
+    if current is not None:
+        tasks.append(current)
+    return tasks
+
+
+def parse_simple_fields(path: str, fields: set[str]) -> dict[str, str]:
+    values: dict[str, str] = {}
+    for line in read_text(path).splitlines():
+        match = re.match(rf"^({'|'.join(re.escape(field) for field in fields)}):\s*(.*?)\s*$", line)
+        if match:
+            values[match.group(1)] = clean_scalar(match.group(2))
+    return values
+
+
+def parse_current_work_package_from_ledger() -> dict[str, str]:
+    values: dict[str, str] = {}
+    in_current = False
+    for line in read_text(".ai/MASTER_LEDGER.yaml").splitlines():
+        if re.match(r"^current_work_package:\s*$", line):
+            in_current = True
+            continue
+        if in_current and line and not line.startswith("  "):
+            break
+        if in_current:
+            match = re.match(r"\s{2}([a-z_]+):\s*(.*?)\s*$", line)
+            if match:
+                values[match.group(1)] = clean_scalar(match.group(2))
+    state_match = re.search(r"(?m)^current_state_machine_state:\s*(.*?)\s*$", read_text(".ai/MASTER_LEDGER.yaml"))
+    if state_match:
+        values["current_state_machine_state"] = clean_scalar(state_match.group(1))
+    return values
+
+
+def extract_table_task_ids(path: str) -> set[str]:
+    task_ids: set[str] = set()
+    for line in read_text(path).splitlines():
+        if not line.startswith("|"):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        for cell in cells:
+            if re.fullmatch(r"WP-\d{4}[-a-z0-9]*", cell):
+                task_ids.add(cell)
+    return task_ids
+
+
+def parse_skill_frontmatter(path: str) -> tuple[dict[str, str], list[str]]:
+    text = read_text(path)
+    errors = []
+    match = re.match(r"\A---\n(.*?)\n---\n", text, re.DOTALL)
+    if not match:
+        return {}, ["missing opening YAML frontmatter block"]
+
+    metadata: dict[str, str] = {}
+    for line_number, line in enumerate(match.group(1).splitlines(), start=2):
+        if not line.strip():
+            continue
+        field_match = re.match(r"^([A-Za-z_][A-Za-z0-9_-]*):\s*(.*?)\s*$", line)
+        if not field_match:
+            errors.append(f"line {line_number}: invalid metadata line")
+            continue
+        key, raw_value = field_match.groups()
+        value = clean_scalar(raw_value)
+        is_quoted = (
+            len(raw_value) >= 2
+            and raw_value[0] == raw_value[-1]
+            and raw_value[0] in {'"', "'"}
+        )
+        if ": " in raw_value and not is_quoted:
+            errors.append(f"line {line_number}: quote metadata values containing ': '")
+        if key in metadata:
+            errors.append(f"line {line_number}: duplicate metadata key {key}")
+        metadata[key] = value
+    return metadata, errors
+
+
 def check_required_files() -> CheckResult:
     missing = [path for path in CORE_FILES if not file_exists(path)]
     return CheckResult(
         "required scaffold files",
         not missing,
         "all required scaffold files exist" if not missing else f"missing: {', '.join(missing)}",
+    )
+
+
+def check_direction_guide_skill_metadata() -> CheckResult:
+    metadata, errors = parse_skill_frontmatter(".agents/skills/direction-guide/SKILL.md")
+    required = {"name", "description"}
+    missing = sorted(field for field in required if not metadata.get(field))
+    if missing:
+        errors.append("missing required metadata: " + ", ".join(missing))
+    if metadata.get("name") != "direction-guide":
+        errors.append(f"name is {metadata.get('name') or '<missing>'}, expected direction-guide")
+    ok = not errors
+    return CheckResult(
+        "direction-guide skill metadata",
+        ok,
+        "SKILL.md frontmatter is parseable and includes direction-guide name and description"
+        if ok
+        else "invalid SKILL.md metadata: " + " | ".join(errors),
+    )
+
+
+def check_approved_root_doc_pruning() -> CheckResult:
+    present = [path for path in APPROVED_PRUNED_ROOT_DOCS if file_exists(path)]
+    referenced = []
+    for active_doc in ACTIVE_ROOT_DOCS:
+        text = read_text(active_doc)
+        for pruned_doc in APPROVED_PRUNED_ROOT_DOCS:
+            if pruned_doc in text:
+                referenced.append(f"{active_doc}:{pruned_doc}")
+    ok = not present and not referenced
+    return CheckResult(
+        "approved root-doc pruning",
+        ok,
+        "approved root guide deletions are absent and active docs no longer point to them"
+        if ok
+        else f"root-doc pruning drift; present: {', '.join(present) or 'none'}; referenced: {', '.join(referenced) or 'none'}",
     )
 
 
@@ -349,6 +543,99 @@ def check_verifier_gate() -> CheckResult:
     )
 
 
+def check_verification_evidence_paths() -> CheckResult:
+    missing = []
+    incomplete = []
+    for task in parse_task_queue():
+        if task.get("status") not in VERIFICATION_EVIDENCE_STATUSES:
+            continue
+        task_id = task.get("task_id", "<unknown>")
+        report_path = task.get("verifier_report_path", "")
+        if not report_path:
+            missing.append(f"{task_id}: verifier_report_path")
+            continue
+        if not file_exists(report_path):
+            missing.append(f"{task_id}: {report_path}")
+            continue
+        text = read_text(report_path)
+        missing_markers = [marker for marker in VERIFICATION_REPORT_MARKERS if marker not in text]
+        if task_id not in text:
+            missing_markers.append("task_id")
+        if missing_markers:
+            incomplete.append(f"{task_id}: {report_path} missing {', '.join(missing_markers)}")
+    ok = not missing and not incomplete
+    return CheckResult(
+        "durable verification evidence paths",
+        ok,
+        "accepted/verified queue items link to durable verification evidence with required gate markers"
+        if ok
+        else f"verification evidence drift; missing paths: {', '.join(missing) or 'none'}; incomplete reports: {' | '.join(incomplete) or 'none'}",
+    )
+
+
+def check_status_consistency() -> CheckResult:
+    tasks = parse_task_queue()
+    by_id = {task.get("task_id", ""): task for task in tasks}
+    errors = []
+    duplicate_ids = sorted({task.get("task_id", "") for task in tasks if [item.get("task_id", "") for item in tasks].count(task.get("task_id", "")) > 1})
+    if duplicate_ids:
+        errors.append(f"duplicate queue ids: {', '.join(duplicate_ids)}")
+
+    project_accepted = extract_table_task_ids(".ai/PROJECT_STATE.md")
+    integration_logged = extract_table_task_ids(".ai/INTEGRATION_LOG.md")
+
+    for task_id, task in by_id.items():
+        status = task.get("status", "")
+        wp_path = task.get("work_package_path", "")
+        if wp_path:
+            if not file_exists(wp_path):
+                errors.append(f"{task_id}: work_package_path missing {wp_path}")
+            else:
+                wp_fields = parse_simple_fields(wp_path, {"task_id", "status"})
+                if wp_fields.get("task_id") != task_id:
+                    errors.append(f"{task_id}: work package task_id is {wp_fields.get('task_id') or '<missing>'}")
+                wp_status = wp_fields.get("status")
+                if status in VERIFICATION_EVIDENCE_STATUSES and wp_status != status:
+                    errors.append(f"{task_id}: queue status {status} != work package status {wp_status or '<missing>'}")
+        if status in FINISHED_STATUSES:
+            if task_id not in project_accepted:
+                errors.append(f"{task_id}: finished in queue but missing from PROJECT_STATE recent accepted changes")
+            if task_id not in integration_logged:
+                errors.append(f"{task_id}: finished in queue but missing from INTEGRATION_LOG")
+        if status not in FINISHED_STATUSES and task_id in project_accepted:
+            errors.append(f"{task_id}: PROJECT_STATE lists accepted but queue status is {status}")
+        if status not in FINISHED_STATUSES and task_id in integration_logged:
+            errors.append(f"{task_id}: INTEGRATION_LOG lists accepted but queue status is {status}")
+
+    for task_id in sorted(project_accepted | integration_logged):
+        if task_id and task_id not in by_id:
+            errors.append(f"{task_id}: listed in project/integration history but missing from queue")
+
+    ledger = parse_current_work_package_from_ledger()
+    current_id = ledger.get("task_id", "")
+    current_status = ledger.get("status", "")
+    current_state = ledger.get("current_state_machine_state", "")
+    if current_id:
+        queue_task = by_id.get(current_id)
+        if queue_task is None:
+            errors.append(f"ledger current work package {current_id} missing from queue")
+        else:
+            if queue_task.get("status") != current_status:
+                errors.append(f"{current_id}: ledger status {current_status} != queue status {queue_task.get('status')}")
+            if current_state in CURRENT_STATE_TO_STATUS and current_status not in CURRENT_STATE_TO_STATUS[current_state]:
+                allowed = ", ".join(sorted(CURRENT_STATE_TO_STATUS[current_state]))
+                errors.append(f"{current_id}: ledger state {current_state} incompatible with status {current_status}; expected one of {allowed}")
+
+    ok = not errors
+    return CheckResult(
+        "status consistency",
+        ok,
+        "queue, work package files, project state, integration log, and ledger statuses agree"
+        if ok
+        else "status drift: " + " | ".join(errors),
+    )
+
+
 def check_repeated_failure_escalation() -> CheckResult:
     requirements = [
         (".ai/MASTER_LEDGER.yaml", r"repeat_stop_threshold:\s*2"),
@@ -390,6 +677,8 @@ def check_no_non_baseline_roles() -> CheckResult:
 def run_checks() -> list[CheckResult]:
     return [
         check_required_files(),
+        check_direction_guide_skill_metadata(),
+        check_approved_root_doc_pruning(),
         check_baseline_agents(),
         check_max_depth(),
         check_bounded_recursive_delegation(),
@@ -399,6 +688,8 @@ def run_checks() -> list[CheckResult]:
         check_recursive_packet_fields(),
         check_report_fields(),
         check_verifier_gate(),
+        check_verification_evidence_paths(),
+        check_status_consistency(),
         check_repeated_failure_escalation(),
         check_no_non_baseline_roles(),
     ]

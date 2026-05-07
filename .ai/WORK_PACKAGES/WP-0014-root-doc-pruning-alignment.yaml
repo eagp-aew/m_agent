@@ -1,0 +1,68 @@
+task_id: WP-0014-root-doc-pruning-alignment
+status: ACCEPTED
+objective: "Align the scaffold docs, validator, and memory with the human-approved deletion of the legacy root guide files."
+why: "The review found that the root guide files were deleted but README and validation still treated the larger scaffold as current. The user approved those deletions and asked to proceed section by section."
+scope_type: validation
+priority: P0
+
+allowed_files:
+  - "README.md"
+  - "scripts/validate_protocol.py"
+  - ".ai/WORK_PACKAGES/WP-0014-root-doc-pruning-alignment.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "new agent roles"
+  - "recursive or parallelism policy changes"
+
+inputs:
+  - "User approval that the 13 tracked root-file deletions are intentional."
+  - "Review findings F-01, F-02, and F-03 from the prior review."
+  - "README.md"
+  - "scripts/validate_protocol.py"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+
+acceptance_criteria:
+  - "README no longer points users to deleted START_HERE.md or FILE_MANIFEST.md."
+  - "README describes the lean current scaffold layout."
+  - "The protocol validator includes active root entrypoints as required files."
+  - "The protocol validator checks that the approved pruned root docs are absent and not referenced by active entrypoint docs."
+  - "Durable memory records WP-0014 as implemented pending human review."
+  - "No application source code, dependencies, new agent roles, or policy expansion are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "ruby -e 'require \"yaml\"; ARGV.each { |f| YAML.load_file(f); puts \"PASS #{f}\" }' .ai/TASK_QUEUE.yaml .ai/MASTER_LEDGER.yaml .ai/WORK_PACKAGES/WP-0014-root-doc-pruning-alignment.yaml"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+rollback_plan:
+  - "If rejected, revise README and validator alignment without restoring deleted root guide files unless the human explicitly requests restoration."
+
+human_approval_required:
+  required: true
+  reason: "The work acknowledges approved tracked-file deletions and updates validation around that deletion."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - validator_result
+  - deletion_alignment_summary
+  - remaining_risks
+  - next_section

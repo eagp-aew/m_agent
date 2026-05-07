@@ -1,0 +1,74 @@
+task_id: WP-0016-status-consistency-validation
+status: ACCEPTED
+objective: "Add validator coverage for status consistency across queue, work-package files, project state, integration log, and live ledger."
+why: "The review found status drift where tasks were listed as accepted in project memory but only implemented in the queue, and some work-package files lagged behind queue status."
+scope_type: validation
+priority: P0
+
+allowed_files:
+  - "scripts/validate_protocol.py"
+  - ".ai/WORK_PACKAGES/WP-0000-bootstrap.yaml"
+  - ".ai/WORK_PACKAGES/WP-0014-root-doc-pruning-alignment.yaml"
+  - ".ai/WORK_PACKAGES/WP-0015-durable-verification-evidence.yaml"
+  - ".ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+  - ".ai/AGENT_REPORTS/WP-0016-fallback-verification.md"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "new agent roles"
+  - "recursive or parallelism policy changes"
+
+inputs:
+  - "User approval to proceed to Section 3."
+  - "Review finding F-04: task status drift between queue, project state, integration log, and work-package files."
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/WORK_PACKAGES/*.yaml"
+  - "scripts/validate_protocol.py"
+
+acceptance_criteria:
+  - "Queue statuses agree with work-package file statuses when work_package_path exists."
+  - "Finished queue items are present in PROJECT_STATE recent accepted changes and INTEGRATION_LOG."
+  - "Items listed as accepted in PROJECT_STATE or INTEGRATION_LOG have finished statuses in TASK_QUEUE."
+  - "MASTER_LEDGER current work package status agrees with the queue and has a state-compatible status."
+  - "Historical WP-0001 and WP-0002 status drift is normalized."
+  - "No application source code, dependencies, new agent roles, or policy expansion are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "ruby -e 'require \"yaml\"; ARGV.each { |f| YAML.load_file(f); puts \"PASS #{f}\" }' .ai/TASK_QUEUE.yaml .ai/MASTER_LEDGER.yaml .ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+rollback_plan:
+  - "If rejected, revise the status consistency validator and status normalization in a new scoped patch."
+
+human_approval_required:
+  required: false
+  reason: "The user approved proceeding to Section 3; changes are limited to validation, status normalization, report artifacts, and durable memory."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - status_consistency_enforcement
+  - validator_result
+  - remaining_risks
+  - next_section

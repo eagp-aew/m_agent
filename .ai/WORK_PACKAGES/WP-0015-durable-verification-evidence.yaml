@@ -1,0 +1,70 @@
+task_id: WP-0015-durable-verification-evidence
+status: ACCEPTED
+objective: "Require durable verification evidence paths for accepted or verified work packages."
+why: "The review found that accepted work mostly had null verifier_report_path values, making verifier-gate evidence hard to replay. Section 2 fixes that by backfilling report artifacts and validating evidence paths."
+scope_type: validation
+priority: P0
+
+allowed_files:
+  - "scripts/validate_protocol.py"
+  - ".ai/AGENT_REPORTS/README.md"
+  - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+  - ".ai/AGENT_REPORTS/WP-0015-fallback-verification.md"
+  - ".agents/skills/direction-guide/references/verification-gate.md"
+  - ".ai/WORK_PACKAGES/WP-0015-durable-verification-evidence.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "new agent roles"
+  - "recursive or parallelism policy changes"
+
+inputs:
+  - "User approval to proceed after Section 1."
+  - "Review finding F-05: accepted work lacks durable verifier report artifacts."
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/AGENT_REPORTS/README.md"
+  - ".agents/skills/direction-guide/references/verification-gate.md"
+  - "scripts/validate_protocol.py"
+
+acceptance_criteria:
+  - "Every queue item with status ACCEPTED, VERIFIED, or DONE has a non-null verifier_report_path."
+  - "Every such verifier_report_path points to an existing durable evidence file."
+  - "The validator fails if accepted or verified queue items lack evidence paths or required verification-gate markers."
+  - "Fallback verification reports are documented as valid durable evidence when no verifier subagent ran."
+  - "No application source code, dependencies, new agent roles, or policy expansion are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "ruby -e 'require \"yaml\"; ARGV.each { |f| YAML.load_file(f); puts \"PASS #{f}\" }' .ai/TASK_QUEUE.yaml .ai/MASTER_LEDGER.yaml .ai/WORK_PACKAGES/WP-0015-durable-verification-evidence.yaml"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+rollback_plan:
+  - "If rejected, remove the validator enforcement and report-path backfill with an explicit human-approved patch."
+
+human_approval_required:
+  required: false
+  reason: "The user approved proceeding with the review fix plan; changes are limited to validation, evidence docs, report artifacts, and durable memory."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - evidence_path_enforcement
+  - validator_result
+  - remaining_risks
+  - next_section

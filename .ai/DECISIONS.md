@@ -192,6 +192,71 @@
   - The master remains the Routing Controller and may deny requests that expand scope, touch approval-gated areas, or exceed budgets.
   - The validator, ledger, metrics, and report template now track child requests, approval decisions, report bundles, max observed depth, child scope violations, and recursive delegation violations.
 
+## DEC-0013: Prune legacy root guide files
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The review found 13 tracked root guide files deleted from the working tree.
+  - The human explicitly approved those deletions before Section 1 cleanup began.
+  - The remaining scaffold should not continue to direct users toward deleted entrypoints.
+- Decision:
+  - Treat the deleted root guide files as intentional scaffold pruning.
+  - Keep root docs lean around `README.md`, `INSTALLATION.md`, and `AGENTS.md`.
+  - Keep durable protocol detail under `.agents/skills/direction-guide/` and `.ai/`.
+  - Update `scripts/validate_protocol.py` so the approved pruned files are expected to be absent and active entrypoint docs do not reference them.
+- Consequences:
+  - The validator now catches stale references to deleted root guides.
+  - Future restoration of any pruned root guide should be routed through a new explicit work package.
+
+## DEC-0014: Require durable verification evidence paths
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The review found accepted work with `verifier_report_path: null`.
+  - The existing verification gate required evidence, but it did not require a durable report path in the task queue.
+- Decision:
+  - Every queue item with status `ACCEPTED`, `VERIFIED`, or `DONE` must link `verifier_report_path` to a durable verifier report or master-direct fallback verification record under `.ai/AGENT_REPORTS/`.
+  - The protocol validator must fail when the path is missing, the report file is missing, or the report lacks required verification-gate evidence markers.
+  - Historical accepted tasks may share a backfilled historical fallback verification bundle when the original per-task report did not exist.
+- Consequences:
+  - Accepted work is easier to replay and audit across threads.
+  - Future accepted work should prefer one report file per work package instead of relying on the historical bundle pattern.
+
+## DEC-0015: Validate status consistency across durable memory
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The review found status drift between `.ai/TASK_QUEUE.yaml`, `.ai/PROJECT_STATE.md`, `.ai/INTEGRATION_LOG.md`, and work-package files.
+  - The queue is the task-status index, but accepted-history artifacts and live ledger status must not contradict it.
+- Decision:
+  - Add a status consistency check to `scripts/validate_protocol.py`.
+  - Require queue entries with work-package paths to agree with the referenced file's `task_id` and finished status.
+  - Require finished queue items to appear in project state and integration log.
+  - Require project/integration accepted-history entries to use finished queue statuses.
+  - Require live ledger current work package status to agree with the queue and with the current state-machine state.
+- Consequences:
+  - Future memory updates should fail validation when they update only one status surface.
+  - Historical WP-0001 and WP-0002 are normalized to `ACCEPTED` because they were already listed as accepted in project state and integration log.
+
+## DEC-0016: Validate direction-guide skill metadata
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The review found `.agents/skills/direction-guide/SKILL.md` was invalid even though the existing validator passed.
+  - The root cause was YAML frontmatter syntax: the unquoted description contained `orchestration: planning`, and the `: ` sequence is not valid inside an unquoted plain scalar.
+  - The previous test matrix only displayed the first lines of `SKILL.md`, so it could not catch parse failures.
+- Decision:
+  - Quote the `description` metadata value in `SKILL.md`.
+  - Add a dependency-free skill metadata check to `scripts/validate_protocol.py`.
+  - Treat malformed `direction-guide` metadata as a protocol validation failure.
+- Consequences:
+  - Future changes to the local skill metadata are covered by the default validator.
+  - The validator intentionally checks the simple expected metadata shape rather than becoming a general YAML parser.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -208,3 +273,7 @@
 | DEC-0010 | 2026-05-06 | accepted | Add a lightweight protocol validator |
 | DEC-0011 | 2026-05-06 | accepted | Adopt guarded parallel implementers |
 | DEC-0012 | 2026-05-06 | accepted | Enable bounded depth-2 child-agent requests |
+| DEC-0013 | 2026-05-07 | accepted | Prune legacy root guide files |
+| DEC-0014 | 2026-05-07 | accepted | Require durable verification evidence paths |
+| DEC-0015 | 2026-05-07 | accepted | Validate status consistency across durable memory |
+| DEC-0016 | 2026-05-07 | accepted | Validate direction-guide skill metadata |

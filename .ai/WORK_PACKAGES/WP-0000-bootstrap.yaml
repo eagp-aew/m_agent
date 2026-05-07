@@ -1,5 +1,5 @@
 task_id: WP-0000-bootstrap
-status: READY
+status: ACCEPTED
 objective: "Verify the Codex multi-agent direction scaffold is present and internally consistent."
 why: "This confirms Codex can see the direction-guide skill, custom agents, and durable memory before any application-code changes."
 scope_type: setup

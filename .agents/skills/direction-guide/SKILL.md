@@ -1,6 +1,6 @@
 ---
 name: direction-guide
-description: Use for multi-agent Codex project orchestration: planning, work package creation, subagent delegation, verification, fixing, integration, and durable project memory updates.
+description: "Use for multi-agent Codex project orchestration: planning, work package creation, subagent delegation, verification, fixing, integration, and durable project memory updates."
 ---
 
 # Direction Guide Protocol

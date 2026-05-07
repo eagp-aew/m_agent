@@ -17,7 +17,7 @@ This repository is a Codex multi-agent direction-system scaffold, not an applica
 |---|---|---|---|
 | Scaffold presence | `test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md` | Any scaffold change | Confirms core entrypoints exist. |
 | Agent definitions | `test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml` | Changes under `.codex/agents/` | Confirms the MVP role set exists. |
-| Skill metadata | `sed -n '1,12p' .agents/skills/direction-guide/SKILL.md` | Changes to `direction-guide` | Confirm YAML frontmatter includes `name` and `description`. |
+| Skill metadata | `python3 scripts/validate_protocol.py` | Changes to `direction-guide` | Confirms `SKILL.md` frontmatter is parseable and includes `name` and `description`. |
 | Protocol validator | `python3 scripts/validate_protocol.py` | Protocol scaffold, role-agent, config, or memory changes | Preferred repeatable check for master-agent protocol consistency. |
 | Placeholder scan | `rg -n "TODO|Replace this section|YYYY-MM-DD|TBD" .ai AGENTS.md .codex .agents/skills/direction-guide -g '!.ai/TEST_MATRIX.md'` | Before accepting memory/scaffold changes | Remaining placeholders must be intentional or queued. |
 | Scope check | `git status --short` | Before final review | Ensure only intended scaffold/memory files changed. |

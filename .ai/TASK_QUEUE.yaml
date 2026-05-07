@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-05-06
+updated_at: 2026-05-07
 
 queue:
   - task_id: WP-0000-bootstrap
@@ -11,20 +11,20 @@ queue:
     blocked_by: []
     acceptance_summary: "Codex can see AGENTS.md, .codex custom agents, .agents skill, and .ai memory files."
     work_package_path: ".ai/WORK_PACKAGES/WP-0000-bootstrap.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0001-repo-memory-specificity
     title: "Make project memory specific to the direction-system repo"
-    status: IMPLEMENTED
+    status: ACCEPTED
     priority: P1
     scope_type: memory
     assigned_agent: master
     blocked_by: []
     acceptance_summary: "PROJECT_STATE, TASK_QUEUE, and TEST_MATRIX describe this repo as a Codex master-agent structure refinement scaffold rather than an application repo."
     work_package_path: null
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0002-clean-bootstrap-placeholders
     title: "Remove remaining bootstrap placeholders from durable memory"
-    status: IMPLEMENTED
+    status: ACCEPTED
     priority: P2
     scope_type: memory
     assigned_agent: master
@@ -32,7 +32,7 @@ queue:
       - WP-0001-repo-memory-specificity
     acceptance_summary: "MISSION, DECISIONS, and INTEGRATION_LOG use concrete dates and wording for this direction-system scaffold."
     work_package_path: null
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0003-master-control-modules
     title: "Define seven master-agent control modules"
     status: ACCEPTED
@@ -42,7 +42,7 @@ queue:
     blocked_by: []
     acceptance_summary: "MASTER_MODULES defines seven control modules and direction-guide requires the master to route work through them before delegation."
     work_package_path: null
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0004-master-operating-contract
     title: "Create strict master operating contract"
     status: ACCEPTED
@@ -53,7 +53,7 @@ queue:
       - WP-0003-master-control-modules
     acceptance_summary: "MASTER_CONTRACT defines strict master-agent permissions, stop rules, approval gates, report acceptance rules, and context pollution controls; direction-guide requires compliance."
     work_package_path: ".ai/WORK_PACKAGES/WP-0004-master-operating-contract.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0005-master-ledger
     title: "Add master execution ledger"
     status: ACCEPTED
@@ -64,7 +64,7 @@ queue:
       - WP-0004-master-operating-contract
     acceptance_summary: "MASTER_LEDGER records live execution state and direction-guide requires ledger updates when starting, assigning, verifying, fixing, integrating, blocking, or completing a work package."
     work_package_path: ".ai/WORK_PACKAGES/WP-0005-master-ledger.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0006-context-packet-schema
     title: "Require context packets for subagent delegation"
     status: ACCEPTED
@@ -75,7 +75,7 @@ queue:
       - WP-0005-master-ledger
     acceptance_summary: "direction-guide now requires every subagent spawn to include a structured context packet with source-of-truth, read scope, write scope, validation, stop conditions, output schema, and role-specific guidance."
     work_package_path: ".ai/WORK_PACKAGES/WP-0006-context-packet-schema.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0007-context-packet-alignment-hardening
     title: "Harden context packet and report alignment"
     status: ACCEPTED
@@ -86,7 +86,7 @@ queue:
       - WP-0006-context-packet-schema
     acceptance_summary: "direction-guide, context-packet schema, report template, role-agent instructions, and TEST_MATRIX now share the same packet fallback, scope, and common report contract."
     work_package_path: ".ai/WORK_PACKAGES/WP-0007-context-packet-alignment-hardening.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0008-routing-matrix
     title: "Create master routing decision matrix"
     status: ACCEPTED
@@ -97,7 +97,7 @@ queue:
       - WP-0007-context-packet-alignment-hardening
     acceptance_summary: "direction-guide now requires the master to consult a routing matrix that covers agent role selection, Codex mode routing, and parallelism limits before delegating."
     work_package_path: null
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0009-verification-gate
     title: "Harden verifier acceptance gate"
     status: ACCEPTED
@@ -108,7 +108,7 @@ queue:
       - WP-0008-routing-matrix
     acceptance_summary: "direction-guide now forbids marking work packages ACCEPTED unless verifier PASS evidence, verifier PARTIAL with accepted limitations, or explicit human override of verifier failure is recorded; verifier output now matches the gate evidence and score schema."
     work_package_path: ".ai/WORK_PACKAGES/WP-0009-verification-gate.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0010-master-protocol-consistency
     title: "Run full master protocol consistency refinement"
     status: ACCEPTED
@@ -119,7 +119,7 @@ queue:
       - WP-0009-verification-gate
     acceptance_summary: "Contract, ledger, routing matrix, context packet schema, verification gate, failure signatures, pre-spawn checklist, thin-master rule, metrics, evals, role policy, and config policy now agree on one-writer routing, required context packets, verifier-equivalent evidence, repeated-failure escalation, baseline roles, and max_depth = 1."
     work_package_path: ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0011-lightweight-protocol-validator
     title: "Add lightweight master protocol validator"
     status: ACCEPTED
@@ -130,7 +130,7 @@ queue:
       - WP-0010-master-protocol-consistency
     acceptance_summary: "Added scripts/validate_protocol.py as a no-dependency read-only Python validator and made it the preferred protocol consistency command in TEST_MATRIX."
     work_package_path: ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0012-guarded-parallel-implementers
     title: "Enable guarded parallel implementer policy"
     status: ACCEPTED
@@ -141,7 +141,7 @@ queue:
       - WP-0011-lightweight-protocol-validator
     acceptance_summary: "Replaced the one-writer baseline with guarded parallel implementers using isolated worktrees, exact disjoint file reservations, a dynamic effective write-agent cap, per-shard verification, combined integration review, and conflict metrics."
     work_package_path: ".ai/WORK_PACKAGES/WP-0012-guarded-parallel-implementers.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
   - task_id: WP-0013-depth-2-child-agent-requests
     title: "Enable depth-2 child-agent request policy"
     status: ACCEPTED
@@ -152,7 +152,51 @@ queue:
       - WP-0012-guarded-parallel-implementers
     acceptance_summary: "Enabled bounded depth-2 recursion where implementers may request explorer, verifier, security-reviewer, or exact-file-subset implementer children only through master approval, child packets, report bundles, ledger metrics, and validator checks."
     work_package_path: ".ai/WORK_PACKAGES/WP-0013-depth-2-child-agent-requests.yaml"
-    verifier_report_path: null
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+  - task_id: WP-0014-root-doc-pruning-alignment
+    title: "Align scaffold with approved root-doc pruning"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0013-depth-2-child-agent-requests
+    acceptance_summary: "README, validator, and live memory now treat the 13 root guide file deletions as approved scaffold pruning."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0014-root-doc-pruning-alignment.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+  - task_id: WP-0015-durable-verification-evidence
+    title: "Require durable verification evidence paths"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0014-root-doc-pruning-alignment
+    acceptance_summary: "Accepted after human approval to proceed: accepted/verified queue items must link to durable verifier or fallback verification evidence."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0015-durable-verification-evidence.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0015-fallback-verification.md"
+  - task_id: WP-0016-status-consistency-validation
+    title: "Add status consistency validation"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0015-durable-verification-evidence
+    acceptance_summary: "Accepted: validator checks status consistency across queue, work-package files, project state, integration log, and live ledger."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0016-status-consistency-validation.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0016-fallback-verification.md"
+  - task_id: WP-0017-direction-guide-skill-metadata
+    title: "Fix direction-guide skill metadata validation"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0016-status-consistency-validation
+    acceptance_summary: "Quoted the direction-guide skill description and added validator coverage for parseable SKILL.md metadata."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0017-direction-guide-skill-metadata.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
 
 status_values:
   - DRAFT
