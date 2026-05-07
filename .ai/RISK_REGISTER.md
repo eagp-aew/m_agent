@@ -13,6 +13,7 @@
 | R-0009 | medium | concurrency | Parallel implementer batches may conflict when file ownership, generated outputs, or integration order are misclassified as independent. | Require isolated worktrees, exact disjoint file reservations, dynamic effective caps, shard verification, combined integration review, and `parallel_write_conflicts = 0` before acceptance. | open |
 | R-0010 | medium | recursion | Implementer child-agent requests may hide scope expansion, lose child evidence, or create uncontrolled recursive routing. | Limit recursion to depth 2, require master approval for every child request, require child report bundles, deny scope expansion, and track child scope and recursive delegation violations. | open |
 | R-0011 | medium | tool safety | Tool-use policy and prompt-injection boundaries may still be bypassed if future agents ignore prose or reports contain stale/non-replayable evidence. | Keep `tool-policy.md` canonical; require `trust_boundary` fields; validate report referenced paths and lightweight secret patterns in `scripts/validate_protocol.py`; add negative fixtures next. | open |
+| R-0012 | medium | validation | Protocol closure can become ceremonial if gates, schemas, or tests are not kept aligned with future changes. | Use `scripts/protocol_gate.py`, `tests/test_validate_protocol.py`, schema/context checks, and review coverage reports before accepting future protocol work. | open |
 
 ## Risk severity
 

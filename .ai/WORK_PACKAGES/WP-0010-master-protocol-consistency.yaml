@@ -5,6 +5,17 @@ why: "The protocol spans the master contract, ledger, routing matrix, context pa
 scope_type: protocol
 priority: P1
 
+historical_policy:
+  contains_superseded_claims: true
+  superseded_by:
+    - DEC-0011
+    - DEC-0012
+  current_policy_reference:
+    - ".ai/DECISIONS.md"
+    - ".agents/skills/direction-guide/references/config-policy.md"
+    - ".agents/skills/direction-guide/references/routing-matrix.md"
+  note: "Original criteria required agents.max_depth = 1 and a one-writer baseline. Current accepted policy is guarded parallel implementers with max_parallel_write_agents = 3 as a ceiling and bounded depth-2 child-agent requests with master approval."
+
 allowed_files:
   - "AGENTS.md"
   - ".codex/config.toml"

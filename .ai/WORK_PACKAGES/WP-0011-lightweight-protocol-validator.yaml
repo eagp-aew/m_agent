@@ -5,6 +5,19 @@ why: "The protocol consistency checks in TEST_MATRIX should be repeatable throug
 scope_type: validation
 priority: P1
 
+historical_policy:
+  contains_superseded_claims: true
+  superseded_by:
+    - DEC-0011
+    - DEC-0012
+    - DEC-0017
+  current_policy_reference:
+    - ".ai/DECISIONS.md"
+    - ".agents/skills/direction-guide/references/config-policy.md"
+    - ".agents/skills/direction-guide/references/routing-matrix.md"
+    - ".agents/skills/direction-guide/references/tool-policy.md"
+  note: "Original validator criteria checked max_depth = 1, recursive delegation disabled, and one-writer policy. Current validator policy tracks guarded parallel implementers, bounded depth-2 child-agent requests, tool policy, trust boundaries, and report-path evidence."
+
 allowed_files:
   - "scripts/validate_protocol.py"
   - ".ai/TEST_MATRIX.md"

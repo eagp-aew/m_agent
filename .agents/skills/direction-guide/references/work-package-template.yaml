@@ -5,6 +5,35 @@ why: ""
 scope_type: exploration | implementation | verification | fix | integration | setup
 priority: P0 | P1 | P2 | P3
 
+provenance:
+  created_at: "<date>"
+  created_by: codex-master
+  source:
+    - ""
+  trust_level: repo_controlled
+  verified_by: pending
+  superseded_by: null
+
+risk_class: documentation | protocol_validation | security_sensitive | application_behavior | production_config
+
+context_profile: small | protocol | full
+context_profile_reason: ""
+
+fallback_verification:
+  allowed: true
+  reason: ""
+  high_risk_requires_independent_verifier: false
+  allowed_evidence_type: MASTER_FALLBACK_VERIFICATION
+
+execution_budget:
+  max_steps: 12
+  max_tool_calls: 80
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0001-verifier.md"
+  cancellation:
+    owner: master
+    condition: ""
+
 allowed_files:
   - ""
 
@@ -61,6 +90,19 @@ attempts:
   implement: 0
   fix: 0
   verify: 0
+
+error: null
+# When status is FAIL, BLOCKED, or PARTIAL due to a concrete defect, use:
+# error:
+#   error_id: ERR-WP0001-001
+#   error_category: SPEC_AMBIGUITY | IMPLEMENTATION_BUG | TEST_EXPECTATION_BUG | INTEGRATION_CONFLICT | ENVIRONMENT_FAILURE | DEPENDENCY_OR_VERSION_MISMATCH | SECURITY_REGRESSION | PERFORMANCE_REGRESSION | FLAKY_TEST | SCOPE_VIOLATION
+#   error_code: ""
+#   retryable: true
+#   side_effect_risk: none | low | medium | high
+#   idempotency_key: null
+#   evidence:
+#     - ""
+#   recommended_action: ""
 
 output_required:
   - summary

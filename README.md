@@ -18,53 +18,9 @@ Command + Shift + .
 
 to toggle hidden files/folders.
 
-## What is included
+## Current scaffold map
 
-```text
-AGENTS.md
-INSTALLATION.md
-README.md
-.gitignore
-scripts/
-  validate_protocol.py
-
-.codex/
-  config.toml
-  agents/
-    explorer.toml
-    implementer.toml
-    verifier.toml
-    fixer.toml
-    integrator.toml
-    security-reviewer.toml
-
-.agents/
-  skills/
-    direction-guide/
-      SKILL.md
-      references/
-        work-package-template.yaml
-        agent-report-template.md
-        context-packet-schema.md
-        failure-taxonomy.md
-        routing-matrix.md
-        review-rubric.md
-
-.ai/
-  MISSION.md
-  PROJECT_STATE.md
-  TASK_QUEUE.yaml
-  DECISIONS.md
-  TEST_MATRIX.md
-  RISK_REGISTER.md
-  INTEGRATION_LOG.md
-  WORK_PACKAGES/
-    WP-0000-bootstrap.yaml
-  AGENT_REPORTS/
-    README.md
-  AUTOMATION_REPORTS/
-    README.md
-```
+The current architecture, accepted work history, risky areas, and next recommended work live in `.ai/PROJECT_STATE.md`. Treat that file as the current manifest instead of maintaining a second full file list in this README.
 
 ## Core idea
 

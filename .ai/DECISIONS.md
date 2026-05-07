@@ -274,6 +274,24 @@
   - External content and tool output are treated as evidence, not instructions.
   - The validator remains lightweight and dependency-free, so deeper semantic enforcement should come from future negative fixtures and protocol-gate work rather than a large framework.
 
+## DEC-0018: Add protocol gates, schema policy, and negative fixtures
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The repository review still had open items after tool policy and trust-boundary hardening: pre-accept gates, negative tests, fallback evidence typing, historical supersession, execution budgets, structured errors, README drift, and context profiles.
+  - The goal remains infrastructure for long-running Codex project work, not a standalone runtime or a broader agent swarm.
+- Decision:
+  - Add `scripts/protocol_gate.py` with read-only `audit`, `pre-implement`, `pre-accept`, and `check-report` commands.
+  - Add no-dependency negative tests and fixtures under `tests/`.
+  - Add schema policy and context profile references under `.agents/skills/direction-guide/references/`.
+  - Type historical fallback evidence as `HISTORICAL_ATTESTATION` and add supersession metadata to historical work packages with old max-depth or one-writer assumptions.
+  - Keep recursion depth and parallelism ceilings unchanged.
+- Consequences:
+  - Review closure is now auditable through both durable coverage records and executable checks.
+  - Future accepted work can use a pre-accept gate instead of relying only on manual protocol reading.
+  - The system is still a Codex scaffold; command execution safety depends on runtime permissions plus the master protocol.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -295,3 +313,4 @@
 | DEC-0015 | 2026-05-07 | accepted | Validate status consistency across durable memory |
 | DEC-0016 | 2026-05-07 | accepted | Validate direction-guide skill metadata |
 | DEC-0017 | 2026-05-07 | accepted | Make tool policy and trust boundaries validator-enforced |
+| DEC-0018 | 2026-05-07 | accepted | Add protocol gates, schema policy, and negative fixtures |

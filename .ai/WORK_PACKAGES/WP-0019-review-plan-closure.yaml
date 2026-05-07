@@ -1,0 +1,151 @@
+task_id: WP-0019-review-plan-closure
+status: ACCEPTED
+objective: "Close the remaining actionable findings from the repository review plan with gate commands, negative tests, supersession metadata, fallback evidence typing, budgets, and a complete coverage matrix."
+why: "The second pass against /Users/jie/Downloads/m_agent_repository_review_and_fix_plan.md found that WP-0018 addressed tool policy, trust boundaries, report paths, and secret scanning, but left protocol-gate commands, negative fixtures, historical supersession, fallback policy typing, loop budgets, README drift, and explicit finding coverage incomplete."
+scope_type: validation
+priority: P0
+
+provenance:
+  created_at: 2026-05-07
+  created_by: codex-master
+  source:
+    - "/Users/jie/Downloads/m_agent_repository_review_and_fix_plan.md"
+    - ".ai/PROJECT_STATE.md"
+    - ".ai/TASK_QUEUE.yaml"
+    - ".ai/MASTER_LEDGER.yaml"
+  trust_level: repo_controlled
+  verified_by: "fallback:.ai/AGENT_REPORTS/WP-0019-verifier.md"
+  superseded_by: null
+
+risk_class: protocol_validation
+fallback_verification:
+  allowed: true
+  reason: "The package changes only scaffold policy, validation scripts, tests, reports, and durable memory; no application source or approval-gated runtime behavior is modified."
+
+execution_budget:
+  max_steps: 12
+  max_tool_calls: 80
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop if validator/test failures repeat with the same signature twice or if scope expands into dependencies, production config, secrets, public APIs, or deletion."
+
+allowed_files:
+  - "README.md"
+  - "scripts/protocol_gate.py"
+  - "scripts/validate_protocol.py"
+  - "tests/test_validate_protocol.py"
+  - "tests/fixtures/bad_skill_metadata/SKILL.md"
+  - "tests/fixtures/report_missing_paths/report.md"
+  - "tests/fixtures/secrets/scaffold_secret.txt"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/context-profiles.md"
+  - ".agents/skills/direction-guide/references/failure-taxonomy.md"
+  - ".agents/skills/direction-guide/references/schema-policy.md"
+  - ".agents/skills/direction-guide/references/verification-gate.md"
+  - ".agents/skills/direction-guide/references/work-package-template.yaml"
+  - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+  - ".ai/AGENT_REPORTS/WP-0019-gate-tests-implementer.md"
+  - ".ai/AGENT_REPORTS/WP-0019-policy-memory-implementer.md"
+  - ".ai/AGENT_REPORTS/WP-0019-review-coverage.md"
+  - ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+  - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+  - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
+  - ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "new agent roles"
+  - "file deletions"
+  - "recursive or parallelism policy expansion"
+
+inputs:
+  - "/Users/jie/Downloads/m_agent_repository_review_and_fix_plan.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - "scripts/validate_protocol.py"
+  - ".agents/skills/direction-guide/SKILL.md"
+
+acceptance_criteria:
+  - "Add a no-dependency `scripts/protocol_gate.py` with `audit`, `pre-implement`, `pre-accept`, and `check-report` commands."
+  - "Add no-dependency negative tests and fixtures for validator/gate behavior, including malformed skill metadata, unreplayable report paths, secret scanning, and report evidence checks."
+  - "Mark historical fallback evidence as `HISTORICAL_ATTESTATION` and clarify future fallback rules, including `fallback_verification` work-package metadata."
+  - "Add supersession metadata or current-policy references to historical work packages with superseded `max_depth = 1` or one-writer language."
+  - "Add execution budget/trace/cancellation fields to the ledger/work-package guidance without increasing recursion depth or parallelism."
+  - "Add structured error fields to report/failure guidance."
+  - "Simplify README so it points to current project state instead of maintaining a stale full manifest."
+  - "Add context profiles for small/protocol/full context selection."
+  - "Record a coverage matrix for every review finding F-01 through F-17."
+  - "No dependencies, new roles, public APIs, production config, auth/payment/permissions/secrets handling changes, or file deletions are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "python3 scripts/protocol_gate.py audit"
+  - "python3 scripts/protocol_gate.py pre-accept WP-0019-review-plan-closure"
+  - "python3 scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0019-verifier.md"
+  - "python3 -m unittest tests/test_validate_protocol.py"
+  - "python3 -m py_compile scripts/validate_protocol.py scripts/protocol_gate.py"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards:
+  - shard_id: gate-tests
+    worktree_id: codex-wp0019-gate-tests
+    reserved_files:
+      - "scripts/protocol_gate.py"
+      - "scripts/validate_protocol.py"
+      - "tests/test_validate_protocol.py"
+      - "tests/fixtures/bad_skill_metadata/SKILL.md"
+      - "tests/fixtures/report_missing_paths/report.md"
+      - "tests/fixtures/secrets/scaffold_secret.txt"
+    validation_commands:
+      - "python3 -m unittest tests/test_validate_protocol.py"
+      - "python3 scripts/protocol_gate.py audit"
+  - shard_id: policy-memory
+    worktree_id: codex-wp0019-policy-memory
+    reserved_files:
+      - "README.md"
+      - ".agents/skills/direction-guide/SKILL.md"
+      - ".agents/skills/direction-guide/references/context-profiles.md"
+      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
+      - ".agents/skills/direction-guide/references/schema-policy.md"
+      - ".agents/skills/direction-guide/references/verification-gate.md"
+      - ".agents/skills/direction-guide/references/work-package-template.yaml"
+      - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+      - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
+      - ".ai/TEST_MATRIX.md"
+    validation_commands:
+      - "python3 scripts/validate_protocol.py"
+
+rollback_plan:
+  - "If rejected, remove only WP-0019 gate/test/docs/memory additions with an explicit patch and preserve accepted WP-0018 work."
+
+human_approval_required:
+  required: false
+  reason: "The user explicitly requested addressing the review issues inside this folder; this package is limited to scaffold policy, validation, tests, reports, and durable memory."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - review_finding_coverage
+  - files_changed
+  - validations_run
+  - subagent_reports
+  - risks

@@ -7,6 +7,9 @@ documented protocol consistency checks into one repeatable command.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
+import argparse
+import json
 from pathlib import Path
 import re
 import subprocess
@@ -28,17 +31,20 @@ CORE_FILES = [
     "AGENTS.md",
     "README.md",
     "INSTALLATION.md",
+    "scripts/protocol_gate.py",
     "scripts/validate_protocol.py",
     ".codex/config.toml",
     ".agents/skills/direction-guide/SKILL.md",
     ".agents/skills/direction-guide/references/agent-report-template.md",
     ".agents/skills/direction-guide/references/agent-role-policy.md",
     ".agents/skills/direction-guide/references/config-policy.md",
+    ".agents/skills/direction-guide/references/context-profiles.md",
     ".agents/skills/direction-guide/references/context-packet-schema.md",
     ".agents/skills/direction-guide/references/failure-signatures.md",
     ".agents/skills/direction-guide/references/failure-taxonomy.md",
     ".agents/skills/direction-guide/references/pre-spawn-checklist.md",
     ".agents/skills/direction-guide/references/routing-matrix.md",
+    ".agents/skills/direction-guide/references/schema-policy.md",
     ".agents/skills/direction-guide/references/thin-master-rule.md",
     ".agents/skills/direction-guide/references/verification-gate.md",
     ".ai/MASTER_CONTRACT.md",
@@ -49,6 +55,10 @@ CORE_FILES = [
     ".ai/TEST_MATRIX.md",
     ".ai/RISK_REGISTER.md",
     ".ai/EVALS/EVAL-005-child-agent-requests.md",
+    "tests/test_validate_protocol.py",
+    "tests/fixtures/bad_skill_metadata/SKILL.md",
+    "tests/fixtures/report_missing_paths/report.md",
+    "tests/fixtures/secrets/scaffold_secret.txt",
 ]
 
 APPROVED_PRUNED_ROOT_DOCS = [
@@ -177,6 +187,62 @@ TRUST_BOUNDARY_FIELDS = [
     "repo_controlled",
 ]
 
+SCHEMA_POLICY_REQUIREMENTS = [
+    (".agents/skills/direction-guide/references/schema-policy.md", r"provenance"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"fallback_verification"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"execution_budget"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"trace"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"error_category"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"error_code"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"idempotency_key"),
+    (".agents/skills/direction-guide/references/schema-policy.md", r"superseded_by"),
+    (".agents/skills/direction-guide/references/context-profiles.md", r"\bsmall\b"),
+    (".agents/skills/direction-guide/references/context-profiles.md", r"\bprotocol\b"),
+    (".agents/skills/direction-guide/references/context-profiles.md", r"\bfull\b"),
+    (".agents/skills/direction-guide/SKILL.md", r"schema-policy\.md"),
+    (".agents/skills/direction-guide/SKILL.md", r"context-profiles\.md"),
+    (".agents/skills/direction-guide/references/work-package-template.yaml", r"provenance:"),
+    (".agents/skills/direction-guide/references/work-package-template.yaml", r"fallback_verification:"),
+    (".agents/skills/direction-guide/references/work-package-template.yaml", r"execution_budget:"),
+    (".agents/skills/direction-guide/references/work-package-template.yaml", r"context_profile:"),
+    (".agents/skills/direction-guide/references/work-package-template.yaml", r"error_category:"),
+    (".agents/skills/direction-guide/references/verification-gate.md", r"VERIFIER_REPORT"),
+    (".agents/skills/direction-guide/references/verification-gate.md", r"MASTER_FALLBACK_VERIFICATION"),
+    (".agents/skills/direction-guide/references/verification-gate.md", r"HISTORICAL_ATTESTATION"),
+    (".agents/skills/direction-guide/references/verification-gate.md", r"High-risk"),
+    (".agents/skills/direction-guide/references/failure-taxonomy.md", r"error_category"),
+    (".agents/skills/direction-guide/references/failure-taxonomy.md", r"error_code"),
+    (".agents/skills/direction-guide/references/failure-taxonomy.md", r"idempotency_key"),
+]
+
+HISTORICAL_SUPERSESSION_REQUIREMENTS = [
+    (".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml", r"historical_policy:"),
+    (".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml", r"superseded_by:"),
+    (".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml", r"DEC-0011"),
+    (".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml", r"DEC-0012"),
+    (".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml", r"current_policy_reference:"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"historical_policy:"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"superseded_by:"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"DEC-0011"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"DEC-0012"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"DEC-0017"),
+    (".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml", r"current_policy_reference:"),
+    (".ai/AGENT_REPORTS/historical-fallback-verification.md", r"HISTORICAL_ATTESTATION"),
+    (".ai/AGENT_REPORTS/historical-fallback-verification.md", r"not valid evidence for accepting new work"),
+]
+
+PROTOCOL_GATE_REQUIREMENTS = [
+    ("scripts/protocol_gate.py", r"def audit"),
+    ("scripts/protocol_gate.py", r"def pre_implement"),
+    ("scripts/protocol_gate.py", r"def pre_accept"),
+    ("scripts/protocol_gate.py", r"def check_report"),
+    ("scripts/protocol_gate.py", r"validate_protocol\.run_checks"),
+    ("scripts/protocol_gate.py", r"check_report_gate"),
+    (".ai/TEST_MATRIX.md", r"scripts/protocol_gate\.py audit"),
+    (".ai/TEST_MATRIX.md", r"scripts/protocol_gate\.py pre-accept"),
+    (".ai/TEST_MATRIX.md", r"unittest tests/test_validate_protocol\.py"),
+]
+
 REPORT_PATH_MARKER_PREFIXES = (
     "external:",
     "runtime:",
@@ -250,6 +316,11 @@ class CheckResult:
 
 def rel(path: Path) -> str:
     return path.relative_to(ROOT).as_posix()
+
+
+def display_path(path: Path) -> str:
+    path = path.resolve()
+    return rel(path) if is_under_root(path) else str(path)
 
 
 def read_text(path: str) -> str:
@@ -486,22 +557,30 @@ def check_tool_policy_reference() -> CheckResult:
     )
 
 
-def check_direction_guide_skill_metadata() -> CheckResult:
-    metadata, errors = parse_skill_frontmatter(".agents/skills/direction-guide/SKILL.md")
+def check_skill_metadata(path: str, expected_name: str | None = None) -> CheckResult:
+    metadata, errors = parse_skill_frontmatter(path)
     required = {"name", "description"}
     missing = sorted(field for field in required if not metadata.get(field))
     if missing:
         errors.append("missing required metadata: " + ", ".join(missing))
-    if metadata.get("name") != "direction-guide":
-        errors.append(f"name is {metadata.get('name') or '<missing>'}, expected direction-guide")
+    if expected_name is not None and metadata.get("name") != expected_name:
+        errors.append(f"name is {metadata.get('name') or '<missing>'}, expected {expected_name}")
     ok = not errors
     return CheckResult(
-        "direction-guide skill metadata",
+        "skill metadata",
         ok,
-        "SKILL.md frontmatter is parseable and includes direction-guide name and description"
+        f"{path} frontmatter is parseable and includes name and description"
         if ok
-        else "invalid SKILL.md metadata: " + " | ".join(errors),
+        else f"invalid {path} metadata: " + " | ".join(errors),
     )
+
+
+def check_direction_guide_skill_metadata() -> CheckResult:
+    result = check_skill_metadata(".agents/skills/direction-guide/SKILL.md", "direction-guide")
+    result.name = "direction-guide skill metadata"
+    if result.ok:
+        result.message = "SKILL.md frontmatter is parseable and includes direction-guide name and description"
+    return result
 
 
 def check_approved_root_doc_pruning() -> CheckResult:
@@ -691,6 +770,75 @@ def check_trust_boundary_fields() -> CheckResult:
     )
 
 
+def check_schema_policy_and_context_profiles() -> CheckResult:
+    missing = [
+        f"{path}:{pattern}"
+        for path, pattern in SCHEMA_POLICY_REQUIREMENTS
+        if not contains(path, pattern, re.IGNORECASE)
+    ]
+    return CheckResult(
+        "schema policy and context profiles",
+        not missing,
+        "schema policy, fallback metadata, execution budgets, structured errors, supersession fields, and context profiles are documented"
+        if not missing
+        else "schema/context profile drift: " + ", ".join(missing),
+    )
+
+
+def check_historical_supersession_metadata() -> CheckResult:
+    missing = [
+        f"{path}:{pattern}"
+        for path, pattern in HISTORICAL_SUPERSESSION_REQUIREMENTS
+        if not contains(path, pattern, re.IGNORECASE)
+    ]
+    return CheckResult(
+        "historical supersession metadata",
+        not missing,
+        "historical max-depth/one-writer claims point to current decisions and historical evidence is typed"
+        if not missing
+        else "historical supersession drift: " + ", ".join(missing),
+    )
+
+
+def check_protocol_gate_surface() -> CheckResult:
+    missing = [
+        f"{path}:{pattern}"
+        for path, pattern in PROTOCOL_GATE_REQUIREMENTS
+        if not contains(path, pattern, re.IGNORECASE)
+    ]
+    return CheckResult(
+        "protocol gate surface",
+        not missing,
+        "protocol gate exposes audit, pre-implement, pre-accept, and check-report commands with test-matrix coverage"
+        if not missing
+        else "protocol gate drift: " + ", ".join(missing),
+    )
+
+
+def check_negative_test_fixtures() -> CheckResult:
+    fixture_checks = [
+        ("tests/test_validate_protocol.py", r"test_malformed_skill_metadata_fixture_fails"),
+        ("tests/test_validate_protocol.py", r"test_report_with_unreplayable_path_fails_gate"),
+        ("tests/test_validate_protocol.py", r"test_secret_scan_fixture_reports_label_without_value"),
+        ("tests/test_validate_protocol.py", r"test_protocol_gate_check_report_fails_for_bad_fixture"),
+        ("tests/fixtures/bad_skill_metadata/SKILL.md", r"duplicate-name"),
+        ("tests/fixtures/report_missing_paths/report.md", r"does-not-exist\.md"),
+        ("tests/fixtures/secrets/scaffold_secret.txt", r"FAKE_"),
+    ]
+    missing = [
+        f"{path}:{pattern}"
+        for path, pattern in fixture_checks
+        if not contains(path, pattern, re.IGNORECASE)
+    ]
+    return CheckResult(
+        "negative validator fixtures",
+        not missing,
+        "negative tests cover malformed skill metadata, unreplayable report paths, fake secret patterns, and report gate failures"
+        if not missing
+        else "negative fixture drift: " + ", ".join(missing),
+    )
+
+
 def check_recursive_packet_fields() -> CheckResult:
     targets = [
         ".agents/skills/direction-guide/references/context-packet-schema.md",
@@ -806,13 +954,14 @@ def validate_report_path_candidate(candidate: str) -> str | None:
     return None if path.exists() else "does not exist"
 
 
-def check_report_referenced_paths() -> CheckResult:
+def check_report_referenced_paths(paths: Iterable[Path] | None = None) -> CheckResult:
     errors = []
-    for report_path in report_files():
+    checked_paths = report_files() if paths is None else paths
+    for report_path in checked_paths:
         for candidate in extract_report_path_candidates(report_path.read_text(encoding="utf-8")):
             error = validate_report_path_candidate(candidate)
             if error:
-                errors.append(f"{rel(report_path)}:`{candidate}` {error}")
+                errors.append(f"{display_path(report_path)}:`{candidate}` {error}")
     return CheckResult(
         "report referenced paths",
         not errors,
@@ -822,9 +971,9 @@ def check_report_referenced_paths() -> CheckResult:
     )
 
 
-def check_lightweight_secret_scan() -> CheckResult:
+def scan_files_for_secret_patterns(paths: Iterable[Path]) -> list[str]:
     findings = []
-    for path in scaffold_scan_files():
+    for path in paths:
         try:
             text = path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
@@ -832,13 +981,49 @@ def check_lightweight_secret_scan() -> CheckResult:
         for line_number, line in enumerate(text.splitlines(), start=1):
             for label, pattern in SECRET_PATTERNS:
                 if pattern.search(line):
-                    findings.append(f"{rel(path)}:{line_number}:{label}")
+                    findings.append(f"{display_path(path)}:{line_number}:{label}")
+    return findings
+
+
+def check_lightweight_secret_scan(paths: Iterable[Path] | None = None) -> CheckResult:
+    findings = scan_files_for_secret_patterns(scaffold_scan_files() if paths is None else paths)
     return CheckResult(
         "lightweight scaffold secret scan",
         not findings,
         "no obvious tracked secret patterns found in scaffold files"
         if not findings
         else "obvious secret patterns found without printing values: " + ", ".join(findings),
+    )
+
+
+def check_report_gate(path: Path | str) -> CheckResult:
+    report_path = Path(path)
+    if not report_path.is_absolute():
+        report_path = (ROOT / report_path).resolve()
+    if not is_under_root(report_path):
+        return CheckResult("report gate", False, f"{report_path} escapes repository")
+    if not report_path.is_file():
+        return CheckResult("report gate", False, f"{display_path(report_path)} does not exist")
+
+    text = report_path.read_text(encoding="utf-8")
+    missing_fields = [field for field in REPORT_FIELDS if field not in text]
+    missing_markers = [marker for marker in VERIFICATION_REPORT_MARKERS if marker not in text]
+    path_check = check_report_referenced_paths([report_path])
+
+    errors = []
+    if missing_fields:
+        errors.append("missing report fields: " + ", ".join(missing_fields))
+    if missing_markers:
+        errors.append("missing verification markers: " + ", ".join(missing_markers))
+    if not path_check.ok:
+        errors.append(path_check.message)
+
+    return CheckResult(
+        "report gate",
+        not errors,
+        f"{display_path(report_path)} includes required fields, verification markers, and replayable path references"
+        if not errors
+        else f"{display_path(report_path)} failed report gate: " + " | ".join(errors),
     )
 
 
@@ -946,6 +1131,7 @@ def check_no_non_baseline_roles() -> CheckResult:
 def run_checks() -> list[CheckResult]:
     return [
         check_required_files(),
+        check_protocol_gate_surface(),
         check_tool_policy_reference(),
         check_direction_guide_skill_metadata(),
         check_approved_root_doc_pruning(),
@@ -956,6 +1142,8 @@ def run_checks() -> list[CheckResult]:
         check_context_packet_requirement(),
         check_packet_fields(),
         check_trust_boundary_fields(),
+        check_schema_policy_and_context_profiles(),
+        check_historical_supersession_metadata(),
         check_recursive_packet_fields(),
         check_report_fields(),
         check_verifier_gate(),
@@ -965,19 +1153,53 @@ def run_checks() -> list[CheckResult]:
         check_repeated_failure_escalation(),
         check_no_non_baseline_roles(),
         check_lightweight_secret_scan(),
+        check_negative_test_fixtures(),
     ]
 
 
-def main() -> int:
+def format_result(result: CheckResult) -> str:
+    status = "PASS" if result.ok else "FAIL"
+    return f"{status} {result.name}: {result.message}"
+
+
+def print_results(results: Iterable[CheckResult]) -> list[CheckResult]:
+    materialized = list(results)
+    for result in materialized:
+        print(format_result(result))
+    return materialized
+
+
+def result_to_dict(result: CheckResult) -> dict[str, object]:
+    return {"name": result.name, "ok": result.ok, "message": result.message}
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Validate the Codex master-agent protocol scaffold.")
+    parser.add_argument("--json", action="store_true", help="emit machine-readable validation results")
+    args = parser.parse_args(argv)
+
     results = run_checks()
-    for result in results:
-        status = "PASS" if result.ok else "FAIL"
-        print(f"{status} {result.name}: {result.message}")
     failed = [result for result in results if not result.ok]
+    if args.json:
+        print(
+            json.dumps(
+                {
+                    "ok": not failed,
+                    "passed": len(results) - len(failed),
+                    "failed": len(failed),
+                    "results": [result_to_dict(result) for result in results],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+        )
+    else:
+        print_results(results)
     if failed:
         print(f"\n{len(failed)} protocol validation check(s) failed.", file=sys.stderr)
         return 1
-    print(f"\nAll {len(results)} protocol validation checks passed.")
+    if not args.json:
+        print(f"\nAll {len(results)} protocol validation checks passed.")
     return 0
 
 

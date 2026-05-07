@@ -9,7 +9,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 - Milestone: Bootstrap Codex multi-agent direction workflow
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: none (latest accepted: WP-0018-protocol-enforcement-hardening)
+- Active work package: none (latest accepted: WP-0019-review-plan-closure)
 
 ## Important constraints
 
@@ -66,6 +66,8 @@ The repo is organized around Codex-native orchestration:
   - Mitigation: Quote metadata values containing `: ` and make `scripts/validate_protocol.py` validate `direction-guide` skill metadata.
 - Risk: Tool-use and prompt-injection safety can remain voluntary if command policy, trust boundaries, and evidence paths are only described in prose.
   - Mitigation: Keep `.agents/skills/direction-guide/references/tool-policy.md` canonical and make `scripts/validate_protocol.py` check tool-policy coverage, trust-boundary fields, report referenced paths, and lightweight scaffold secret patterns.
+- Risk: Review findings can appear addressed while remaining prose-only or untested.
+  - Mitigation: Use `scripts/protocol_gate.py`, negative fixtures in `tests/`, schema/context validator checks, and `.ai/AGENT_REPORTS/WP-0019-review-coverage.md` to keep review closure auditable.
 
 ## Recent accepted changes
 
@@ -90,6 +92,7 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-07 | WP-0016-status-consistency-validation | Added validator coverage for status consistency across queue, work-package files, project state, integration log, and live ledger | Protocol validator, YAML parse, and diff check passed |
 | 2026-05-07 | WP-0017-direction-guide-skill-metadata | Fixed invalid `direction-guide` skill metadata and added validator coverage for skill frontmatter | Ruby YAML frontmatter parse, protocol validator, and diff check passed |
 | 2026-05-07 | WP-0018-protocol-enforcement-hardening | Added canonical tool policy, required trust-boundary packet fields, report-path audit rules, and validator checks for tool policy, report path replayability, and lightweight scaffold secret patterns | Protocol validator, validator py_compile, and diff check passed |
+| 2026-05-07 | WP-0019-review-plan-closure | Closed remaining review findings with protocol gates, negative tests, schema/context policy, historical supersession metadata, fallback evidence typing, execution budgets, structured errors, README cleanup, and a F-01 through F-17 coverage matrix | Protocol validator, protocol gate, negative unittest, py_compile, JSON validator output, and diff check passed |
 
 ## Open questions
 
@@ -97,6 +100,6 @@ The repo is organized around Codex-native orchestration:
 
 ## Next recommended work
 
-1. Add negative fixtures for malformed reports, unreplayable report paths, prompt injection, tool-policy violations, overlapping reservations, and obvious secret patterns.
-2. Exercise one read-only child explorer request and one denied child request in manual eval scenarios before allowing child implementers on application code.
-3. Keep `scripts/validate_protocol.py` aligned with any future routing, recursion, trust-boundary, or tool-policy refinements.
+1. Exercise one read-only child explorer request and one denied child request in manual eval scenarios before allowing child implementers on application code.
+2. Add deeper fixtures only when the protocol changes again, especially overlapping reservations, child scope violations, and prompt-injection transcripts.
+3. Keep `scripts/validate_protocol.py` and `scripts/protocol_gate.py` aligned with any future routing, recursion, trust-boundary, schema, or tool-policy refinements.

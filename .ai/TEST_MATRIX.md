@@ -19,7 +19,11 @@ This repository is a Codex multi-agent direction-system scaffold, not an applica
 | Agent definitions | `test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml` | Changes under `.codex/agents/` | Confirms the MVP role set exists. |
 | Skill metadata | `python3 scripts/validate_protocol.py` | Changes to `direction-guide` | Confirms `SKILL.md` frontmatter is parseable and includes `name` and `description`. |
 | Protocol validator | `python3 scripts/validate_protocol.py` | Protocol scaffold, role-agent, config, or memory changes | Preferred repeatable check for master-agent protocol consistency. |
+| Protocol gate | `python3 scripts/protocol_gate.py audit` | Before accepting protocol scaffold changes | Runs the validator through the gate command surface. |
+| Pre-accept gate | `python3 scripts/protocol_gate.py pre-accept <task_id> --report <report_path>` | Before marking implementation-capable work accepted | Confirms validator, work-package status, and verifier report evidence are acceptable. |
+| Negative validator tests | `python3 -m unittest tests/test_validate_protocol.py` | Validator or protocol-gate changes | Exercises malformed metadata, unreplayable report paths, fake secret detection, and report-gate failure behavior. |
 | Tool policy alignment | `python3 scripts/validate_protocol.py` | Changes to command, trust-boundary, or report-audit policy | Confirms the canonical tool policy, packet schema, report template, and direction guide stay aligned. |
+| Schema and context profile alignment | `python3 scripts/validate_protocol.py` | Changes to work-package metadata, fallback verification, execution budgets, structured errors, supersession, or context profile guidance | Confirms canonical protocol docs stay aligned until deeper schema checks are added. |
 | Placeholder scan | `rg -n "TODO|Replace this section|YYYY-MM-DD|TBD" .ai AGENTS.md .codex .agents/skills/direction-guide -g '!.ai/TEST_MATRIX.md'` | Before accepting memory/scaffold changes | Remaining placeholders must be intentional or queued. |
 | Scope check | `git status --short` | Before final review | Ensure only intended scaffold/memory files changed. |
 
@@ -54,6 +58,7 @@ Checks:
 10. Verify role-specific report sections appear only as optional extras after the common required fields.
 11. Verify Security Reviewer has role-specific packet guidance.
 12. Verify runtime fallback behavior is documented in `SKILL.md` and `context-packet-schema.md`.
+13. Verify schema policy and context profile references are present when work packages, fallback verification, structured errors, or context selection guidance changes.
 
 Expected result: PASS only if all protocol, schema, role-agent, and report-template requirements are aligned.
 
@@ -97,6 +102,23 @@ Checks:
 8. Verify `SKILL.md` points future agents to the canonical tool policy before tool-sensitive delegation, verification, or integration.
 
 Expected result: PASS only if the command policy and trust-boundary language are present in the canonical reference and required protocol surfaces.
+
+## Schema Policy and Context Profile Check
+
+Purpose: Ensure protocol metadata for provenance, fallback verification, execution control, structured errors, supersession, and context sizing stays explicit and auditable.
+
+Checks:
+
+1. Verify `.agents/skills/direction-guide/references/schema-policy.md` exists.
+2. Verify `.agents/skills/direction-guide/references/context-profiles.md` exists.
+3. Verify `SKILL.md` points to both files before protocol, fallback, schema, or context-selection work.
+4. Verify `work-package-template.yaml` includes provenance, `fallback_verification`, `execution_budget`, context profile, and structured error fields.
+5. Verify `verification-gate.md` distinguishes `VERIFIER_REPORT`, `MASTER_FALLBACK_VERIFICATION`, and `HISTORICAL_ATTESTATION`.
+6. Verify high-risk fallback limitations are documented.
+7. Verify `failure-taxonomy.md` documents `error_category`, `error_code` or equivalent structured error fields through the canonical error object.
+8. Verify historical work packages with superseded max-depth, no-recursion, or one-writer claims include `historical_policy.superseded_by` and `current_policy_reference`.
+
+Expected result: PASS only if new protocol metadata has one canonical reference and historical policy claims point to current accepted decisions.
 
 ## Guarded Parallel Implementer Check
 

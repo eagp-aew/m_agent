@@ -1,5 +1,8 @@
 # Historical Fallback Verification Bundle
 
+- evidence_type: `HISTORICAL_ATTESTATION`
+- current_use_limit: This bundle backfills evidence for work accepted before durable report-path enforcement existed. It is not valid evidence for accepting new work.
+
 This bundle backfills durable master-direct fallback verification evidence for work that was already marked accepted before report-path enforcement existed. It is intentionally concise and points to durable memory rather than replaying raw logs.
 
 ## Shared Evidence Sources

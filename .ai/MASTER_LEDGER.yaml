@@ -8,50 +8,61 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0018-protocol-enforcement-hardening
-  title: "Harden protocol enforcement boundaries"
+  task_id: WP-0019-review-plan-closure
+  title: "Close remaining repository review findings"
   status: ACCEPTED
   scope_type: validation
   assigned_agent: master
-  work_package_path: ".ai/WORK_PACKAGES/WP-0018-protocol-enforcement-hardening.yaml"
+  work_package_path: ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
 
 current_state_machine_state: DONE
 
 active_agent_runs:
-  - agent_run_id: "019e002a-4f3c-7453-9229-6ac2057562d9"
-    nickname: Mendel
+  - agent_run_id: "019e003f-e598-7d70-a186-95f47ac4cd0d"
+    nickname: Carver
     role: implementer
-    task_id: WP-0018-protocol-enforcement-hardening
-    shard_id: docs-policy
-    worktree_id: codex-wp0018-docs-policy
+    task_id: WP-0019-review-plan-closure
+    shard_id: gate-tests
+    worktree_id: codex-wp0019-gate-tests
     status: COMPLETE
-    report_path: ".ai/AGENT_REPORTS/WP-0018-docs-implementer.md"
-  - agent_run_id: "019e002a-4f5f-7f60-857c-f9660f5ddb70"
-    nickname: Lovelace
+    report_path: ".ai/AGENT_REPORTS/WP-0019-gate-tests-implementer.md"
+  - agent_run_id: "019e003f-e556-76c3-a854-98232f865c78"
+    nickname: Pascal
     role: implementer
-    task_id: WP-0018-protocol-enforcement-hardening
-    shard_id: validator-enforcement
-    worktree_id: codex-wp0018-validator-enforcement
+    task_id: WP-0019-review-plan-closure
+    shard_id: policy-memory
+    worktree_id: codex-wp0019-policy-memory
     status: COMPLETE
-    report_path: ".ai/AGENT_REPORTS/WP-0018-validator-implementer.md"
+    report_path: ".ai/AGENT_REPORTS/WP-0019-policy-memory-implementer.md"
 
 active_parallel_batch: null
 file_reservations:
-  - shard_id: docs-policy
+  - shard_id: gate-tests
     files:
-      - ".agents/skills/direction-guide/SKILL.md"
-      - ".agents/skills/direction-guide/references/context-packet-schema.md"
-      - ".agents/skills/direction-guide/references/agent-report-template.md"
-      - ".agents/skills/direction-guide/references/tool-policy.md"
-      - ".ai/TEST_MATRIX.md"
-  - shard_id: validator-enforcement
-    files:
+      - "scripts/protocol_gate.py"
       - "scripts/validate_protocol.py"
+      - "tests/test_validate_protocol.py"
+      - "tests/fixtures/bad_skill_metadata/SKILL.md"
+      - "tests/fixtures/report_missing_paths/report.md"
+      - "tests/fixtures/secrets/scaffold_secret.txt"
+  - shard_id: policy-memory
+    files:
+      - "README.md"
+      - ".agents/skills/direction-guide/SKILL.md"
+      - ".agents/skills/direction-guide/references/context-profiles.md"
+      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
+      - ".agents/skills/direction-guide/references/schema-policy.md"
+      - ".agents/skills/direction-guide/references/verification-gate.md"
+      - ".agents/skills/direction-guide/references/work-package-template.yaml"
+      - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+      - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
+      - ".ai/TEST_MATRIX.md"
 worktree_assignments:
-  - shard_id: docs-policy
-    worktree_id: codex-wp0018-docs-policy
-  - shard_id: validator-enforcement
-    worktree_id: codex-wp0018-validator-enforcement
+  - shard_id: gate-tests
+    worktree_id: codex-wp0019-gate-tests
+  - shard_id: policy-memory
+    worktree_id: codex-wp0019-policy-memory
 effective_parallel_write_agents: 2
 parallel_write_conflicts: 0
 
@@ -83,6 +94,9 @@ open_decisions:
     resolution: "Add scripts/validate_protocol.py as a no-dependency lightweight validator."
 
 failure_counts_by_task:
+  WP-0019-review-plan-closure:
+    verify: 0
+    fix: 0
   WP-0018-protocol-enforcement-hardening:
     verify: 0
     fix: 0
@@ -142,7 +156,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0018-protocol-enforcement-hardening
+    work_package_id: WP-0019-review-plan-closure
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -170,37 +184,61 @@ quality_metrics:
       deletions: null
       note: "See git diff --stat for WP-0018 scoped scaffold, validator, report, and memory changes."
     files_changed:
-      - ".agents/skills/direction-guide/SKILL.md"
-      - ".agents/skills/direction-guide/references/context-packet-schema.md"
-      - ".agents/skills/direction-guide/references/agent-report-template.md"
-      - ".agents/skills/direction-guide/references/tool-policy.md"
+      - "README.md"
+      - "scripts/protocol_gate.py"
       - "scripts/validate_protocol.py"
-      - ".ai/TEST_MATRIX.md"
-      - ".ai/AGENT_REPORTS/WP-0015-fallback-verification.md"
-      - ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md"
-      - ".ai/AGENT_REPORTS/WP-0018-docs-implementer.md"
-      - ".ai/AGENT_REPORTS/WP-0018-validator-implementer.md"
-      - ".ai/AGENT_REPORTS/WP-0018-verifier.md"
-      - ".ai/WORK_PACKAGES/WP-0018-protocol-enforcement-hardening.yaml"
+      - "tests/test_validate_protocol.py"
+      - "tests/fixtures/bad_skill_metadata/SKILL.md"
+      - "tests/fixtures/report_missing_paths/report.md"
+      - "tests/fixtures/secrets/scaffold_secret.txt"
+      - ".agents/skills/direction-guide/SKILL.md"
+      - ".agents/skills/direction-guide/references/context-profiles.md"
+      - ".agents/skills/direction-guide/references/schema-policy.md"
+      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
+      - ".agents/skills/direction-guide/references/verification-gate.md"
+      - ".agents/skills/direction-guide/references/work-package-template.yaml"
+      - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - ".ai/AGENT_REPORTS/WP-0019-gate-tests-implementer.md"
+      - ".ai/AGENT_REPORTS/WP-0019-policy-memory-implementer.md"
+      - ".ai/AGENT_REPORTS/WP-0019-review-coverage.md"
+      - ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+      - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+      - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
+      - ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
       - ".ai/TASK_QUEUE.yaml"
       - ".ai/MASTER_LEDGER.yaml"
       - ".ai/PROJECT_STATE.md"
       - ".ai/DECISIONS.md"
       - ".ai/INTEGRATION_LOG.md"
       - ".ai/RISK_REGISTER.md"
+      - ".ai/TEST_MATRIX.md"
   scope_check:
     status: PASS
-    evidence: "WP-0018 touched only scaffold policy, validation, report artifacts, and durable memory; no application source, dependency manifest, production config, new role, recursion expansion, or parallelism expansion was changed."
+    evidence: "WP-0019 touched only scaffold policy, validation scripts, tests, reports, and durable memory; no application source, dependency manifest, production config, new role, deletion, recursion expansion, or parallelism expansion was changed."
   validation:
     status: PASS
     commands:
       - "python3 scripts/validate_protocol.py"
-      - "python3 -m py_compile scripts/validate_protocol.py"
+      - "python3 scripts/validate_protocol.py --json"
+      - "python3 scripts/protocol_gate.py audit"
+      - "python3 scripts/protocol_gate.py pre-accept WP-0019-review-plan-closure --report .ai/AGENT_REPORTS/WP-0019-verifier.md"
+      - "python3 scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0019-verifier.md"
+      - "python3 -m unittest tests/test_validate_protocol.py"
+      - "python3 -m py_compile scripts/validate_protocol.py scripts/protocol_gate.py"
       - "git diff --check"
       - "git status --short --untracked-files=all"
   verifier_status:
     status: PASS
-    evidence: "Master fallback verifier recorded PASS evidence in .ai/AGENT_REPORTS/WP-0018-verifier.md after all 20 protocol validator checks passed."
+    evidence: "Master fallback verifier recorded PASS evidence in .ai/AGENT_REPORTS/WP-0019-verifier.md and .ai/AGENT_REPORTS/WP-0019-review-coverage.md."
+
+execution_budget:
+  max_steps: 12
+  max_tool_calls: 80
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on repeated identical validation failure, approval-gated scope expansion, dependency changes, production config, secrets, public APIs, or deletion."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

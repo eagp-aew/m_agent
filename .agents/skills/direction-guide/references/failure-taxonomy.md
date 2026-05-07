@@ -1,5 +1,22 @@
 # Failure Taxonomy
 
+When a verifier, fallback verifier, fixer, or integrator returns `FAIL`, `BLOCKED`, or a defect-driven `PARTIAL`, include a structured error object in the report when a concrete failure exists:
+
+```yaml
+error:
+  error_id: ERR-<task-id>-001
+  error_category: SPEC_AMBIGUITY | IMPLEMENTATION_BUG | TEST_EXPECTATION_BUG | INTEGRATION_CONFLICT | ENVIRONMENT_FAILURE | DEPENDENCY_OR_VERSION_MISMATCH | SECURITY_REGRESSION | PERFORMANCE_REGRESSION | FLAKY_TEST | SCOPE_VIOLATION
+  error_code: ""
+  retryable: true | false
+  side_effect_risk: none | low | medium | high
+  idempotency_key: null
+  evidence:
+    - ""
+  recommended_action: ""
+```
+
+Use stable `error_code` values and evidence references so repeated failure signatures can match the same problem without relying on noisy logs or shifting line numbers.
+
 ## SPEC_AMBIGUITY
 
 The desired behavior is unclear.
