@@ -1,0 +1,70 @@
+task_id: WP-0006-context-packet-schema
+status: ACCEPTED
+objective: "Create a required context packet schema for all direction-guide subagent delegation."
+why: "Subagent handoffs need a consistent, bounded contract for source of truth, read scope, write scope, validation, stop conditions, and report shape."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/WORK_PACKAGES/WP-0006-context-packet-schema.yaml"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+
+inputs:
+  - "User request in root thread"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/agent-report-template.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_MODULES.md"
+  - ".ai/MASTER_LEDGER.yaml"
+
+acceptance_criteria:
+  - "Create .agents/skills/direction-guide/references/context-packet-schema.md."
+  - "The schema requires task_id, agent_role, objective, source_of_truth, must_read, may_read, do_not_read, allowed_files, forbidden_files, acceptance_criteria, validation_commands, output_schema, stop_conditions, and max_context_notes."
+  - "The schema includes role-specific guidance for explorer, implementer, verifier, fixer, and integrator."
+  - "Update direction-guide so every subagent spawn must include a context packet."
+  - "Do not modify application source code."
+
+validation_commands:
+  - "test -f .agents/skills/direction-guide/references/context-packet-schema.md && test -f .agents/skills/direction-guide/SKILL.md && test -f AGENTS.md"
+  - "rg -n \"context packet|task_id|agent_role|source_of_truth|max_context_notes\" .agents/skills/direction-guide"
+  - "rg -n \"Explorer|Implementer|Verifier|Fixer|Integrator\" .agents/skills/direction-guide/references/context-packet-schema.md"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "git status --short"
+
+rollback_plan:
+  - "If rejected, remove the context-packet requirement from direction-guide and revise or remove the schema reference with an explicit human-approved patch."
+
+human_approval_required:
+  required: false
+  reason: "Changes are limited to scaffold protocol documentation and durable project memory; no application source code, dependencies, deletions, or approval-gated areas are touched."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - schema_summary
+  - gaps_in_current_agent_instructions
+  - tests_run
+  - risks
+  - next_action

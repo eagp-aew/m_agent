@@ -1,0 +1,84 @@
+task_id: WP-0005-master-ledger
+status: ACCEPTED
+objective: "Create a master execution ledger and require direction-guide workflows to keep it current."
+why: "The master workflow needs one live state file that records active execution state, active work package status, agent runs, decisions, failures, quality metrics, and concurrency limits."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".ai/WORK_PACKAGES/WP-0005-master-ledger.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+
+forbidden_files:
+  - "src/**"
+  - "app/**"
+  - "lib/**"
+  - "database/**"
+  - "package.json"
+  - "package-lock.json"
+  - "pnpm-lock.yaml"
+  - "yarn.lock"
+
+inputs:
+  - "User request on 2026-05-06"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_MODULES.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+
+acceptance_criteria:
+  - ".ai/MASTER_LEDGER.yaml exists."
+  - "MASTER_LEDGER tracks the active milestone."
+  - "MASTER_LEDGER tracks the current work package."
+  - "MASTER_LEDGER tracks the current state machine state."
+  - "MASTER_LEDGER tracks active agent runs."
+  - "MASTER_LEDGER tracks open decisions."
+  - "MASTER_LEDGER tracks failure counts by task."
+  - "MASTER_LEDGER tracks failure signatures."
+  - "MASTER_LEDGER tracks quality metrics."
+  - "MASTER_LEDGER tracks max fix attempts."
+  - "MASTER_LEDGER tracks max parallel write agents."
+  - "MASTER_LEDGER tracks max parallel read agents."
+  - "direction-guide requires ledger updates when starting, assigning, verifying, fixing, integrating, blocking, or completing a work package."
+  - "direction-guide uses only the requested state machine states."
+  - "No application source code is modified."
+  - "Durable project memory is updated after accepted work."
+
+validation_commands:
+  - "test -f .ai/MASTER_LEDGER.yaml"
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "sed -n '1,12p' .agents/skills/direction-guide/SKILL.md"
+  - "rg -n \"INTAKE|PLAN|SCOUT|PACKAGE|IMPLEMENT|VERIFY|FIX_OR_ACCEPT|INTEGRATE|UPDATE_MEMORY|DONE|BLOCKED|ESCALATED\" .agents/skills/direction-guide/SKILL.md .ai/MASTER_LEDGER.yaml"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "git status --short"
+
+rollback_plan:
+  - "Revert MASTER_LEDGER, direction-guide ledger requirements, and WP-0005 memory entries if the ledger protocol is rejected."
+
+human_approval_required:
+  required: false
+  reason: "The user explicitly requested scaffold/protocol documentation changes and no application source changes are needed."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - ledger_fields_created
+  - task_queue_vs_master_ledger
+  - validation_evidence
+  - remaining_risks

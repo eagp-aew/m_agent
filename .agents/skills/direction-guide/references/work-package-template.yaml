@@ -22,6 +22,32 @@ acceptance_criteria:
 validation_commands:
   - ""
 
+implementation_shards: []
+# Optional guarded parallel implementation shape:
+# - shard_id: ""
+#   objective: ""
+#   worktree: ""
+#   allowed_files:
+#     - ""
+#   blocked_by: []
+#   validation_commands:
+#     - ""
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none | read_only | exact_subset_of_parent_reserved_files"
+  approval_required: true
+
 rollback_plan:
   - ""
 

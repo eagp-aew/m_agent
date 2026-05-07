@@ -1,0 +1,85 @@
+task_id: WP-0007-context-packet-alignment-hardening
+status: ACCEPTED
+objective: "Harden context packet, role-agent, report template, fallback, and validation alignment for direction-guide delegation."
+why: "The packet requirement exists, but downstream role-agent instructions, report template, runtime fallback language, and validation checks must enforce the same contract to prevent delegation drift."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/agent-report-template.md"
+  - ".codex/agents/explorer.toml"
+  - ".codex/agents/implementer.toml"
+  - ".codex/agents/verifier.toml"
+  - ".codex/agents/fixer.toml"
+  - ".codex/agents/integrator.toml"
+  - ".codex/agents/security-reviewer.toml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/WORK_PACKAGES/WP-0007-context-packet-alignment-hardening.yaml"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+
+inputs:
+  - "User-approved implementation plan"
+  - "/Users/jie/Downloads/task5_context_packet_alignment_hardening.md"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/agent-report-template.md"
+  - ".codex/agents/*.toml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_LEDGER.yaml"
+
+acceptance_criteria:
+  - "SKILL.md documents runtime fallback when subagent spawning is unavailable or disallowed."
+  - "context-packet-schema.md explicitly distinguishes read-scope and write-scope fields."
+  - "context-packet-schema.md defines forbidden_files as write-scope only and do_not_read as read-scope only."
+  - "context-packet-schema.md includes Security Reviewer packet guidance and a reusable delegation prompt skeleton."
+  - "agent-report-template.md matches the required report fields from SKILL.md and allows role-specific extras only after common fields."
+  - "Every .codex/agents/*.toml role treats context_packet as source of truth, blocks on missing or conflicting packet fields, respects read/write scope, and returns the common report fields."
+  - ".ai/TEST_MATRIX.md includes a context-packet/report alignment check."
+  - "No application source code, dependencies, deletions, or production configuration are changed."
+
+validation_commands:
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
+  - "sed -n '1,12p' .agents/skills/direction-guide/SKILL.md"
+  - "Run context packet/report alignment scans from .ai/TEST_MATRIX.md"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "Parse touched YAML memory files"
+  - "git diff --check"
+  - "git status --short"
+
+rollback_plan:
+  - "If rejected, revert only the WP-0007 alignment changes with an explicit human-approved patch that preserves prior accepted WP-0006 context packet work."
+
+human_approval_required:
+  required: false
+  reason: "Changes are limited to protocol documentation, role-agent instructions, validation docs, and durable project memory; no application source code, dependencies, deletions, or approval-gated areas are touched."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - feedback_accepted_or_modified
+  - tests_run
+  - evidence
+  - risks
+  - next_action

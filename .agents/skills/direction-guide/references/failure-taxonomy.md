@@ -46,7 +46,7 @@ Route: security reviewer.
 
 The implementation likely worsens latency, memory, query count, bundle size, or runtime cost.
 
-Route: performance reviewer or targeted fixer.
+Route: verifier confirms the regression with evidence, then route to a bounded fixer if the failure is concrete. Escalate to the human/master decision path when the performance expectation or acceptable tradeoff is unclear.
 
 ## FLAKY_TEST
 
@@ -59,3 +59,5 @@ Route: verifier reproduces before code fix.
 The agent edited forbidden files or expanded beyond the work package.
 
 Route: master rejects, trims, or asks human.
+
+Includes implementers self-authorizing child agents, child agents attempting grandchildren, child implementers touching files outside the approved parent reservation, or any recursive delegation that exceeds the approved depth-2 packet.

@@ -1,0 +1,89 @@
+task_id: WP-0012-guarded-parallel-implementers
+status: ACCEPTED
+objective: "Enable a guarded parallel implementer policy for master-agent workflows."
+why: "The direction system needs a safe way for the master to spawn multiple implementers editing different files without conflicts, while preserving verification, integration, and memory gates."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/config-policy.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/pre-spawn-checklist.md"
+  - ".agents/skills/direction-guide/references/routing-matrix.md"
+  - ".agents/skills/direction-guide/references/work-package-template.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/METRICS.md"
+  - ".ai/TEST_MATRIX.md"
+  - "scripts/validate_protocol.py"
+  - ".ai/DECISIONS.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/WORK_PACKAGES/WP-0012-guarded-parallel-implementers.yaml"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+  - "new agent roles"
+  - ".codex/config.toml max_depth changes"
+
+inputs:
+  - "User-approved implementation plan in root thread on 2026-05-06"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/routing-matrix.md"
+  - ".agents/skills/direction-guide/references/config-policy.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/pre-spawn-checklist.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/METRICS.md"
+  - ".ai/TEST_MATRIX.md"
+  - "scripts/validate_protocol.py"
+
+acceptance_criteria:
+  - "Protocol replaces the old one-writer baseline with a guarded parallel implementer policy."
+  - "Global write-agent ceiling is documented as max_parallel_write_agents = 3."
+  - "The master computes effective_parallel_write_agents from global ceiling, independent exact-file shards, and available agent capacity."
+  - "Parallel implementers require isolated worktrees, unique shard ids, exact allowed files with no globs, disjoint reservations, and shard validation."
+  - "Shared generated files, public APIs, dependency manifests, migrations, auth/payment/permissions/secrets/production config, deletion, and broad refactors force single-writer mode unless explicitly approved."
+  - "Context packets document optional shard_id, worktree_id, reserved_files, and parallel_batch_id fields without changing the required common report shape."
+  - "Ledger, metrics, test matrix, and validator track effective write-agent count and parallel write conflicts."
+  - "No dependencies, application source edits, new agent roles, deletion, or recursive delegation are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "Parse touched YAML memory files"
+  - "git diff --check"
+  - "git status --short"
+
+implementation_shards: []
+
+rollback_plan:
+  - "If rejected, restore the previous single-writer protocol language with an explicit patch that preserves unrelated accepted scaffold work."
+
+human_approval_required:
+  required: true
+  reason: "Changing workflow-level write-agent concurrency policy requires human approval; the user explicitly requested implementation of the approved plan."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - guarded_parallel_policy
+  - validator_command
+  - tests_run
+  - evidence
+  - risks

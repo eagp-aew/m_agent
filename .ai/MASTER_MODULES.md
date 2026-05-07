@@ -34,14 +34,14 @@ The master agent operates through seven explicit control modules. These modules 
 - Purpose: Decide whether the master handles the work directly or delegates bounded tasks to specialized agents.
 - Inputs: Work package, context brief, write scope, complexity, approval status, available agent roles.
 - Outputs: Routing decision, agent assignments when used, disjoint write scopes, required report format.
-- Decisions it owns: Whether to use explorer, implementer, verifier, fixer, integrator, or security-reviewer roles; whether parallel work is allowed; and when to stop delegating.
-- What it must not do: It must not delegate unbounded work, assign overlapping write scopes, delegate before scope and context are complete, or bypass approval gates.
-- Failure conditions: No safe routing exists, write scopes conflict, the next needed action is too coupled to delegate, or prior fix attempts have hit the stop limit.
+- Decisions it owns: Whether to use explorer, implementer, verifier, fixer, integrator, or security-reviewer roles; whether parallel work is allowed; whether an implementer child-agent request is approved or denied; and when to stop delegating.
+- What it must not do: It must not delegate unbounded work, assign overlapping write scopes, let implementers self-authorize child agents, delegate before scope and context are complete, or bypass approval gates.
+- Failure conditions: No safe routing exists, write scopes conflict, a child-agent request cannot be bounded inside the parent scope, the next needed action is too coupled to delegate, or prior fix attempts have hit the stop limit.
 
 ## 5. Verification Controller
 
 - Purpose: Prove that acceptance criteria are satisfied and classify any failures before fixes begin.
-- Inputs: Implementation result, acceptance criteria, validation commands, diff scope, verifier report when available.
+- Inputs: Implementation result, acceptance criteria, validation commands, diff scope, verifier report or master-direct fallback verification evidence.
 - Outputs: Verification status, evidence, failure classification, fix recommendation, residual test gaps.
 - Decisions it owns: Which validations are sufficient, whether failures are environmental or implementation-related, whether a verifier result is PASS, PARTIAL, BLOCKED, or FAIL, and whether fixer work is allowed.
 - What it must not do: It must not accept unverified behavior changes, hand-wave failed checks, assign fixes before classification, or broaden validation beyond the task without reason.

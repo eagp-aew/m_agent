@@ -11,6 +11,7 @@
 - After accepted work, update `.ai/PROJECT_STATE.md` and `.ai/TASK_QUEUE.yaml`.
 - Record durable product/architecture decisions in `.ai/DECISIONS.md`.
 - Keep the root thread clean; do not paste raw logs unless essential.
+- Follow Thin Master, Thick Artifacts: keep chat concise, and prefer structured project artifacts for durable scope, evidence, decisions, risks, and logs.
 
 ## Multi-agent protocol
 
@@ -19,10 +20,12 @@ For complex work:
 1. Read `.ai/` project memory.
 2. Create or select one work package.
 3. Use explorer agents for read-only mapping if scope is unclear.
-4. Assign exactly one implementer unless write scopes are disjoint.
-5. Assign a verifier after implementation.
-6. Classify failures before assigning a fixer.
-7. Stop after two failed fix attempts or repeated identical errors.
+4. Assign write-capable implementers only through the guarded parallel policy: isolated worktrees, exact disjoint file reservations, and an effective cap no higher than `max_parallel_write_agents`.
+5. Allow implementer-requested child agents only through the bounded depth-2 child-agent request gate: the master approves every request, records the decision, and children cannot spawn grandchildren.
+6. Assign a verifier after implementation, or perform master-direct fallback verification with the same evidence shape when subagent spawning is unavailable or disallowed.
+7. Classify failures before assigning a fixer.
+8. Stop after two failed fix attempts or repeated identical errors.
+9. Spawn subagents only with a complete context packet.
 
 ## Validation
 
@@ -54,7 +57,7 @@ A task is done only when:
 
 - acceptance criteria are satisfied;
 - relevant validation passed or failures are explained;
-- verifier returns PASS or scoped PARTIAL;
+- verifier evidence or fallback verification returns PASS, scoped PARTIAL, or an explicit human override of verifier failure is recorded;
 - `.ai/` memory is updated;
 - remaining risks are recorded.
 

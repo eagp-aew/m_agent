@@ -54,6 +54,105 @@ queue:
     acceptance_summary: "MASTER_CONTRACT defines strict master-agent permissions, stop rules, approval gates, report acceptance rules, and context pollution controls; direction-guide requires compliance."
     work_package_path: ".ai/WORK_PACKAGES/WP-0004-master-operating-contract.yaml"
     verifier_report_path: null
+  - task_id: WP-0005-master-ledger
+    title: "Add master execution ledger"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0004-master-operating-contract
+    acceptance_summary: "MASTER_LEDGER records live execution state and direction-guide requires ledger updates when starting, assigning, verifying, fixing, integrating, blocking, or completing a work package."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0005-master-ledger.yaml"
+    verifier_report_path: null
+  - task_id: WP-0006-context-packet-schema
+    title: "Require context packets for subagent delegation"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0005-master-ledger
+    acceptance_summary: "direction-guide now requires every subagent spawn to include a structured context packet with source-of-truth, read scope, write scope, validation, stop conditions, output schema, and role-specific guidance."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0006-context-packet-schema.yaml"
+    verifier_report_path: null
+  - task_id: WP-0007-context-packet-alignment-hardening
+    title: "Harden context packet and report alignment"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0006-context-packet-schema
+    acceptance_summary: "direction-guide, context-packet schema, report template, role-agent instructions, and TEST_MATRIX now share the same packet fallback, scope, and common report contract."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0007-context-packet-alignment-hardening.yaml"
+    verifier_report_path: null
+  - task_id: WP-0008-routing-matrix
+    title: "Create master routing decision matrix"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0007-context-packet-alignment-hardening
+    acceptance_summary: "direction-guide now requires the master to consult a routing matrix that covers agent role selection, Codex mode routing, and parallelism limits before delegating."
+    work_package_path: null
+    verifier_report_path: null
+  - task_id: WP-0009-verification-gate
+    title: "Harden verifier acceptance gate"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0008-routing-matrix
+    acceptance_summary: "direction-guide now forbids marking work packages ACCEPTED unless verifier PASS evidence, verifier PARTIAL with accepted limitations, or explicit human override of verifier failure is recorded; verifier output now matches the gate evidence and score schema."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0009-verification-gate.yaml"
+    verifier_report_path: null
+  - task_id: WP-0010-master-protocol-consistency
+    title: "Run full master protocol consistency refinement"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0009-verification-gate
+    acceptance_summary: "Contract, ledger, routing matrix, context packet schema, verification gate, failure signatures, pre-spawn checklist, thin-master rule, metrics, evals, role policy, and config policy now agree on one-writer routing, required context packets, verifier-equivalent evidence, repeated-failure escalation, baseline roles, and max_depth = 1."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+    verifier_report_path: null
+  - task_id: WP-0011-lightweight-protocol-validator
+    title: "Add lightweight master protocol validator"
+    status: ACCEPTED
+    priority: P1
+    scope_type: validation
+    assigned_agent: master
+    blocked_by:
+      - WP-0010-master-protocol-consistency
+    acceptance_summary: "Added scripts/validate_protocol.py as a no-dependency read-only Python validator and made it the preferred protocol consistency command in TEST_MATRIX."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
+    verifier_report_path: null
+  - task_id: WP-0012-guarded-parallel-implementers
+    title: "Enable guarded parallel implementer policy"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0011-lightweight-protocol-validator
+    acceptance_summary: "Replaced the one-writer baseline with guarded parallel implementers using isolated worktrees, exact disjoint file reservations, a dynamic effective write-agent cap, per-shard verification, combined integration review, and conflict metrics."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0012-guarded-parallel-implementers.yaml"
+    verifier_report_path: null
+  - task_id: WP-0013-depth-2-child-agent-requests
+    title: "Enable depth-2 child-agent request policy"
+    status: ACCEPTED
+    priority: P1
+    scope_type: protocol
+    assigned_agent: master
+    blocked_by:
+      - WP-0012-guarded-parallel-implementers
+    acceptance_summary: "Enabled bounded depth-2 recursion where implementers may request explorer, verifier, security-reviewer, or exact-file-subset implementer children only through master approval, child packets, report bundles, ledger metrics, and validator checks."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0013-depth-2-child-agent-requests.yaml"
+    verifier_report_path: null
 
 status_values:
   - DRAFT

@@ -21,12 +21,15 @@ one work package
 
 ## Do not do yet
 
-- recursive subagents;
 - automatic merging;
 - broad automations;
 - huge role systems;
-- multiple write agents;
 - dependency upgrades.
+
+## After MVP policy additions
+
+- Multiple write agents are allowed only through the guarded parallel implementer policy.
+- Recursive subagents are allowed only as bounded depth-2, master-approved implementer child-agent requests.
 
 ## Success criteria
 

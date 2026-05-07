@@ -1,0 +1,125 @@
+task_id: WP-0013-depth-2-child-agent-requests
+status: ACCEPTED
+objective: "Enable bounded depth-2 child-agent request policy for implementers."
+why: "The direction system needs implementers to request extra child-agent help when specific triggers occur, while keeping the master in control of routing, approval, verification, integration, and durable memory."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - "AGENTS.md"
+  - ".codex/config.toml"
+  - ".codex/agents/explorer.toml"
+  - ".codex/agents/implementer.toml"
+  - ".codex/agents/verifier.toml"
+  - ".codex/agents/fixer.toml"
+  - ".codex/agents/integrator.toml"
+  - ".codex/agents/security-reviewer.toml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/agent-report-template.md"
+  - ".agents/skills/direction-guide/references/config-policy.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/failure-taxonomy.md"
+  - ".agents/skills/direction-guide/references/pre-spawn-checklist.md"
+  - ".agents/skills/direction-guide/references/routing-matrix.md"
+  - ".agents/skills/direction-guide/references/work-package-template.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/MASTER_MODULES.md"
+  - ".ai/METRICS.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/EVALS/EVAL-005-child-agent-requests.md"
+  - ".ai/WORK_PACKAGES/WP-0013-depth-2-child-agent-requests.yaml"
+  - "FILE_MANIFEST.md"
+  - "07-mvp-build-plan.md"
+  - "08-prompt-library.md"
+  - "scripts/validate_protocol.py"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+  - "new agent roles"
+  - "recursive depth greater than 2"
+  - "autonomous implementer child spawning without master approval"
+
+inputs:
+  - "User-approved plan in root thread on 2026-05-06"
+  - "AGENTS.md"
+  - ".codex/config.toml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/routing-matrix.md"
+  - ".agents/skills/direction-guide/references/config-policy.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/agent-report-template.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/METRICS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/EVALS/EVAL-005-child-agent-requests.md"
+  - "scripts/validate_protocol.py"
+
+acceptance_criteria:
+  - "Protocol sets agents.max_depth = 2 and defines recursion as master -> implementer -> child agent only."
+  - "Implementers may request child agents only through master-approved child_agent_requests."
+  - "Allowed child triggers are missing_context, independent_subshard, pre_return_verification, security_signal, and validation_bottleneck."
+  - "Allowed child roles are explorer, verifier, security-reviewer, and exact-file-subset implementer; child fixers are not allowed."
+  - "Every child packet must set delegation_depth = 2, max_child_depth = 0, can_request_child_agents = false, and child_spawn_mode = none."
+  - "Child implementer write scope must be an exact subset of the parent implementer's reserved files."
+  - "Master ledger, metrics, report template, role instructions, test matrix, and validator track child requests, approvals, depth, report presence, scope violations, and recursive delegation violations."
+  - "No dependencies, application source edits, new agent roles, deletion, unapproved risky changes, or recursive depth greater than 2 are introduced."
+
+validation_commands:
+  - "python3 scripts/validate_protocol.py"
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
+  - "rg -n \"max_depth = 2|child_agent_requests|Child-Agent Request Gate|recursive_delegation_violations\" .codex .agents .ai AGENTS.md"
+  - "test -f .ai/EVALS/EVAL-005-child-agent-requests.md"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "Parse touched YAML memory files"
+  - "git diff --check"
+  - "git status --short"
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: true
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 2
+  child_write_policy: "exact_subset_of_parent_reserved_files"
+  approval_required: true
+
+rollback_plan:
+  - "If rejected, restore max_depth = 1 and the prior recursive delegation disabled language with an explicit patch that preserves unrelated accepted scaffold work."
+
+human_approval_required:
+  required: true
+  reason: "Changing recursive delegation depth and implementer child-agent routing policy requires human approval; the user explicitly requested implementation of the approved plan."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - bounded_recursion_policy
+  - child_agent_request_gate
+  - validator_command
+  - tests_run
+  - evidence
+  - risks

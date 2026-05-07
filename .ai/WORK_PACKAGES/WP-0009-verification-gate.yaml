@@ -1,0 +1,76 @@
+task_id: WP-0009-verification-gate
+status: ACCEPTED
+objective: "Upgrade verifier behavior into a hard acceptance gate for direction-guide work packages."
+why: "The workflow needs an explicit rule preventing the master from marking work ACCEPTED unless verifier evidence, scoped partial acceptance, or a human override supports it."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - ".agents/skills/direction-guide/references/verification-gate.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".codex/agents/verifier.toml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/WORK_PACKAGES/WP-0009-verification-gate.yaml"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+
+inputs:
+  - "User-approved Verification Gate Hardening plan"
+  - "AGENTS.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".codex/agents/verifier.toml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_LEDGER.yaml"
+
+acceptance_criteria:
+  - "Create .agents/skills/direction-guide/references/verification-gate.md."
+  - "The gate states that the master may not mark a work package ACCEPTED unless verifier PASS with evidence, verifier PARTIAL with accepted limitations, or explicit human override of verifier failure is present."
+  - "Verifier evidence requires acceptance criteria mapping, files inspected, commands/tests run or reason not run, regression risks, scope violation check, forbidden files check, and recommendation PASS, PARTIAL, or FAIL."
+  - "The verifier score schema includes acceptance_criteria_checked, tests_or_reason_present, forbidden_files_checked, risks_recorded, and recommendation."
+  - "SKILL.md requires reading and enforcing the gate through verification, fix-or-accept, integration, memory update, and done states."
+  - ".codex/agents/verifier.toml requires verifier output to match the gate evidence and score schema."
+  - "No application source code is modified."
+
+validation_commands:
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
+  - "sed -n '1,12p' .agents/skills/direction-guide/SKILL.md"
+  - "rg -n \"may not mark a work package `ACCEPTED`|acceptance_criteria_checked|tests_or_reason_present|forbidden_files_checked|risks_recorded|recommendation\" .agents/skills/direction-guide/references/verification-gate.md .agents/skills/direction-guide/SKILL.md .codex/agents/verifier.toml"
+  - "rg -n \"acceptance criteria mapping|files inspected|commands/tests run or reason not run|regression risks|scope violation check|forbidden files check\" .agents/skills/direction-guide/references/verification-gate.md .agents/skills/direction-guide/SKILL.md .codex/agents/verifier.toml"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "Parse touched YAML memory files"
+  - "git diff --check"
+  - "git status --short"
+
+rollback_plan:
+  - "If rejected, remove the verification gate requirement from direction-guide, revert verifier output additions, and update memory with an explicit patch that preserves prior accepted work."
+
+human_approval_required:
+  required: false
+  reason: "Changes are limited to protocol documentation, verifier agent instructions, and durable project memory; no application source code, dependencies, deletions, or approval-gated areas are touched."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - final_verification_gate_rule
+  - verifier_file_changes
+  - tests_run
+  - evidence
+  - risks

@@ -9,7 +9,7 @@ This repository is a Codex multi-agent direction-system scaffold, used to refine
 - Milestone: Bootstrap Codex multi-agent direction workflow
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: none (latest accepted: WP-0004-master-operating-contract)
+- Active work package: none (latest accepted: WP-0013-depth-2-child-agent-requests)
 
 ## Important constraints
 
@@ -30,15 +30,32 @@ The repo is organized around Codex-native orchestration:
 - `.ai/` is the durable memory layer for mission, state, queue, decisions, test matrix, risks, integration log, work packages, and agent/automation report locations.
 - `.ai/MASTER_MODULES.md` defines the seven master-thread control modules used to move from intake through memory updates before and after delegation.
 - `.ai/MASTER_CONTRACT.md` defines the strict operating contract that all multi-agent workflows must satisfy, including master permissions, stop conditions, approval gates, report acceptance rules, and context pollution controls.
+- `.ai/MASTER_LEDGER.yaml` records live execution state for the master workflow, including the active milestone, current work package, state-machine state, active agent runs, open decisions, failure tracking, quality metrics, and concurrency limits.
+- `.agents/skills/direction-guide/references/context-packet-schema.md` defines the required context packet every subagent spawn must receive.
+- `.agents/skills/direction-guide/references/routing-matrix.md` defines the master routing matrix for agent roles, Codex mode selection, and parallelism limits.
+- `.agents/skills/direction-guide/references/verification-gate.md` defines the hard verifier evidence gate required before work packages can be marked `ACCEPTED`.
+- `.agents/skills/direction-guide/references/config-policy.md`, the routing matrix, and `.ai/MASTER_LEDGER.yaml` agree on the current concurrency baseline: `agents.max_depth = 2` for master-approved implementer child-agent requests, `max_parallel_write_agents = 3` as a ceiling, one writer by default, and parallel implementers only through isolated worktrees with exact disjoint file reservations.
+- `.codex/agents/*.toml` role instructions enforce the context packet contract and shared report shape.
+- `scripts/validate_protocol.py` is the no-dependency read-only validator for the master-agent protocol scaffold.
 
 ## Known risky areas
 
 - Risk: The workflow may become too ceremonial before proving value.
-  - Mitigation: Complete one small work package before adding more roles or automation.
+  - Mitigation: Use compact one-line module outputs for small master-only tasks while preserving module order and ownership.
 - Risk: Codex may treat this scaffold repo like an application repo and propose irrelevant feature work.
   - Mitigation: Keep `.ai/` memory explicit that work packages should refine the master-agent direction system itself.
-- Risk: Validation may be too informal because the repo has no package manager or test framework.
-  - Mitigation: Use deterministic file-presence, metadata, placeholder, and git-scope checks until a stronger scaffold validator is introduced.
+- Risk: Module handoffs and delegation prompts may drift as the seven-module flow is exercised.
+  - Mitigation: Keep ownership, Routing Controller readiness, the routing matrix, and delegation checklist requirements explicit in `direction-guide`.
+- Risk: Documentation-only validation and dirty `.ai/` memory can make acceptance evidence ambiguous.
+  - Mitigation: Use deterministic scaffold checks and distinguish pre-existing dirty state from current-task changes during integration.
+- Risk: The master could accept work without concrete verifier evidence.
+  - Mitigation: Enforce the verification gate and require accepted limitations or explicit human override for non-PASS outcomes.
+- Risk: Routing, metrics, and role policy can drift across separate protocol files.
+  - Mitigation: Run `python3 scripts/validate_protocol.py` and keep durable routing decisions in `.ai/DECISIONS.md`.
+- Risk: Parallel implementer batches may create integration conflicts if shard boundaries are too loose.
+  - Mitigation: Require isolated worktrees, exact file reservations, dynamic write-agent caps, shard verification, combined integration review, and `parallel_write_conflicts = 0`.
+- Risk: Recursive child-agent requests may hide scope expansion or turn implementers into uncontrolled routers.
+  - Mitigation: Limit recursion to depth 2, require master approval for every child request, deny scope expansion, require child report bundles, and track recursive delegation violations.
 
 ## Recent accepted changes
 
@@ -48,6 +65,15 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-06 | WP-0001-repo-memory-specificity | Made project state, task queue, and test matrix specific to this direction-system repo | Scaffold checks and YAML parse passed |
 | 2026-05-06 | WP-0003-master-control-modules | Defined seven explicit master control modules and wired them into `direction-guide` delegation flow | Scaffold checks and Markdown review passed |
 | 2026-05-06 | WP-0004-master-operating-contract | Added a strict master operating contract and required `direction-guide` workflows to comply with it | Scaffold checks and Markdown review passed |
+| 2026-05-06 | WP-0005-master-ledger | Added live master execution ledger and required `direction-guide` workflows to update it at key control points | Scaffold checks and Markdown review passed |
+| 2026-05-06 | WP-0006-context-packet-schema | Added a required context packet schema for every direction-guide subagent spawn | Scaffold checks and Markdown review passed |
+| 2026-05-06 | WP-0007-context-packet-alignment-hardening | Aligned role-agent instructions, report template, runtime fallback, and validation checks with the context packet contract | Scaffold and alignment checks passed |
+| 2026-05-06 | WP-0008-routing-matrix | Added a routing matrix for master agent role selection, Codex mode selection, and parallelism limits | Routing matrix checks passed |
+| 2026-05-06 | WP-0009-verification-gate | Added a hard acceptance gate requiring verifier PASS evidence, scoped PARTIAL acceptance, or explicit human override | Verification gate checks passed |
+| 2026-05-06 | WP-0010-master-protocol-consistency | Aligned contract, routing, config, metrics, evals, role policy, failure routing, and verifier fallback language across the master-agent protocol | Consistency, scaffold, YAML, and scope checks passed |
+| 2026-05-06 | WP-0011-lightweight-protocol-validator | Added a no-dependency Python validator for repeatable master-agent protocol consistency checks | Validator, scaffold, YAML, diff, placeholder, and scope checks passed |
+| 2026-05-06 | WP-0012-guarded-parallel-implementers | Replaced the one-writer baseline with a guarded parallel implementer policy using isolated worktrees, exact file reservations, dynamic caps, and conflict tracking | Validator, scaffold, placeholder, diff, YAML, and scope checks passed |
+| 2026-05-06 | WP-0013-depth-2-child-agent-requests | Enabled bounded depth-2 child-agent requests from implementers with master approval, child packet limits, child report bundles, and recursion metrics | Validator, scaffold, recursive policy scan, child-request eval, diff, YAML, and scope checks passed |
 
 ## Open questions
 
@@ -55,6 +81,6 @@ The repo is organized around Codex-native orchestration:
 
 ## Next recommended work
 
-1. Decide whether the next work package should add a lightweight scaffold validator or continue refining the written protocol.
-2. Exercise the master contract and seven control modules on the next real delegated task.
-3. Tighten the protocol if the contract proves too ceremonial or leaves routing gaps.
+1. Exercise guarded parallel implementation on a small documentation-only work package with two exact-file shards before using it on application code.
+2. Exercise one read-only child explorer request and one denied child request in manual eval scenarios before allowing child implementers on application code.
+3. Keep `scripts/validate_protocol.py` aligned with any future routing, recursion, or concurrency policy refinements.

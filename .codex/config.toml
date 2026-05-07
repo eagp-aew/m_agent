@@ -7,7 +7,7 @@ approval_policy = "on-request"
 
 [agents]
 max_threads = 5
-max_depth = 1
+max_depth = 2
 job_max_runtime_seconds = 1800
 
 [features]

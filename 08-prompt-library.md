@@ -22,9 +22,10 @@ No edits.
 ## Implementation
 
 ```text
-Assign WP-____ to exactly one implementer.
-The implementer may edit only allowed_files.
-After implementation, write a structured report.
+Assign WP-____ to one implementer by default, or a guarded parallel implementer batch only when exact-file shards are approved.
+The implementer may edit only allowed_files and reserved_files.
+If the packet permits child-agent requests, the implementer may return child_agent_requests for master approval but must not self-authorize child agents.
+After implementation, write a structured report with child_report_bundle when approved child agents were used.
 ```
 
 ## Verification

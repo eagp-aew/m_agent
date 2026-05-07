@@ -1,56 +1,117 @@
-# Agent Report: WP-____ / ROLE
+# Subagent Report
 
-## Metadata
+## task_id
 
-- Task ID: WP-____
-- Agent role:
-- Status: PASS | PARTIAL | BLOCKED | FAIL
-- Date:
+`<task_id>`
 
-## One-sentence result
+## agent_role
 
+`explorer | implementer | verifier | fixer | integrator | security-reviewer`
 
-## Files read
+## status
 
--
+`PASS | PARTIAL | BLOCKED | FAIL`
 
-## Files changed
+## one_sentence_result
 
-- Path:
-  - Change summary:
+`<one sentence summary of the result>`
 
-## Commands run
+## files_read
 
-| Command | Result | Notes |
-|---|---|---|
-|  | PASS/FAIL/NOT_RUN |  |
+- `<path>` - `<why it was read>`
 
-## Tests run
+Use `None` if no files were read.
 
-| Test/command | Result | Notes |
-|---|---|---|
-|  | PASS/FAIL/NOT_RUN |  |
+## files_changed
 
-## Acceptance criteria mapping
+- `<path>` - `<summary of change>`
 
-| Criterion | Status | Evidence |
-|---|---|---|
-|  | PASS/PARTIAL/FAIL |  |
+Use `None` if no files were changed.
 
-## Evidence
+## commands_run
 
--
+- `<command>` - `<result>`
 
-## Risks
+Use `None` if no commands were run.
 
-- Severity: low | medium | high
-  - Description:
-  - Mitigation:
+## tests_run
 
-## Assumptions
+- `<test or validation command>` - `<PASS | FAIL | NOT_RUN>` - `<evidence or reason>`
 
--
+Use `None` if no tests were run.
 
-## Recommended next action
+## evidence
 
+- `<specific evidence supporting the status>`
 
+## risks
+
+- `<remaining risk or None>`
+
+## assumptions
+
+- `<assumption or None>`
+
+## recommended_next_action
+
+`<next action for the master>`
+
+## child_agent_requests
+
+Use `None` unless the reporting agent is an implementer whose context packet permits master-approved child-agent requests.
+
+Each requested child agent must include:
+
+- `request_id`
+- `trigger`: `missing_context | independent_subshard | pre_return_verification | security_signal | validation_bottleneck`
+- `requested_role`: `explorer | verifier | security-reviewer | implementer`
+- `objective`
+- `why_needed`
+- `proposed_context_packet`
+- `proposed_allowed_files`
+- `proposed_reserved_files`
+- `validation_commands`
+- `risk_class`
+- `approval_gates`
+- `fallback_if_denied`
+- `expected_report_use`
+
+## child_report_bundle
+
+Use `None` unless the reporting implementer received approved child-agent reports.
+
+When present, include each approved child `request_id`, child `agent_run_id`, child role, status, files read, files changed, validation evidence, scope check, and how the parent used the report.
+
+## Optional Role-Specific Sections
+
+Role-specific sections may be appended after the required common report fields. They must not replace or rename the common fields above.
+
+Suggested optional sections:
+
+## explorer_recommendations
+
+Useful for explorer when recommending allowed files, forbidden files, validation commands, or follow-up context.
+
+## root_cause
+
+Required for fixer when diagnosing a verifier failure.
+
+## security_findings
+
+Required for security-reviewer when security issues are found or explicitly absent.
+
+## acceptance_criteria_check
+
+Useful for verifier and integrator.
+
+## integration_notes
+
+Useful for integrator.
+
+## failure_classification
+
+Useful for verifier and fixer when reporting failure evidence.
+
+## recursive_delegation_notes
+
+Useful for implementers and integrators when child-agent requests or reports were involved.

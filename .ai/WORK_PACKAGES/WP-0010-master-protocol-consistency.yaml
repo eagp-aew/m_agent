@@ -1,0 +1,89 @@
+task_id: WP-0010-master-protocol-consistency
+status: ACCEPTED
+objective: "Run a full consistency refinement pass across the master-agent protocol without modifying application source code."
+why: "The protocol spans the master contract, ledger, routing matrix, context packet schema, verification gate, failure routing, metrics, evals, role policy, config policy, and role-agent instructions; these files must agree before the workflow is reliable."
+scope_type: protocol
+priority: P1
+
+allowed_files:
+  - "AGENTS.md"
+  - ".codex/config.toml"
+  - ".codex/agents/*.toml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/*.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/METRICS.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/MASTER_MODULES.md"
+  - ".ai/EVALS/*.md"
+  - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
+
+forbidden_files:
+  - "application source code"
+  - "auth, payment, permissions, migrations, secrets, and production config"
+  - "dependency manifests"
+  - "deleted files"
+  - "new agent roles"
+
+inputs:
+  - "User request in root thread on 2026-05-06"
+  - "AGENTS.md"
+  - ".codex/config.toml"
+  - ".codex/agents/*.toml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/*.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/METRICS.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/EVALS/*.md"
+
+acceptance_criteria:
+  - "Master contract, ledger, routing matrix, context packet schema, verification gate, failure signatures, pre-spawn checklist, thin-master rule, metrics, evals, role policy, and config policy agree."
+  - "Contradictions are fixed only in protocol and durable memory files."
+  - "No new agent roles are added."
+  - ".codex/config.toml keeps agents.max_depth = 1."
+  - "Every implementation path requires verifier-equivalent evidence or explicit human override before acceptance."
+  - "Repeated failure escalates instead of looping."
+  - "Every subagent delegation requires a complete context packet."
+  - "No application source code is modified."
+
+validation_commands:
+  - "test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md"
+  - "test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml"
+  - "Run Master Protocol Consistency Check from .ai/TEST_MATRIX.md"
+  - "Run Context Packet and Report Alignment Check from .ai/TEST_MATRIX.md"
+  - "Run the placeholder scan from .ai/TEST_MATRIX.md"
+  - "Parse touched YAML memory files"
+  - "git diff --check"
+  - "git status --short"
+
+rollback_plan:
+  - "If rejected, revert only WP-0010 protocol-consistency edits with an explicit patch that preserves previous accepted work."
+
+human_approval_required:
+  required: false
+  reason: "The user explicitly requested protocol consistency refinement; changes are limited to protocol documentation, role-agent instructions, and durable project memory with no application source, dependency, deletion, production config, or new-role changes."
+
+assigned_agent: master
+
+attempts:
+  implement: 1
+  fix: 0
+  verify: 1
+
+output_required:
+  - files_changed
+  - contradictions_found
+  - contradictions_fixed
+  - final_master_workflow
+  - remaining_manual_decisions

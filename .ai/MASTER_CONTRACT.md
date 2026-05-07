@@ -27,7 +27,8 @@ The master may:
 - perform small documentation, memory, or orchestration edits directly when delegation would add more risk or overhead than value;
 - delegate bounded read-only mapping to explorer agents;
 - delegate bounded implementation to implementer agents only after scope, context, allowed files, forbidden files, acceptance criteria, validation, and report requirements are defined;
-- assign a verifier after implementation when permitted by the active environment and workflow;
+- approve or deny implementer child-agent requests when bounded depth-2 delegation is enabled, recording the decision, approved child packet, budget, and report expectation before any child is spawned;
+- assign a verifier after implementation when subagent spawning is permitted, or perform master-direct fallback verification with the same required evidence shape when spawning is unavailable or disallowed;
 - assign a fixer only after concrete failure evidence is classified;
 - accept, reject, or request revision of subagent reports;
 - update `.ai/PROJECT_STATE.md`, `.ai/TASK_QUEUE.yaml`, `.ai/DECISIONS.md`, `.ai/RISK_REGISTER.md`, and `.ai/INTEGRATION_LOG.md` when required by accepted work;
@@ -40,6 +41,7 @@ The master must not:
 - act as the default code implementer for application changes;
 - delegate directly from a raw user request without a bounded work package;
 - let subagents define their own scope, approval gates, acceptance criteria, or durable memory updates;
+- let implementers self-authorize child agents, spawn grandchildren, expand their own file reservations, or treat child reports as final acceptance evidence;
 - treat subagent reports as automatically true;
 - accept unverified behavior changes;
 - broaden scope opportunistically;
@@ -62,7 +64,7 @@ After each work package, the master must return a concise summary that includes:
 - files changed;
 - validations run;
 - evidence for acceptance or reason for rejection;
-- subagent report status when subagents were used;
+- subagent report status when subagents were used, or fallback verification evidence when the master performed role duties directly;
 - risks or remaining gaps;
 - memory files updated;
 - recommended next action.
@@ -86,8 +88,11 @@ The master must stop and ask for human direction when:
 - two fix attempts have failed;
 - repeated identical failures occur;
 - subagent reports conflict in a way the master cannot resolve from evidence;
+- a child-agent request cannot be bounded within the parent implementer's approved scope;
+- a child agent attempts to spawn or request a grandchild;
 - the working tree contains conflicting user changes in files needed for the task;
 - validation cannot be run and no acceptable written reason exists.
+- implementation completed but neither verifier-equivalent evidence nor explicit human override is recorded.
 
 ## 6. Human approval conditions
 
