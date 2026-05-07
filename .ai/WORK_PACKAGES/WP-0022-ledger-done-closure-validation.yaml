@@ -1,0 +1,134 @@
+task_id: WP-0022-ledger-done-closure-validation
+status: ACCEPTED
+objective: "Make DONE ledger closure enforceable so accepted work cannot leave stale active agents, file reservations, worktree assignments, write-agent counts, or null quality metrics."
+why: "Post-WP-0021 rescan found that the protocol requires clearing active execution state at DONE, but validator coverage only checks status consistency. A stale ledger can make future agents misread completed work as still active."
+scope_type: validation
+priority: P0
+
+provenance:
+  created_at: "2026-05-07"
+  created_by: codex-master
+  source:
+    - "Post-WP-0021 rescan."
+    - "Explorer finding: DONE ledger state could retain active execution artifacts."
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0022-verifier.md"
+  superseded_by: null
+
+risk_class: protocol_validation
+
+context_profile: protocol
+context_profile_reason: "The work touches ledger validator semantics, tests, and durable memory closure."
+
+fallback_verification:
+  allowed: true
+  reason: "The change is a low-risk validator/test/memory-policy hardening with no application behavior, dependencies, or deletion."
+  high_risk_requires_independent_verifier: false
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 10
+  max_tool_calls: 80
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0022-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency changes, deletion, public API changes, production config, secrets, broad refactors, or ledger semantics that conflict with the master contract."
+
+allowed_files:
+  - "scripts/validate_protocol.py"
+  - "tests/test_validate_protocol.py"
+  - "tests/fixtures/stale_done_ledger.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/WORK_PACKAGES/WP-0022-ledger-done-closure-validation.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0022-verifier.md"
+
+forbidden_files:
+  - ".codex/config.toml"
+  - ".codex/agents/"
+  - ".agents/skills/direction-guide/"
+  - "dependency manifests"
+  - "application source files"
+  - "auth, payment, permissions, migrations, secrets, or production config"
+  - "deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".ai/METRICS.md"
+  - ".ai/MASTER_LEDGER.yaml"
+  - "scripts/validate_protocol.py"
+  - "tests/test_validate_protocol.py"
+
+acceptance_criteria:
+  - "Validator fails a DONE ledger that still has active agent runs, active parallel batch, file reservations, worktree assignments, nonzero effective write-agent count, or null per-work-package metrics."
+  - "Validator passes the current ledger after accepted work is closed."
+  - "Unit tests include an adverse stale DONE ledger fixture."
+  - "TEST_MATRIX documents the ledger DONE closure check."
+  - "No dependencies, deletions, public APIs, production config, auth/payment/permissions/secrets handling changes, or broad refactors are introduced."
+
+validation_commands:
+  - "python3 -B -m unittest tests/test_validate_protocol.py"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards:
+  - shard_id: ledger-validator
+    objective: "Add validator/test coverage for DONE ledger closure."
+    worktree: "codex-wp0022-ledger-validator"
+    allowed_files:
+      - "scripts/validate_protocol.py"
+      - "tests/test_validate_protocol.py"
+      - "tests/fixtures/stale_done_ledger.yaml"
+      - ".ai/TEST_MATRIX.md"
+    blocked_by: []
+    validation_commands:
+      - "python3 -B -m unittest tests/test_validate_protocol.py"
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only WP-0022 scoped validator, fixture, test, TEST_MATRIX, and memory changes if verification fails."
+
+human_approval_required:
+  required: false
+  reason: "The work is limited to validator, tests, documentation, and durable memory; it does not delete files or touch approval-gated application areas."
+
+assigned_agent: James
+
+attempts:
+  implement: 0
+  fix: 0
+  verify: 1
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - tests_run
+  - verifier_report
+  - risks
+  - follow_up_tasks

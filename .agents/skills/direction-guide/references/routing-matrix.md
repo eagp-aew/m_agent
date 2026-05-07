@@ -63,6 +63,8 @@ The Routing Controller may approve an implementer-requested child agent only whe
 - the requested role is one of `explorer`, `verifier`, `security-reviewer`, or `implementer`;
 - child `explorer`, `verifier`, and `security-reviewer` packets are read-only;
 - a child `implementer` may edit only exact file paths that are already reserved to the parent implementer and are not reserved to another active child;
+- a child `implementer` must receive an explicit write lease with `write_lease_id`, `leased_files`, `lease_owner_agent_run_id`, and `parent_write_state: paused_for_leased_files` recorded before spawn;
+- while a child implementer write lease is active, the parent implementer must not edit `leased_files` until the child report is reviewed and the master records the lease as returned or revoked;
 - the effective write-agent count, including the parent when it is writing and any write-capable children, stays within `max_parallel_write_agents`;
 - the master can review every child report before accepting the parent implementer report.
 
@@ -70,4 +72,4 @@ The master must deny child-agent requests when they require new files outside th
 
 Allowed request triggers are `missing_context`, `independent_subshard`, `pre_return_verification`, `security_signal`, and `validation_bottleneck`. Any other trigger returns to the master as a normal scope or routing decision.
 
-Every approved child packet must set `delegation_depth: 2`, `max_child_depth: 0`, `can_request_child_agents: false`, and `child_spawn_mode: "none"`. Child agents must not spawn or request grandchildren.
+Every approved child packet must set `delegation_depth: 2`, `max_child_depth: 0`, `can_request_child_agents: false`, and `child_spawn_mode: "none"`. Child agents must not spawn or request grandchildren. Child implementer packets must also carry the approved write lease fields, and the Integration Controller must mark a conflict if parent and child both edit a leased file during the lease.

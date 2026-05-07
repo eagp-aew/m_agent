@@ -1,0 +1,187 @@
+task_id: WP-0020-protocol-gate-semantic-hardening
+status: ACCEPTED
+objective: "Harden protocol gates so accepted work cannot pass with mismatched reports, failing report semantics, shallow work packages, weak durable evidence checks, or missing role-agent trust-boundary validation."
+why: "Read-only review found the current protocol validator and gate can pass unsafe evidence shapes, including using a verifier report from the wrong work package."
+scope_type: validation
+priority: P0
+
+provenance:
+  created_at: "2026-05-07"
+  created_by: codex-master
+  source:
+    - "User request to implement the Fresh-Baseline Master-Agent Refinement Plan."
+    - "Read-only explorer report PLAN-validator-gate-review."
+  trust_level: repo_controlled
+  verified_by: "verifier:.ai/AGENT_REPORTS/WP-0020-verifier.md"
+  superseded_by: null
+
+risk_class: protocol_validation
+
+context_profile: protocol
+context_profile_reason: "The work changes protocol gate semantics, validator behavior, negative tests, role-agent packet validation, and durable memory state."
+
+fallback_verification:
+  allowed: false
+  reason: "This hardens acceptance-gate enforcement; independent verifier evidence is required unless the human explicitly overrides."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 14
+  max_tool_calls: 100
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0020-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on repeated identical validation failure, approval-gated scope expansion, dependency changes, production config, secrets, public APIs, broad refactors, or deletion."
+
+allowed_files:
+  - "scripts/validate_protocol.py"
+  - "scripts/protocol_gate.py"
+  - "tests/test_validate_protocol.py"
+  - "tests/fixtures/wrong_task_report/report.md"
+  - "tests/fixtures/failing_report_with_markers/report.md"
+  - "tests/fixtures/shallow_work_package.yaml"
+  - "tests/fixtures/report_bare_missing_path/report.md"
+  - "tests/fixtures/report_missing_common_fields/report.md"
+  - ".codex/agents/explorer.toml"
+  - ".codex/agents/implementer.toml"
+  - ".codex/agents/verifier.toml"
+  - ".codex/agents/fixer.toml"
+  - ".codex/agents/integrator.toml"
+  - ".codex/agents/security-reviewer.toml"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/WORK_PACKAGES/WP-0020-protocol-gate-semantic-hardening.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0020-verifier.md"
+
+forbidden_files:
+  - "AGENTS.md"
+  - "README.md"
+  - "INSTALLATION.md"
+  - ".codex/config.toml"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/"
+  - "dependency manifests"
+  - "application source files"
+  - "auth, payment, permissions, migrations, secrets, or production config"
+  - "deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - ".agents/skills/direction-guide/SKILL.md"
+  - ".agents/skills/direction-guide/references/verification-gate.md"
+  - ".agents/skills/direction-guide/references/context-packet-schema.md"
+  - ".agents/skills/direction-guide/references/tool-policy.md"
+  - ".agents/skills/direction-guide/references/schema-policy.md"
+  - "scripts/validate_protocol.py"
+  - "scripts/protocol_gate.py"
+  - "tests/test_validate_protocol.py"
+
+acceptance_criteria:
+  - "`pre-accept <task_id> --report <other-task-report>` fails when the report task id does not match the requested work package."
+  - "Report gate rejects reports whose status or recommendation is `FAIL`, rejects `PARTIAL` unless accepted limitations are present, and requires verifier score fields to be affirmative for `PASS`."
+  - "Durable verification evidence path validation uses the same report-gate semantics as direct report checks."
+  - "Pre-implement and pre-accept work-package gates require minimum scope, approval, fallback, execution-budget, risk, acceptance, and validation fields."
+  - "Report path auditing catches missing bare repo-like paths in addition to backticked paths while preserving explicit external/runtime/user/generated/not_applicable markers."
+  - "Every baseline role-agent TOML requires `trust_boundary` as a packet field before acting, matching the context packet schema."
+  - "No dependencies, new agent roles, public APIs, production config, auth/payment/permissions/secrets handling changes, broad refactors, or file deletions are introduced."
+
+validation_commands:
+  - "python3 -m unittest tests/test_validate_protocol.py"
+  - "python3 scripts/validate_protocol.py"
+  - "python3 scripts/protocol_gate.py audit"
+  - "python3 scripts/protocol_gate.py pre-accept WP-0019-review-plan-closure --report .ai/AGENT_REPORTS/WP-0018-verifier.md"
+  - "python3 scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0019-verifier.md"
+  - "python3 -m py_compile scripts/validate_protocol.py scripts/protocol_gate.py"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards:
+  - shard_id: gate-core
+    objective: "Harden validator and protocol-gate logic."
+    worktree: "codex-wp0020-gate-core"
+    allowed_files:
+      - "scripts/validate_protocol.py"
+      - "scripts/protocol_gate.py"
+    blocked_by: []
+    validation_commands:
+      - "python3 scripts/validate_protocol.py"
+      - "python3 scripts/protocol_gate.py audit"
+  - shard_id: tests-fixtures
+    objective: "Add negative fixtures and tests for gate bypasses."
+    worktree: "codex-wp0020-tests-fixtures"
+    allowed_files:
+      - "tests/test_validate_protocol.py"
+      - "tests/fixtures/wrong_task_report/report.md"
+      - "tests/fixtures/failing_report_with_markers/report.md"
+      - "tests/fixtures/shallow_work_package.yaml"
+      - "tests/fixtures/report_bare_missing_path/report.md"
+      - "tests/fixtures/report_missing_common_fields/report.md"
+    blocked_by: []
+    validation_commands:
+      - "python3 -m unittest tests/test_validate_protocol.py"
+  - shard_id: role-packet-policy
+    objective: "Align role-agent packet validation and test-matrix notes with trust-boundary enforcement."
+    worktree: "codex-wp0020-role-packet-policy"
+    allowed_files:
+      - ".codex/agents/explorer.toml"
+      - ".codex/agents/implementer.toml"
+      - ".codex/agents/verifier.toml"
+      - ".codex/agents/fixer.toml"
+      - ".codex/agents/integrator.toml"
+      - ".codex/agents/security-reviewer.toml"
+      - ".ai/TEST_MATRIX.md"
+    blocked_by: []
+    validation_commands:
+      - "python3 scripts/validate_protocol.py"
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the WP-0020 files listed in allowed_files if verification fails and no bounded fixer can resolve the failure."
+  - "Preserve prior accepted WP-0019 baseline and do not delete generated or fixture files without explicit human approval."
+
+human_approval_required:
+  required: false
+  reason: "The work is limited to scaffold validation, test fixtures, role-agent packet validation text, and durable memory. It does not delete files, add dependencies, or touch approval-gated application areas."
+
+assigned_agent: master-orchestrated-parallel-implementers
+
+attempts:
+  implement: 0
+  fix: 0
+  verify: 0
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - tests_run
+  - verifier_report
+  - risks
+  - follow_up_tasks

@@ -219,6 +219,61 @@ queue:
     acceptance_summary: "Added protocol gates, negative tests, supersession metadata, fallback evidence typing, budgets, context profiles, and a complete review finding coverage matrix."
     work_package_path: ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+  - task_id: WP-0020-protocol-gate-semantic-hardening
+    title: "Harden protocol gate semantics"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: master-orchestrated-parallel-implementers
+    blocked_by:
+      - WP-0019-review-plan-closure
+    acceptance_summary: "Protocol gates now reject wrong-task verifier reports, failing report semantics, shallow work packages, weak durable evidence, bare missing report paths, and role packets without trust_boundary validation."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0020-protocol-gate-semantic-hardening.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0020-verifier.md"
+  - task_id: WP-0021-runtime-export-bundle
+    title: "Define exportable runtime scaffold bundle"
+    status: ACCEPTED
+    priority: P0
+    scope_type: protocol
+    assigned_agent: master-orchestrated-parallel-implementers
+    blocked_by:
+      - WP-0020-protocol-gate-semantic-hardening
+    acceptance_summary: "Defined reusable runtime bundle assets, separated scaffold development history from target-repo memory, documented real-repo adoption, and added validator/test coverage for required export files."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0021-runtime-export-bundle.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0021-verifier.md"
+  - task_id: WP-0022-ledger-done-closure-validation
+    title: "Validate DONE ledger closure"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: James
+    blocked_by:
+      - WP-0021-runtime-export-bundle
+    acceptance_summary: "Validator now rejects DONE ledger state with stale active runs, reservations, worktrees, active batch, nonzero write-agent count, or null per-work-package metrics; tests include an adverse stale DONE fixture."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0022-ledger-done-closure-validation.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0022-verifier.md"
+  - task_id: WP-0023-child-write-lease-policy
+    title: "Add child implementer write-lease policy"
+    status: ACCEPTED
+    priority: P0
+    scope_type: protocol
+    assigned_agent: master-orchestrated-implementers
+    blocked_by:
+      - WP-0022-ledger-done-closure-validation
+    acceptance_summary: "Child implementers now require explicit write leases, leased files, lease owner ids, parent pause state, and return/revocation before parents resume leased files; validator and tests cover required markers."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0023-child-write-lease-policy.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0023-verifier.md"
+  - task_id: WP-0024-historical-exception-metrics
+    title: "Validate historical work-package exceptions"
+    status: ACCEPTED
+    priority: P0
+    scope_type: validation
+    assigned_agent: Galileo
+    blocked_by:
+      - WP-0023-child-write-lease-policy
+    acceptance_summary: "Metrics now distinguish post-enforcement 100% work-package coverage from four enumerated historical pre-enforcement exceptions, and validator/tests reject future accepted work without work_package_path."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0024-historical-exception-metrics.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
 
 status_values:
   - DRAFT

@@ -292,6 +292,92 @@
   - Future accepted work can use a pre-accept gate instead of relying only on manual protocol reading.
   - The system is still a Codex scaffold; command execution safety depends on runtime permissions plus the master protocol.
 
+## DEC-0019: Enforce semantic protocol gates
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - Read-only review found that protocol gates could pass with a verifier report from the wrong task, marker-only failing reports, shallow work packages, and unbackticked missing evidence paths.
+  - Role-agent TOMLs also omitted `trust_boundary` from their required packet-field validation list even though the context packet schema required it.
+- Decision:
+  - Require `pre-accept` report task ids to match the requested work package.
+  - Make report gates parse status, recommendation, and verifier score semantics instead of accepting marker words alone.
+  - Reject `FAIL` reports, require accepted limitations for `PARTIAL`, and require affirmative score fields for `PASS`.
+  - Reuse report-gate semantics for durable verifier evidence paths.
+  - Extend path auditing to bare repo-like paths while preserving explicit external/runtime/user/generated/not_applicable markers.
+  - Require every baseline role agent to validate `trust_boundary` before acting.
+- Consequences:
+  - Accepted work is harder to spoof with stale or mismatched evidence.
+  - Tests should run subprocess validators with `-B` to avoid tracked bytecode churn.
+  - Future protocol-gate changes should add negative fixtures before acceptance.
+
+## DEC-0020: Define an exportable runtime bundle
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - The user and multiple reviews noted that the repository was still perceived as a scaffold rather than a copyable runtime structure for real project repos.
+  - Adoption needed a boundary between reusable master-agent runtime assets and this scaffold repo's development-only `.ai` history.
+- Decision:
+  - Define the runtime bundle in `README.md`, `INSTALLATION.md`, and `.ai/TEST_MATRIX.md`.
+  - Treat root entrypoints, `.codex` config and agents, the `direction-guide` skill, validation scripts, validator tests/fixtures, and rewritten target-repo `.ai` seed memory as the reusable runtime.
+  - Treat this repo's historical work packages, agent reports, accepted-work history, active ledger state, and scaffold next-work notes as development-only history that should not be copied wholesale into target repos.
+  - Extend `scripts/validate_protocol.py` with export-bundle file and documentation checks.
+- Consequences:
+  - Real project adoption now has an explicit copy/install flow.
+  - The validator can catch missing runtime assets before bootstrap work is accepted.
+  - Target repos still need fresh or rewritten `.ai` memory before application work begins.
+
+## DEC-0021: Enforce DONE ledger closure
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - Post-WP-0021 rescan found that the protocol required clearing active execution state at DONE, but validation only checked status compatibility.
+  - A stale DONE ledger could make future agents treat completed agents, reservations, worktrees, or null metrics as still active.
+- Decision:
+  - Add `check_ledger_done_closure()` to `scripts/validate_protocol.py`.
+  - Fail validation when `current_state_machine_state: DONE` retains active agent runs, active parallel batch, file reservations, worktree assignments, nonzero effective write-agent count, or null per-work-package metrics.
+  - Add `tests/fixtures/stale_done_ledger.yaml` and unit coverage for the adverse stale DONE case.
+- Consequences:
+  - Memory closure now has an executable guard instead of relying on prose.
+  - The live ledger must use concrete metric values before `DONE`.
+  - The check intentionally stays dependency-free and follows the current top-level ledger shape.
+
+## DEC-0022: Require child implementer write leases
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - Child implementers could edit exact subsets of parent reservations, but the protocol did not say who owned the write lease while the child was active.
+  - Without explicit lease ownership, a parent and child could both modify the same reserved file during a child run.
+- Decision:
+  - Require child implementer packets to include `write_lease_id`, `leased_files`, `lease_owner_agent_run_id`, and `parent_write_state: paused_for_leased_files`.
+  - Require the master to record the write lease before spawning a child implementer.
+  - Require the parent implementer to pause writes to leased files until the child report is reviewed and the master records the lease as returned or revoked.
+  - Add validator and unit-test coverage for the required lease-policy markers.
+- Consequences:
+  - Child implementer write ownership is explicit and auditable.
+  - Parent/child concurrent edits to leased files become protocol conflicts rather than convention failures.
+  - The validator remains lightweight and marker-based.
+
+## DEC-0023: Account for historical work-package exceptions
+
+- Date: 2026-05-07
+- Status: accepted
+- Context:
+  - Four accepted scaffold-history tasks predated durable work-package enforcement and still have `work_package_path: null`.
+  - The metrics target said 100% work-package coverage without making those exceptions explicit, which could overstate compliance.
+- Decision:
+  - Treat `WP-0001-repo-memory-specificity`, `WP-0002-clean-bootstrap-placeholders`, `WP-0003-master-control-modules`, and `WP-0008-routing-matrix` as the only historical pre-enforcement work-package exceptions.
+  - Require those exceptions to keep `work_package_path: null` and link to `.ai/AGENT_REPORTS/historical-fallback-verification.md`.
+  - Require every other accepted or DONE task to have an explicit `work_package_path`.
+  - Add validator and unit-test coverage for this accounting.
+- Consequences:
+  - The 100% work-package metric now applies cleanly to post-enforcement accepted work.
+  - Future accepted work cannot silently omit a work package.
+  - Historical exceptions remain auditable instead of pretending the old evidence shape existed.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -314,3 +400,8 @@
 | DEC-0016 | 2026-05-07 | accepted | Validate direction-guide skill metadata |
 | DEC-0017 | 2026-05-07 | accepted | Make tool policy and trust boundaries validator-enforced |
 | DEC-0018 | 2026-05-07 | accepted | Add protocol gates, schema policy, and negative fixtures |
+| DEC-0019 | 2026-05-07 | accepted | Enforce semantic protocol gates |
+| DEC-0020 | 2026-05-07 | accepted | Define an exportable runtime bundle |
+| DEC-0021 | 2026-05-07 | accepted | Enforce DONE ledger closure |
+| DEC-0022 | 2026-05-07 | accepted | Require child implementer write leases |
+| DEC-0023 | 2026-05-07 | accepted | Account for historical work-package exceptions |

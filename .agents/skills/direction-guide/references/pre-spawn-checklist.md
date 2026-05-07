@@ -15,7 +15,7 @@ Before spawning any subagent, the master must complete this checklist and keep t
 - How will success be verified?
 - Does this require human approval?
 - If this is a parallel implementer batch, what is the `parallel_batch_id`, per-shard `shard_id`, isolated worktree, exact file reservation, and effective write-agent count?
-- If this is an implementer-requested child agent, what is the `request_id`, trigger, parent run id, approved child role, approved depth, child budget, child write policy, and fallback if denied?
+- If this is an implementer-requested child agent, what is the `request_id`, trigger, parent run id, approved child role, approved depth, child budget, child write policy, write lease id, leased files, parent write state, and fallback if denied?
 
 ## Completion Rules
 
@@ -35,4 +35,6 @@ Before spawning any subagent, the master must complete this checklist and keep t
 - The master must approve or deny every child-agent request and record the decision in the ledger before any child is spawned.
 - Approved child-agent packets must set `delegation_depth: 2`, `max_child_depth: 0`, `can_request_child_agents: false`, and `child_spawn_mode: "none"`.
 - Child implementer write scopes must be exact subsets of the parent implementer's reserved files and must not overlap sibling child reservations.
+- Child implementers require an explicit write lease: `write_lease_id`, `leased_files`, `lease_owner_agent_run_id`, and `parent_write_state: paused_for_leased_files`.
+- The parent implementer must pause writes to `leased_files` until the master reviews the child report and records the lease as returned or revoked.
 - If a child request would expand scope, change acceptance criteria, alter approval gates, require deletion, add dependencies, touch sensitive areas, or create grandchild delegation, deny the request and route the issue back to the master.

@@ -15,6 +15,27 @@ ROOT = validate_protocol.ROOT
 IMPLEMENTABLE_STATUSES = {"READY", "ASSIGNED", "IMPLEMENTED"}
 ACCEPTABLE_STATUSES = {"IMPLEMENTED", "VERIFIED", "INTEGRATED", "ACCEPTED", "DONE"}
 
+WORK_PACKAGE_REQUIRED_MARKERS = [
+    "objective:",
+    "scope_type:",
+    "provenance:",
+    "risk_class:",
+    "fallback_verification:",
+    "execution_budget:",
+    "allowed_files:",
+    "forbidden_files:",
+    "acceptance_criteria:",
+    "validation_commands:",
+    "human_approval_required:",
+]
+
+WORK_PACKAGE_NESTED_MARKERS = {
+    "provenance": ["created_at:", "created_by:", "source:", "trust_level:"],
+    "fallback_verification": ["allowed:", "reason:"],
+    "execution_budget": ["max_steps:", "max_tool_calls:", "trace_path:", "cancellation:"],
+    "human_approval_required": ["required:", "reason:"],
+}
+
 
 def task_queue_entry(task_id: str) -> dict[str, str] | None:
     for task in validate_protocol.parse_task_queue():
@@ -56,15 +77,19 @@ def work_package_check(task_id: str, allowed_statuses: set[str]) -> list[validat
     if status not in allowed_statuses:
         expected = ", ".join(sorted(allowed_statuses))
         errors.append(f"status is {status or '<missing>'}; expected one of {expected}")
-    for marker in ("acceptance_criteria:", "validation_commands:"):
+    for marker in WORK_PACKAGE_REQUIRED_MARKERS:
         if marker not in text:
             errors.append(f"missing {marker.rstrip(':')}")
+    for section, markers in WORK_PACKAGE_NESTED_MARKERS.items():
+        for marker in markers:
+            if marker not in text:
+                errors.append(f"missing {section}.{marker.rstrip(':')}")
 
     return [
         validate_protocol.CheckResult(
             "work package",
             not errors,
-            f"{rel_path} is present with task_id, status, acceptance criteria, and validation commands"
+            f"{rel_path} is present with task_id, status, scope, approval, fallback, budget, risk, acceptance, and validation fields"
             if not errors
             else f"{rel_path} failed work-package gate: " + " | ".join(errors),
         )
@@ -107,7 +132,12 @@ def pre_implement(args: argparse.Namespace) -> int:
 def pre_accept(args: argparse.Namespace) -> int:
     results = validate_protocol.run_checks()
     results.extend(work_package_check(args.task_id, ACCEPTABLE_STATUSES))
-    results.append(validate_protocol.check_report_gate(verifier_report_path(args.task_id, args.report)))
+    results.append(
+        validate_protocol.check_report_gate(
+            verifier_report_path(args.task_id, args.report),
+            expected_task_id=args.task_id,
+        )
+    )
     return run_gate(results, f"Pre-accept gate passed for {args.task_id}.")
 
 

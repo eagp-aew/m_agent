@@ -1,0 +1,6 @@
+task_id: WP-TEST-shallow-work-package
+status: READY
+acceptance_criteria:
+  - "This intentionally shallow fixture has only the fields the old gate accepted."
+validation_commands:
+  - "python3 -m unittest tests/test_validate_protocol.py"

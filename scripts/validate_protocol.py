@@ -59,6 +59,79 @@ CORE_FILES = [
     "tests/fixtures/bad_skill_metadata/SKILL.md",
     "tests/fixtures/report_missing_paths/report.md",
     "tests/fixtures/secrets/scaffold_secret.txt",
+    "tests/fixtures/stale_done_ledger.yaml",
+]
+
+EXPORT_RUNTIME_BUNDLE_FILES = [
+    "AGENTS.md",
+    "README.md",
+    "INSTALLATION.md",
+    "scripts/protocol_gate.py",
+    "scripts/validate_protocol.py",
+    ".codex/config.toml",
+    ".codex/agents/explorer.toml",
+    ".codex/agents/implementer.toml",
+    ".codex/agents/verifier.toml",
+    ".codex/agents/fixer.toml",
+    ".codex/agents/integrator.toml",
+    ".codex/agents/security-reviewer.toml",
+    ".agents/skills/direction-guide/SKILL.md",
+    ".agents/skills/direction-guide/references/agent-report-template.md",
+    ".agents/skills/direction-guide/references/agent-role-policy.md",
+    ".agents/skills/direction-guide/references/config-policy.md",
+    ".agents/skills/direction-guide/references/context-profiles.md",
+    ".agents/skills/direction-guide/references/context-packet-schema.md",
+    ".agents/skills/direction-guide/references/failure-signatures.md",
+    ".agents/skills/direction-guide/references/failure-taxonomy.md",
+    ".agents/skills/direction-guide/references/pre-spawn-checklist.md",
+    ".agents/skills/direction-guide/references/routing-matrix.md",
+    ".agents/skills/direction-guide/references/schema-policy.md",
+    ".agents/skills/direction-guide/references/thin-master-rule.md",
+    ".agents/skills/direction-guide/references/tool-policy.md",
+    ".agents/skills/direction-guide/references/verification-gate.md",
+    ".agents/skills/direction-guide/references/work-package-template.yaml",
+    ".ai/MASTER_CONTRACT.md",
+    ".ai/MASTER_LEDGER.yaml",
+    ".ai/METRICS.md",
+    ".ai/TASK_QUEUE.yaml",
+    ".ai/TEST_MATRIX.md",
+    ".ai/RISK_REGISTER.md",
+    ".ai/EVALS/EVAL-005-child-agent-requests.md",
+    "tests/test_validate_protocol.py",
+    "tests/fixtures/bad_skill_metadata/SKILL.md",
+    "tests/fixtures/failing_report_with_markers/report.md",
+    "tests/fixtures/report_bare_missing_path/report.md",
+    "tests/fixtures/report_missing_common_fields/report.md",
+    "tests/fixtures/report_missing_paths/report.md",
+    "tests/fixtures/secrets/scaffold_secret.txt",
+    "tests/fixtures/shallow_work_package.yaml",
+    "tests/fixtures/stale_done_ledger.yaml",
+    "tests/fixtures/wrong_task_report/report.md",
+]
+
+EXPORT_RUNTIME_DOC_REQUIREMENTS = [
+    ("README.md", "runtime bundle", r"runtime bundle"),
+    (
+        "README.md",
+        "development-only memory boundary",
+        r"development-only.*(?:memory|history)|(?:memory|history).*development-only",
+    ),
+    (
+        "README.md",
+        "scaffold project memory boundary",
+        r"(?:project-specific|scaffold).*memory|memory.*(?:project-specific|scaffold)",
+    ),
+    ("INSTALLATION.md", "runtime bundle", r"runtime (?:bundle|assets)"),
+    (
+        "INSTALLATION.md",
+        "development-only memory boundary",
+        r"development-only.*(?:memory|history)|(?:memory|history).*development-only",
+    ),
+    (
+        "INSTALLATION.md",
+        "scaffold project memory boundary",
+        r"(?:project-specific|scaffold).*memory|memory.*(?:project-specific|scaffold)",
+    ),
 ]
 
 APPROVED_PRUNED_ROOT_DOCS = [
@@ -89,6 +162,7 @@ PACKET_FIELDS = [
     "agent_role",
     "objective",
     "source_of_truth",
+    "trust_boundary",
     "must_read",
     "may_read",
     "do_not_read",
@@ -133,8 +207,42 @@ RECURSIVE_PACKET_FIELDS = [
     "child_report_bundle_required",
 ]
 
+CHILD_WRITE_LEASE_REQUIREMENTS = [
+    (".agents/skills/direction-guide/references/routing-matrix.md", r"write_lease_id"),
+    (".agents/skills/direction-guide/references/routing-matrix.md", r"leased_files"),
+    (".agents/skills/direction-guide/references/routing-matrix.md", r"lease_owner_agent_run_id"),
+    (".agents/skills/direction-guide/references/routing-matrix.md", r"parent_write_state:\s*paused_for_leased_files"),
+    (".agents/skills/direction-guide/references/routing-matrix.md", r"returned or revoked"),
+    (".agents/skills/direction-guide/references/pre-spawn-checklist.md", r"write_lease_id"),
+    (".agents/skills/direction-guide/references/pre-spawn-checklist.md", r"leased_files"),
+    (".agents/skills/direction-guide/references/pre-spawn-checklist.md", r"parent_write_state:\s*paused_for_leased_files"),
+    (".agents/skills/direction-guide/references/context-packet-schema.md", r"write_lease_id"),
+    (".agents/skills/direction-guide/references/context-packet-schema.md", r"leased_files"),
+    (".agents/skills/direction-guide/references/context-packet-schema.md", r"lease_owner_agent_run_id"),
+    (".agents/skills/direction-guide/references/context-packet-schema.md", r"parent_write_state"),
+    (".codex/agents/implementer.toml", r"write_lease_id"),
+    (".codex/agents/implementer.toml", r"leased_files"),
+    (".codex/agents/implementer.toml", r"paused_for_leased_files"),
+    (".ai/METRICS.md", r"child_write_leases"),
+    (".ai/METRICS.md", r"returned or revoked"),
+    (".ai/MASTER_LEDGER.yaml", r"child_write_leases"),
+    (".ai/TEST_MATRIX.md", r"Child Write Lease Check"),
+    (".ai/TEST_MATRIX.md", r"parent.*pause.*leased_files"),
+]
+
 VERIFICATION_EVIDENCE_STATUSES = {"ACCEPTED", "VERIFIED", "DONE"}
 HISTORICAL_EVIDENCE_PATH = ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+HISTORICAL_WORK_PACKAGE_EXCEPTION_TASK_IDS = {
+    "WP-0001-repo-memory-specificity",
+    "WP-0002-clean-bootstrap-placeholders",
+    "WP-0003-master-control-modules",
+    "WP-0008-routing-matrix",
+}
+LEGACY_DURABLE_REPORT_PATHS = {
+    ".ai/AGENT_REPORTS/WP-0015-fallback-verification.md",
+    ".ai/AGENT_REPORTS/WP-0016-fallback-verification.md",
+    ".ai/AGENT_REPORTS/WP-0017-fallback-verification.md",
+}
 FINISHED_STATUSES = {"ACCEPTED", "DONE"}
 ACTIVE_STATUSES = {"DRAFT", "READY", "ASSIGNED", "IMPLEMENTED", "VERIFY_FAIL", "VERIFIED", "INTEGRATED", "BLOCKED", "CANCELLED", "ESCALATED"}
 CURRENT_STATE_TO_STATUS = {
@@ -257,6 +365,15 @@ REPORT_PATH_MARKERS = {
     "not run",
     "manual",
 }
+
+REPORT_SCORE_FIELDS = [
+    "acceptance_criteria_checked",
+    "tests_or_reason_present",
+    "forbidden_files_checked",
+    "risks_recorded",
+]
+
+REPORT_TERMINAL_VALUES = {"PASS", "PARTIAL", "FAIL"}
 
 REPORT_PATH_ALLOWED_SCHEMES = ("http://", "https://")
 
@@ -397,6 +514,60 @@ def parse_current_work_package_from_ledger() -> dict[str, str]:
     return values
 
 
+def top_level_scalar_from_text(text: str, field: str) -> str:
+    match = re.search(rf"(?m)^{re.escape(field)}:\s*(.*?)\s*$", text)
+    return clean_scalar(match.group(1)) if match else ""
+
+
+def top_level_block_from_text(text: str, field: str) -> tuple[str, list[str]]:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        match = re.match(rf"^{re.escape(field)}:\s*(.*?)\s*$", line)
+        if not match:
+            continue
+        block = []
+        for block_line in lines[index + 1 :]:
+            if block_line and not block_line.startswith((" ", "\t")):
+                break
+            block.append(block_line)
+        return clean_scalar(match.group(1)), block
+    return "", []
+
+
+def top_level_sequence_has_items(text: str, field: str) -> bool:
+    inline_value, block = top_level_block_from_text(text, field)
+    if inline_value in {"", "[]", "{}"}:
+        return any(re.match(r"\s+-\s+", line) for line in block)
+    return True
+
+
+def scalar_is_nonzero_int(value: str) -> bool:
+    if value in {"", "null", "None"}:
+        return False
+    try:
+        return int(value) != 0
+    except ValueError:
+        return True
+
+
+def null_per_work_package_metric_fields(text: str) -> list[str]:
+    _, quality_block = top_level_block_from_text(text, "quality_metrics")
+    fields: list[str] = []
+    in_per_work_package = False
+    for line in quality_block:
+        if re.match(r"\s{2}per_work_package_checks:\s*$", line):
+            in_per_work_package = True
+            continue
+        if in_per_work_package and line.strip() and not line.startswith("    "):
+            break
+        if not in_per_work_package:
+            continue
+        match = re.match(r"\s+([A-Za-z0-9_]+):\s*(?:null|None)\s*(?:#.*)?$", line)
+        if match:
+            fields.append(match.group(1))
+    return fields
+
+
 def extract_table_task_ids(path: str) -> set[str]:
     task_ids: set[str] = set()
     for line in read_text(path).splitlines():
@@ -449,6 +620,27 @@ def extract_report_path_candidates(text: str) -> list[str]:
     candidates = []
     for match in re.finditer(r"`([^`]+)`", text):
         candidate = clean_report_path_candidate(match.group(1))
+        if looks_like_report_path(candidate):
+            candidates.append(candidate)
+    without_inline_code = re.sub(r"`[^`]+`", " ", text)
+    marker_prefix_pattern = re.compile(
+        r"(?im)(?:^|[\s(])(?:" + "|".join(re.escape(prefix.rstrip(":")) for prefix in REPORT_PATH_MARKER_PREFIXES) + r"):\s*$"
+    )
+    bare_path_pattern = re.compile(
+        r"(?<![A-Za-z0-9_.:/-])"
+        r"((?:\.{1,2}/|/)?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+"
+        r"\.(?:md|txt|yaml|yml|toml|json|py|sh|rb))"
+        r"(?=$|[\s.,;:)\]}])"
+    )
+    for match in bare_path_pattern.finditer(without_inline_code):
+        candidate = clean_report_path_candidate(match.group(1))
+        prefix = without_inline_code[max(0, match.start() - 24) : match.start()].lower()
+        if (
+            prefix.endswith(REPORT_PATH_MARKER_PREFIXES)
+            or marker_prefix_pattern.search(prefix)
+            or prefix.endswith(REPORT_PATH_ALLOWED_SCHEMES)
+        ):
+            continue
         if looks_like_report_path(candidate):
             candidates.append(candidate)
     return candidates
@@ -533,6 +725,47 @@ def check_required_files() -> CheckResult:
         "required scaffold files",
         not missing,
         "all required scaffold files exist" if not missing else f"missing: {', '.join(missing)}",
+    )
+
+
+def normalize_repo_path(path: Path | str) -> str:
+    return Path(path).as_posix().lstrip("./")
+
+
+def missing_required_export_runtime_files(
+    existing_paths: Iterable[Path | str] | None = None,
+) -> list[str]:
+    if existing_paths is None:
+        return [path for path in EXPORT_RUNTIME_BUNDLE_FILES if not file_exists(path)]
+    existing = {normalize_repo_path(path) for path in existing_paths}
+    return [path for path in EXPORT_RUNTIME_BUNDLE_FILES if path not in existing]
+
+
+def check_required_export_runtime_bundle_files(
+    existing_paths: Iterable[Path | str] | None = None,
+) -> CheckResult:
+    missing = missing_required_export_runtime_files(existing_paths)
+    return CheckResult(
+        "required export runtime bundle files",
+        not missing,
+        "all required export runtime bundle files exist"
+        if not missing
+        else "missing export runtime bundle files: " + ", ".join(missing),
+    )
+
+
+def check_export_runtime_bundle_docs() -> CheckResult:
+    missing = [
+        f"{path}:{label}"
+        for path, label, pattern in EXPORT_RUNTIME_DOC_REQUIREMENTS
+        if not contains(path, pattern, re.IGNORECASE | re.DOTALL)
+    ]
+    return CheckResult(
+        "export runtime bundle docs",
+        not missing,
+        "README and INSTALLATION describe the runtime bundle and development-only memory boundaries"
+        if not missing
+        else "export runtime bundle doc gaps: " + ", ".join(missing),
     )
 
 
@@ -721,12 +954,17 @@ def check_context_packet_requirement() -> CheckResult:
     ok, missing_context = all_contain(paths, r"context packet", re.IGNORECASE)
     agent_paths = [f".codex/agents/{name}" for name in sorted(BASELINE_AGENTS)]
     ok_agents, missing_agents = all_contain(agent_paths, r"context_packet.*source of truth", re.IGNORECASE | re.DOTALL)
+    ok_agent_trust, missing_agent_trust = all_contain(
+        agent_paths,
+        r"validate that the packet includes:.*`trust_boundary`",
+        re.IGNORECASE | re.DOTALL,
+    )
     return CheckResult(
         "context packet requirement",
-        ok and ok_agents,
-        "context packet requirement appears in protocol, checklist, schema, and all agents"
-        if ok and ok_agents
-        else f"context packet language missing in: {', '.join(missing_context + missing_agents)}",
+        ok and ok_agents and ok_agent_trust,
+        "context packet requirement, source-of-truth language, and role trust_boundary validation appear in protocol, checklist, schema, and all agents"
+        if ok and ok_agents and ok_agent_trust
+        else f"context packet language missing in: {', '.join(missing_context + missing_agents + missing_agent_trust)}",
     )
 
 
@@ -821,9 +1059,11 @@ def check_negative_test_fixtures() -> CheckResult:
         ("tests/test_validate_protocol.py", r"test_report_with_unreplayable_path_fails_gate"),
         ("tests/test_validate_protocol.py", r"test_secret_scan_fixture_reports_label_without_value"),
         ("tests/test_validate_protocol.py", r"test_protocol_gate_check_report_fails_for_bad_fixture"),
+        ("tests/test_validate_protocol.py", r"test_stale_done_ledger_fixture_fails_done_closure"),
         ("tests/fixtures/bad_skill_metadata/SKILL.md", r"duplicate-name"),
         ("tests/fixtures/report_missing_paths/report.md", r"does-not-exist\.md"),
         ("tests/fixtures/secrets/scaffold_secret.txt", r"FAKE_"),
+        ("tests/fixtures/stale_done_ledger.yaml", r"current_state_machine_state:\s*DONE"),
     ]
     missing = [
         f"{path}:{pattern}"
@@ -833,7 +1073,7 @@ def check_negative_test_fixtures() -> CheckResult:
     return CheckResult(
         "negative validator fixtures",
         not missing,
-        "negative tests cover malformed skill metadata, unreplayable report paths, fake secret patterns, and report gate failures"
+        "negative tests cover malformed skill metadata, unreplayable report paths, fake secret patterns, report gate failures, and stale DONE ledger closure"
         if not missing
         else "negative fixture drift: " + ", ".join(missing),
     )
@@ -856,6 +1096,33 @@ def check_recursive_packet_fields() -> CheckResult:
         "recursive delegation packet fields are named in skill and schema"
         if not missing
         else f"missing recursive field references: {', '.join(missing)}",
+    )
+
+
+def child_write_lease_policy_missing(
+    documents: dict[str, str] | None = None,
+) -> list[str]:
+    missing = []
+    for path, pattern in CHILD_WRITE_LEASE_REQUIREMENTS:
+        if documents is not None and path in documents:
+            found = re.search(pattern, documents[path], re.IGNORECASE | re.DOTALL) is not None
+        else:
+            found = contains(path, pattern, re.IGNORECASE | re.DOTALL)
+        if not found:
+            missing.append(f"{path}:{pattern}")
+    return missing
+
+
+def check_child_write_lease_policy(
+    documents: dict[str, str] | None = None,
+) -> CheckResult:
+    missing = child_write_lease_policy_missing(documents)
+    return CheckResult(
+        "child write lease policy",
+        not missing,
+        "child implementer write leases, parent pause state, and lease return/revocation are documented and trackable"
+        if not missing
+        else "child write lease policy drift: " + ", ".join(missing),
     )
 
 
@@ -912,19 +1179,70 @@ def check_verification_evidence_paths() -> CheckResult:
         if not file_exists(report_path):
             missing.append(f"{task_id}: {report_path}")
             continue
-        text = read_text(report_path)
-        missing_markers = [marker for marker in VERIFICATION_REPORT_MARKERS if marker not in text]
-        if task_id not in text:
-            missing_markers.append("task_id")
-        if missing_markers:
-            incomplete.append(f"{task_id}: {report_path} missing {', '.join(missing_markers)}")
+        report_result = check_report_gate(
+            report_path,
+            expected_task_id=task_id,
+            allow_historical_attestation=report_path == HISTORICAL_EVIDENCE_PATH,
+            allow_legacy_report_fields=report_path in LEGACY_DURABLE_REPORT_PATHS,
+        )
+        if not report_result.ok:
+            incomplete.append(f"{task_id}: {report_result.message}")
     ok = not missing and not incomplete
     return CheckResult(
         "durable verification evidence paths",
         ok,
-        "accepted/verified queue items link to durable verification evidence with required gate markers"
+        "accepted/verified queue items link to durable verification evidence that passes report-gate semantics"
         if ok
         else f"verification evidence drift; missing paths: {', '.join(missing) or 'none'}; incomplete reports: {' | '.join(incomplete) or 'none'}",
+    )
+
+
+def check_work_package_path_coverage(
+    tasks: Iterable[dict[str, str]] | None = None,
+) -> CheckResult:
+    checked_tasks = list(parse_task_queue() if tasks is None else tasks)
+    errors = []
+    observed_historical_exceptions = set()
+
+    for task in checked_tasks:
+        status = task.get("status", "")
+        if status not in FINISHED_STATUSES:
+            continue
+
+        task_id = task.get("task_id", "<unknown>")
+        work_package_path = task.get("work_package_path", "")
+        verifier_report_path = task.get("verifier_report_path", "")
+        is_historical_exception = task_id in HISTORICAL_WORK_PACKAGE_EXCEPTION_TASK_IDS
+
+        if work_package_path:
+            continue
+        if not is_historical_exception:
+            errors.append(
+                f"{task_id}: accepted task missing work_package_path without registered historical exception"
+            )
+            continue
+
+        observed_historical_exceptions.add(task_id)
+        if verifier_report_path != HISTORICAL_EVIDENCE_PATH:
+            errors.append(
+                f"{task_id}: historical work-package exception must link to {HISTORICAL_EVIDENCE_PATH}"
+            )
+
+    missing_registered_exceptions = sorted(
+        HISTORICAL_WORK_PACKAGE_EXCEPTION_TASK_IDS - observed_historical_exceptions
+    )
+    if missing_registered_exceptions:
+        errors.append(
+            "registered historical work-package exceptions not present with missing work_package_path: "
+            + ", ".join(missing_registered_exceptions)
+        )
+
+    return CheckResult(
+        "work-package path coverage",
+        not errors,
+        "accepted work has work_package_path except enumerated historical pre-enforcement tasks linked to historical fallback verification"
+        if not errors
+        else "work-package coverage drift: " + " | ".join(errors),
     )
 
 
@@ -996,7 +1314,126 @@ def check_lightweight_secret_scan(paths: Iterable[Path] | None = None) -> CheckR
     )
 
 
-def check_report_gate(path: Path | str) -> CheckResult:
+def normalize_report_value(value: str) -> str:
+    value = value.strip()
+    value = re.sub(r"^\s*[-*]\s+", "", value)
+    value = re.sub(r"\s+#.*$", "", value)
+    value = value.strip().strip("`").strip()
+    return clean_scalar(value)
+
+
+def extract_markdown_field(text: str, field: str) -> str:
+    section_match = re.search(
+        rf"(?ims)^##\s+{re.escape(field)}\s*$\n(?P<body>.*?)(?=^##\s+|\Z)",
+        text,
+    )
+    if section_match:
+        for line in section_match.group("body").splitlines():
+            value = normalize_report_value(line)
+            if value:
+                return value
+    line_match = re.search(rf"(?im)^\s*[-*]\s+{re.escape(field)}\s*:\s*(.+?)\s*$", text)
+    if line_match:
+        return normalize_report_value(line_match.group(1))
+    scalar_match = re.search(rf"(?im)^\s*{re.escape(field)}\s*:\s*(.+?)\s*$", text)
+    if scalar_match:
+        return normalize_report_value(scalar_match.group(1))
+    return ""
+
+
+def normalize_report_terminal(value: str) -> str:
+    cleaned = normalize_report_value(value).upper()
+    match = re.search(r"\b(PASS|PARTIAL|FAIL)\b", cleaned)
+    return match.group(1) if match else cleaned
+
+
+def report_score_is_affirmative(value: str) -> bool:
+    cleaned = normalize_report_value(value).lower()
+    return cleaned in {"true", "pass", "passed", "yes", "y", "checked", "present", "recorded"}
+
+
+def has_accepted_limitations(text: str) -> bool:
+    if re.search(r"(?im)^\s*[-*]?\s*accepted_limitations\s*:\s*(?!\s*(?:none|null|no|n/a)\s*$).+", text):
+        return True
+    if re.search(r"(?im)^\s*##\s+accepted limitations\s*$", text):
+        return True
+    return re.search(r"\baccepted limitations?\b", text, re.IGNORECASE) is not None
+
+
+def historical_report_section(text: str, expected_task_id: str) -> str:
+    sections = re.split(r"(?m)(?=^##\s+)", text)
+    for section in sections:
+        if extract_markdown_field(section, "task_id") == expected_task_id:
+            return section
+    return ""
+
+
+def report_validation_text(
+    text: str,
+    expected_task_id: str | None,
+    allow_historical_attestation: bool,
+) -> tuple[str, bool]:
+    is_historical = re.search(r"(?im)^\s*[-*]?\s*evidence_type\s*:\s*`?HISTORICAL_ATTESTATION`?", text) is not None
+    if expected_task_id and is_historical and allow_historical_attestation:
+        return historical_report_section(text, expected_task_id), True
+    return text, is_historical
+
+
+def report_semantic_errors(
+    text: str,
+    expected_task_id: str | None = None,
+    allow_historical_attestation: bool = False,
+) -> list[str]:
+    scoped_text, is_historical = report_validation_text(
+        text,
+        expected_task_id,
+        allow_historical_attestation,
+    )
+    errors = []
+    if not scoped_text:
+        errors.append(f"missing report section for task_id {expected_task_id}")
+        return errors
+
+    report_task_id = extract_markdown_field(scoped_text, "task_id")
+    if expected_task_id and report_task_id != expected_task_id:
+        errors.append(f"task_id is {report_task_id or '<missing>'}; expected {expected_task_id}")
+
+    status = normalize_report_terminal(extract_markdown_field(scoped_text, "status"))
+    recommendation = normalize_report_terminal(extract_markdown_field(scoped_text, "recommendation"))
+    if status not in REPORT_TERMINAL_VALUES:
+        errors.append(f"status is {status or '<missing>'}; expected PASS, PARTIAL, or FAIL")
+    if recommendation not in REPORT_TERMINAL_VALUES:
+        errors.append(
+            f"recommendation is {recommendation or '<missing>'}; expected PASS, PARTIAL, or FAIL"
+        )
+    if status == "FAIL" or recommendation == "FAIL":
+        errors.append("status and recommendation must not be FAIL")
+
+    partial = status == "PARTIAL" or recommendation == "PARTIAL"
+    if partial and not has_accepted_limitations(scoped_text):
+        errors.append("PARTIAL report requires accepted limitations")
+
+    pass_result = status == "PASS" and recommendation == "PASS"
+    if pass_result:
+        non_affirmative = [
+            field
+            for field in REPORT_SCORE_FIELDS
+            if not report_score_is_affirmative(extract_markdown_field(scoped_text, field))
+        ]
+        if non_affirmative:
+            errors.append("PASS report has non-affirmative score fields: " + ", ".join(non_affirmative))
+
+    if is_historical and not allow_historical_attestation:
+        errors.append("HISTORICAL_ATTESTATION is not valid evidence for accepting new work")
+    return errors
+
+
+def check_report_gate(
+    path: Path | str,
+    expected_task_id: str | None = None,
+    allow_historical_attestation: bool = False,
+    allow_legacy_report_fields: bool = False,
+) -> CheckResult:
     report_path = Path(path)
     if not report_path.is_absolute():
         report_path = (ROOT / report_path).resolve()
@@ -1006,22 +1443,38 @@ def check_report_gate(path: Path | str) -> CheckResult:
         return CheckResult("report gate", False, f"{display_path(report_path)} does not exist")
 
     text = report_path.read_text(encoding="utf-8")
-    missing_fields = [field for field in REPORT_FIELDS if field not in text]
-    missing_markers = [marker for marker in VERIFICATION_REPORT_MARKERS if marker not in text]
+    scoped_text, is_historical = report_validation_text(
+        text,
+        expected_task_id,
+        allow_historical_attestation,
+    )
+    field_text = scoped_text if scoped_text else text
+    require_common_fields = not (
+        (is_historical and allow_historical_attestation) or allow_legacy_report_fields
+    )
+    missing_fields = [field for field in REPORT_FIELDS if field not in field_text] if require_common_fields else []
+    missing_markers = [marker for marker in VERIFICATION_REPORT_MARKERS if marker not in field_text]
     path_check = check_report_referenced_paths([report_path])
+    semantic_errors = report_semantic_errors(
+        text,
+        expected_task_id=expected_task_id,
+        allow_historical_attestation=allow_historical_attestation,
+    )
 
     errors = []
     if missing_fields:
         errors.append("missing report fields: " + ", ".join(missing_fields))
     if missing_markers:
         errors.append("missing verification markers: " + ", ".join(missing_markers))
+    if semantic_errors:
+        errors.extend(semantic_errors)
     if not path_check.ok:
         errors.append(path_check.message)
 
     return CheckResult(
         "report gate",
         not errors,
-        f"{display_path(report_path)} includes required fields, verification markers, and replayable path references"
+        f"{display_path(report_path)} includes required fields, verification markers, report semantics, and replayable path references"
         if not errors
         else f"{display_path(report_path)} failed report gate: " + " | ".join(errors),
     )
@@ -1090,6 +1543,46 @@ def check_status_consistency() -> CheckResult:
     )
 
 
+def check_ledger_done_closure(ledger_text: str | None = None) -> CheckResult:
+    text = read_text(".ai/MASTER_LEDGER.yaml") if ledger_text is None else ledger_text
+    state = top_level_scalar_from_text(text, "current_state_machine_state")
+    if state != "DONE":
+        return CheckResult(
+            "ledger DONE closure",
+            True,
+            f"ledger state is {state or '<missing>'}; DONE closure artifacts are not active",
+        )
+
+    errors = []
+    stale_sequences = [
+        field
+        for field in ("active_agent_runs", "file_reservations", "worktree_assignments")
+        if top_level_sequence_has_items(text, field)
+    ]
+    if stale_sequences:
+        errors.append("stale active lists: " + ", ".join(stale_sequences))
+
+    active_parallel_batch = top_level_scalar_from_text(text, "active_parallel_batch")
+    if active_parallel_batch and active_parallel_batch not in {"[]", "{}"}:
+        errors.append(f"active_parallel_batch is {active_parallel_batch}")
+
+    write_agents = top_level_scalar_from_text(text, "effective_parallel_write_agents")
+    if scalar_is_nonzero_int(write_agents):
+        errors.append(f"effective_parallel_write_agents is {write_agents}")
+
+    null_metrics = null_per_work_package_metric_fields(text)
+    if null_metrics:
+        errors.append("null per-work-package metrics: " + ", ".join(null_metrics))
+
+    return CheckResult(
+        "ledger DONE closure",
+        not errors,
+        "DONE ledger has no active agents, reservations, worktrees, active batch, write agents, or null per-work-package metrics"
+        if not errors
+        else "stale DONE ledger closure state: " + " | ".join(errors),
+    )
+
+
 def check_repeated_failure_escalation() -> CheckResult:
     requirements = [
         (".ai/MASTER_LEDGER.yaml", r"repeat_stop_threshold:\s*2"),
@@ -1131,6 +1624,8 @@ def check_no_non_baseline_roles() -> CheckResult:
 def run_checks() -> list[CheckResult]:
     return [
         check_required_files(),
+        check_required_export_runtime_bundle_files(),
+        check_export_runtime_bundle_docs(),
         check_protocol_gate_surface(),
         check_tool_policy_reference(),
         check_direction_guide_skill_metadata(),
@@ -1145,11 +1640,14 @@ def run_checks() -> list[CheckResult]:
         check_schema_policy_and_context_profiles(),
         check_historical_supersession_metadata(),
         check_recursive_packet_fields(),
+        check_child_write_lease_policy(),
         check_report_fields(),
         check_verifier_gate(),
         check_verification_evidence_paths(),
+        check_work_package_path_coverage(),
         check_report_referenced_paths(),
         check_status_consistency(),
+        check_ledger_done_closure(),
         check_repeated_failure_escalation(),
         check_no_non_baseline_roles(),
         check_lightweight_secret_scan(),

@@ -8,63 +8,23 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0019-review-plan-closure
-  title: "Close remaining repository review findings"
+  task_id: WP-0024-historical-exception-metrics
+  title: "Validate historical work-package exceptions"
   status: ACCEPTED
   scope_type: validation
-  assigned_agent: master
-  work_package_path: ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
+  assigned_agent: Galileo
+  work_package_path: ".ai/WORK_PACKAGES/WP-0024-historical-exception-metrics.yaml"
 
 current_state_machine_state: DONE
 
-active_agent_runs:
-  - agent_run_id: "019e003f-e598-7d70-a186-95f47ac4cd0d"
-    nickname: Carver
-    role: implementer
-    task_id: WP-0019-review-plan-closure
-    shard_id: gate-tests
-    worktree_id: codex-wp0019-gate-tests
-    status: COMPLETE
-    report_path: ".ai/AGENT_REPORTS/WP-0019-gate-tests-implementer.md"
-  - agent_run_id: "019e003f-e556-76c3-a854-98232f865c78"
-    nickname: Pascal
-    role: implementer
-    task_id: WP-0019-review-plan-closure
-    shard_id: policy-memory
-    worktree_id: codex-wp0019-policy-memory
-    status: COMPLETE
-    report_path: ".ai/AGENT_REPORTS/WP-0019-policy-memory-implementer.md"
+active_agent_runs: []
 
 active_parallel_batch: null
-file_reservations:
-  - shard_id: gate-tests
-    files:
-      - "scripts/protocol_gate.py"
-      - "scripts/validate_protocol.py"
-      - "tests/test_validate_protocol.py"
-      - "tests/fixtures/bad_skill_metadata/SKILL.md"
-      - "tests/fixtures/report_missing_paths/report.md"
-      - "tests/fixtures/secrets/scaffold_secret.txt"
-  - shard_id: policy-memory
-    files:
-      - "README.md"
-      - ".agents/skills/direction-guide/SKILL.md"
-      - ".agents/skills/direction-guide/references/context-profiles.md"
-      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
-      - ".agents/skills/direction-guide/references/schema-policy.md"
-      - ".agents/skills/direction-guide/references/verification-gate.md"
-      - ".agents/skills/direction-guide/references/work-package-template.yaml"
-      - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
-      - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
-      - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
-      - ".ai/TEST_MATRIX.md"
-worktree_assignments:
-  - shard_id: gate-tests
-    worktree_id: codex-wp0019-gate-tests
-  - shard_id: policy-memory
-    worktree_id: codex-wp0019-policy-memory
-effective_parallel_write_agents: 2
+file_reservations: []
+worktree_assignments: []
+effective_parallel_write_agents: 0
 parallel_write_conflicts: 0
+child_write_leases: []
 
 child_agent_requests: []
 recursive_delegation:
@@ -92,8 +52,29 @@ open_decisions:
     owner: human
     status: CLOSED
     resolution: "Add scripts/validate_protocol.py as a no-dependency lightweight validator."
+  - id: OD-0021
+    question: "How should the repo define an exportable runtime bundle for real project repositories?"
+    source: "User Fresh-Baseline Master-Agent Refinement Plan"
+    owner: master
+    status: CLOSED
+    resolution: "WP-0021-runtime-export-bundle defined the runtime bundle boundary, adoption docs, and validator checks."
 
 failure_counts_by_task:
+  WP-0024-historical-exception-metrics:
+    verify: 0
+    fix: 0
+  WP-0023-child-write-lease-policy:
+    verify: 0
+    fix: 0
+  WP-0022-ledger-done-closure-validation:
+    verify: 0
+    fix: 0
+  WP-0021-runtime-export-bundle:
+    verify: 0
+    fix: 0
+  WP-0020-protocol-gate-semantic-hardening:
+    verify: 3
+    fix: 2
   WP-0019-review-plan-closure:
     verify: 0
     fix: 0
@@ -139,7 +120,21 @@ failure_counts_by_task:
 
 failure_signatures:
   repeat_stop_threshold: 2
-  entries: []
+  entries:
+    - work_package_id: WP-0020-protocol-gate-semantic-hardening
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:report-path-marker-spaced-external-prefix-treated-as-repo-path
+      seen_count: 1
+      first_seen_at: 2026-05-07
+      last_seen_at: 2026-05-07
+      evidence: "Verifier reported spaced explicit markers such as external: docs/missing.md were still treated as repo paths."
+    - work_package_id: WP-0020-protocol-gate-semantic-hardening
+      classification: SCOPE_VIOLATION
+      signature: SCOPE_VIOLATION:tracked-pycache-dirty-after-validation
+      seen_count: 1
+      first_seen_at: 2026-05-07
+      last_seen_at: 2026-05-07
+      evidence: "Verifier reported tracked scripts/__pycache__/validate_protocol.cpython-314.pyc remained dirty after validation."
 
 quality_metrics:
   metrics_reference: ".ai/METRICS.md"
@@ -156,7 +151,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0019-review-plan-closure
+    work_package_id: WP-0024-historical-exception-metrics
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -165,7 +160,7 @@ quality_metrics:
     memory_files_updated: true
     exact_file_reservations_recorded: true
     isolated_worktrees_required: true
-    effective_parallel_write_agents: 2
+    effective_parallel_write_agents: 1
     parallel_write_conflicts: 0
     child_agent_requests_require_master_approval: true
     child_agent_requests_approved: 0
@@ -179,66 +174,38 @@ quality_metrics:
     human_approval_required: false
     human_approval_obtained: true
     diff_size:
-      files: null
-      insertions: null
-      deletions: null
-      note: "See git diff --stat for WP-0018 scoped scaffold, validator, report, and memory changes."
+      files: 4
+      insertions: "scoped count not isolated from prior accepted shared-worktree edits"
+      deletions: "scoped count not isolated from prior accepted shared-worktree edits"
+      note: "Scoped WP-0024 implementation touched .ai/METRICS.md, .ai/TEST_MATRIX.md, scripts/validate_protocol.py, and tests/test_validate_protocol.py."
     files_changed:
-      - "README.md"
-      - "scripts/protocol_gate.py"
+      - ".ai/METRICS.md"
+      - ".ai/TEST_MATRIX.md"
       - "scripts/validate_protocol.py"
       - "tests/test_validate_protocol.py"
-      - "tests/fixtures/bad_skill_metadata/SKILL.md"
-      - "tests/fixtures/report_missing_paths/report.md"
-      - "tests/fixtures/secrets/scaffold_secret.txt"
-      - ".agents/skills/direction-guide/SKILL.md"
-      - ".agents/skills/direction-guide/references/context-profiles.md"
-      - ".agents/skills/direction-guide/references/schema-policy.md"
-      - ".agents/skills/direction-guide/references/failure-taxonomy.md"
-      - ".agents/skills/direction-guide/references/verification-gate.md"
-      - ".agents/skills/direction-guide/references/work-package-template.yaml"
-      - ".ai/AGENT_REPORTS/historical-fallback-verification.md"
-      - ".ai/AGENT_REPORTS/WP-0019-gate-tests-implementer.md"
-      - ".ai/AGENT_REPORTS/WP-0019-policy-memory-implementer.md"
-      - ".ai/AGENT_REPORTS/WP-0019-review-coverage.md"
-      - ".ai/AGENT_REPORTS/WP-0019-verifier.md"
-      - ".ai/WORK_PACKAGES/WP-0010-master-protocol-consistency.yaml"
-      - ".ai/WORK_PACKAGES/WP-0011-lightweight-protocol-validator.yaml"
-      - ".ai/WORK_PACKAGES/WP-0019-review-plan-closure.yaml"
-      - ".ai/TASK_QUEUE.yaml"
-      - ".ai/MASTER_LEDGER.yaml"
-      - ".ai/PROJECT_STATE.md"
-      - ".ai/DECISIONS.md"
-      - ".ai/INTEGRATION_LOG.md"
-      - ".ai/RISK_REGISTER.md"
-      - ".ai/TEST_MATRIX.md"
   scope_check:
     status: PASS
-    evidence: "WP-0019 touched only scaffold policy, validation scripts, tests, reports, and durable memory; no application source, dependency manifest, production config, new role, deletion, recursion expansion, or parallelism expansion was changed."
+    evidence: "Verifier confirmed WP-0024 stayed within scoped metrics/validator/test files and introduced no dependencies, deletions, production config, auth/payment/permissions/secrets, public APIs, broad refactors, or historical fact rewrites."
   validation:
     status: PASS
     commands:
-      - "python3 scripts/validate_protocol.py"
-      - "python3 scripts/validate_protocol.py --json"
-      - "python3 scripts/protocol_gate.py audit"
-      - "python3 scripts/protocol_gate.py pre-accept WP-0019-review-plan-closure --report .ai/AGENT_REPORTS/WP-0019-verifier.md"
-      - "python3 scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0019-verifier.md"
-      - "python3 -m unittest tests/test_validate_protocol.py"
-      - "python3 -m py_compile scripts/validate_protocol.py scripts/protocol_gate.py"
+      - "python3 -B -m unittest tests/test_validate_protocol.py"
+      - "python3 -B scripts/validate_protocol.py"
+      - "python3 -B scripts/protocol_gate.py audit"
       - "git diff --check"
       - "git status --short --untracked-files=all"
   verifier_status:
     status: PASS
-    evidence: "Master fallback verifier recorded PASS evidence in .ai/AGENT_REPORTS/WP-0019-verifier.md and .ai/AGENT_REPORTS/WP-0019-review-coverage.md."
+    evidence: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
 
 execution_budget:
-  max_steps: 12
+  max_steps: 10
   max_tool_calls: 80
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0019-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
   cancellation:
     owner: master
-    condition: "Stop on repeated identical validation failure, approval-gated scope expansion, dependency changes, production config, secrets, public APIs, or deletion."
+    condition: "Stop on dependency changes, deletion, public API changes, production config, secrets, broad refactors, or changes that rewrite historical facts without evidence."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

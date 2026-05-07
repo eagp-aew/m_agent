@@ -25,6 +25,7 @@ Record these checks in `.ai/MASTER_LEDGER.yaml` under `quality_metrics` when a w
 | `child_agent_requests_require_master_approval` | boolean | `true` when recursive delegation is enabled | Before `IMPLEMENT` |
 | `child_agent_requests_approved` | integer | Informational | During `IMPLEMENT` and `INTEGRATE` |
 | `child_agent_requests_denied` | integer | Informational | During `IMPLEMENT` and `INTEGRATE` |
+| `child_write_leases` | list | All active leases include `write_lease_id`, `leased_files`, `lease_owner_agent_run_id`, `parent_write_state`, and status | During child implementer approval, `IMPLEMENT`, and `INTEGRATE` |
 | `max_observed_delegation_depth` | integer | `<= 2` | During `IMPLEMENT`, `VERIFY`, and `DONE` |
 | `child_reports_missing` | integer | `0` | During `VERIFY` and `INTEGRATE` |
 | `child_scope_violations` | integer | `0` | During `VERIFY`, `INTEGRATE`, and `DONE` |
@@ -56,6 +57,7 @@ quality_metrics:
     child_agent_requests_require_master_approval: null
     child_agent_requests_approved: 0
     child_agent_requests_denied: 0
+    child_write_leases: []
     max_observed_delegation_depth: 1
     child_reports_missing: 0
     child_scope_violations: 0
@@ -73,7 +75,8 @@ Set unknown values to `null` while the work package is still in progress. Replac
 
 | Target | Required value |
 |---|---|
-| Tasks with work package before implementation | `100%` |
+| Tasks with work package before implementation | `100%` for post-enforcement accepted work; historical pre-enforcement exceptions are enumerated separately below. |
+| Historical pre-enforcement work-package exceptions | `WP-0001-repo-memory-specificity`, `WP-0002-clean-bootstrap-placeholders`, `WP-0003-master-control-modules`, and `WP-0008-routing-matrix` only; each must have `work_package_path: null` and `verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"`. |
 | Tasks with verifier-equivalent evidence | `100%` |
 | Fix attempts per task | `<= 2` |
 | Parallel write conflicts | `0` |
@@ -92,7 +95,20 @@ Use this canonical ledger shape:
 ```yaml
 quality_metrics:
   system_level_targets:
-    tasks_with_work_package_before_implementation: "100%"
+    tasks_with_work_package_before_implementation: "100% post-enforcement accepted work; historical pre-enforcement exceptions are enumerated separately"
+    historical_pre_enforcement_work_package_exceptions:
+      - task_id: "WP-0001-repo-memory-specificity"
+        required_work_package_path: null
+        required_verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - task_id: "WP-0002-clean-bootstrap-placeholders"
+        required_work_package_path: null
+        required_verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - task_id: "WP-0003-master-control-modules"
+        required_work_package_path: null
+        required_verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
+      - task_id: "WP-0008-routing-matrix"
+        required_work_package_path: null
+        required_verifier_report_path: ".ai/AGENT_REPORTS/historical-fallback-verification.md"
     tasks_with_verifier_report: "100% verifier report or fallback verification evidence"
     max_fix_attempts_per_task: 2
     parallel_write_conflicts: 0
@@ -107,13 +123,19 @@ quality_metrics:
     repeated_failure_escalation: "100%"
 ```
 
+## Historical Exception Accounting
+
+The work-package coverage metric applies at 100% after work-package enforcement. Four accepted scaffold-history tasks predate that enforcement and are the only accepted tasks allowed to have `work_package_path: null`: `WP-0001-repo-memory-specificity`, `WP-0002-clean-bootstrap-placeholders`, `WP-0003-master-control-modules`, and `WP-0008-routing-matrix`.
+
+These exceptions do not count as post-enforcement coverage failures only while they remain linked to `.ai/AGENT_REPORTS/historical-fallback-verification.md`. New accepted work must have an explicit `work_package_path`; the historical fallback bundle is not valid evidence for accepting new work.
+
 ## Master Usage
 
 1. `INTAKE`: record whether human approval is required.
 2. `PACKAGE`: record whether a work package existed before implementation and whether allowed files are explicit.
-3. `IMPLEMENT`: record the implementer route and preserve the allowed-file boundary. For guarded parallel batches, record the `parallel_batch_id`, exact file reservations, isolated worktrees, and effective write-agent count before spawning implementers. For recursive delegation, record child-agent request ids, approval decisions, budgets, max observed depth, and approved child report requirements.
+3. `IMPLEMENT`: record the implementer route and preserve the allowed-file boundary. For guarded parallel batches, record the `parallel_batch_id`, exact file reservations, isolated worktrees, and effective write-agent count before spawning implementers. For recursive delegation, record child-agent request ids, approval decisions, budgets, max observed depth, approved child report requirements, and any child implementer write leases. A child implementer lease must include `write_lease_id`, `leased_files`, `lease_owner_agent_run_id`, `parent_write_state: paused_for_leased_files`, and status.
 4. `VERIFY`: record verifier report or fallback verification evidence presence, acceptance-criteria mapping, tests or not-run reason, child report presence when required, and scope checks.
 5. `FIX_OR_ACCEPT`: record fix attempts and repeated failure detection.
-6. `INTEGRATE`: record diff size, changed files, parallel write conflicts, recursive delegation violations, child scope violations, and whether every changed file matched its shard or child reservation.
+6. `INTEGRATE`: record diff size, changed files, parallel write conflicts, recursive delegation violations, child scope violations, whether every changed file matched its shard or child reservation, and whether each child write lease was returned or revoked before the parent resumed leased files.
 7. `UPDATE_MEMORY`: record whether memory files were updated for accepted work.
 8. `DONE`: ensure all metric fields are concrete and reference this file from the ledger.

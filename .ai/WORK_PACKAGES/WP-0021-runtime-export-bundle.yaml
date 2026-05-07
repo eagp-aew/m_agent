@@ -1,0 +1,124 @@
+task_id: WP-0021-runtime-export-bundle
+status: ACCEPTED
+objective: "Define and validate an exportable master-agent runtime bundle that can be copied into real project repositories without carrying this scaffold repo's development-only history."
+why: "Multiple reviews and the user noted that this repository is currently a scaffold for the real runtime structure; adoption should distinguish reusable runtime assets from this repo's project-memory history."
+scope_type: protocol
+priority: P0
+
+provenance:
+  created_at: "2026-05-07"
+  created_by: codex-master
+  source:
+    - "Fresh-Baseline Master-Agent Refinement Plan."
+    - "User reminder that this repo is infrastructure to export into other repos."
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0021-verifier.md"
+  superseded_by: null
+
+risk_class: protocol_validation
+
+context_profile: protocol
+context_profile_reason: "The work will touch installation/export guidance, validator coverage, and scaffold/runtime boundaries."
+
+fallback_verification:
+  allowed: false
+  reason: "Exportability changes affect how the scaffold is adopted in other repositories and should receive independent verifier evidence."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 14
+  max_tool_calls: 100
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0021-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency changes, deletion, production config, secrets, public APIs, broad refactors, or unclear runtime/export boundaries."
+
+allowed_files:
+  - "README.md"
+  - "INSTALLATION.md"
+  - "scripts/validate_protocol.py"
+  - "tests/test_validate_protocol.py"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/WORK_PACKAGES/WP-0021-runtime-export-bundle.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0021-verifier.md"
+
+forbidden_files:
+  - ".codex/config.toml"
+  - ".codex/agents/"
+  - ".agents/skills/direction-guide/"
+  - "dependency manifests"
+  - "application source files"
+  - "auth, payment, permissions, migrations, secrets, or production config"
+  - "deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - "README.md"
+  - "INSTALLATION.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/TEST_MATRIX.md"
+  - "scripts/validate_protocol.py"
+
+acceptance_criteria:
+  - "Reusable runtime bundle contents are explicitly defined for adoption in another repo."
+  - "Development-only history and scaffold project memory are distinguished from runtime assets."
+  - "README and INSTALLATION describe the real-repo adoption flow without suggesting that project-specific history must be copied."
+  - "Validator coverage confirms the export bundle's required files are present."
+  - "No dependencies, file deletions, public APIs, production config, auth/payment/permissions/secrets handling changes, or broad refactors are introduced."
+
+validation_commands:
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B -m unittest tests/test_validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only WP-0021 scoped documentation, validator, test, and memory changes if verification fails."
+
+human_approval_required:
+  required: false
+  reason: "The planned work is limited to scaffold export documentation, validation, tests, and memory; it does not delete files or touch approval-gated application areas."
+
+assigned_agent: master-orchestrated-parallel-implementers
+
+attempts:
+  implement: 0
+  fix: 0
+  verify: 1
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - tests_run
+  - verifier_report
+  - risks
+  - follow_up_tasks

@@ -1,0 +1,61 @@
+version: 1
+updated_at: 2026-05-07
+
+current_work_package:
+  task_id: WP-TEST-stale-done-ledger
+  title: "Stale DONE ledger fixture"
+  status: DONE
+  scope_type: validation
+
+current_state_machine_state: DONE
+
+active_agent_runs:
+  - agent_run_id: "fixture-run-001"
+    nickname: Fixture
+    role: implementer
+    task_id: WP-TEST-stale-done-ledger
+    shard_id: ledger-validator
+    status: RUNNING
+
+active_parallel_batch: WP-TEST-batch-001
+file_reservations:
+  - shard_id: ledger-validator
+    files:
+      - "scripts/validate_protocol.py"
+worktree_assignments:
+  - shard_id: ledger-validator
+    worktree_id: stale-done-worktree
+effective_parallel_write_agents: 1
+parallel_write_conflicts: 0
+
+quality_metrics:
+  metrics_reference: ".ai/METRICS.md"
+  per_work_package_checks:
+    work_package_id: WP-TEST-stale-done-ledger
+    work_package_existed_before_implementation: true
+    implementer_stayed_within_allowed_files: null
+    verifier_report_exists: true
+    verifier_mapped_acceptance_criteria: true
+    tests_run_or_not_run_reason_documented: true
+    memory_files_updated: true
+    fix_attempts: 0
+    repeated_failure_detected: false
+    human_approval_required: false
+    human_approval_obtained: true
+    exact_file_reservations_recorded: true
+    isolated_worktrees_required: true
+    effective_parallel_write_agents: 1
+    parallel_write_conflicts: 0
+    child_agent_requests_require_master_approval: true
+    child_agent_requests_approved: 0
+    child_agent_requests_denied: 0
+    max_observed_delegation_depth: 1
+    child_reports_missing: 0
+    child_scope_violations: 0
+    recursive_delegation_violations: 0
+    diff_size:
+      files: 1
+      insertions: null
+      deletions: 0
+    files_changed:
+      - "scripts/validate_protocol.py"
