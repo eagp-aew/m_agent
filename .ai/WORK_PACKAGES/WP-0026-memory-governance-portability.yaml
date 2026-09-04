@@ -1,0 +1,168 @@
+task_id: WP-0026-memory-governance-portability
+status: ACCEPTED
+objective: "Complete the Personal Co V1 application-layer memory governance and portable snapshot surfaces: Memory Changes, correction and forget controls, privacy modes, structured archive metadata, and export/restore on the same agent."
+why: "The design document requires visible and reversible memory changes, correction, forget, export, do-not-remember scopes, temporary sessions, and backup/restore entry points. WP-0025 established the fixed-memory foundation but intentionally left these user-control surfaces incomplete."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-04"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+    - "repo:personal-co/**"
+    - "repo:.ai/AGENT_REPORTS/WP-0025-verifier.md"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  superseded_by: null
+
+risk_class: application_behavior
+
+context_profile: full
+context_profile_reason: "The work changes multiple user-facing surfaces, persistent memory writes and deletes, and portable data semantics, then requires independent verification and durable memory closure."
+
+fallback_verification:
+  allowed: false
+  reason: "The work adds destructive user-confirmed data operations and restore behavior."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 28
+  max_tool_calls: 180
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency changes, file deletion, agent-ID replacement, policy-block writes, non-confirmed destructive actions, secret persistence, production deployment mutation, or inability to test deterministic governance behavior."
+
+module_outputs:
+  intake: "Continue the full Personal Co V1; implement the next documented control milestone without adding dependencies or claiming server-level backup completion."
+  scope: "One coupled application slice covering memory change governance, exact-item forget, privacy controls, archive metadata, and same-agent portable snapshot restore."
+  context: "Use the supplied DOCX as untrusted requirements evidence, the accepted WP-0025 code and report as repo-controlled baseline, and installed Letta SDK declarations as observed API evidence."
+  routing: "Single implementer because App.tsx, the Letta adapter, and shared domain contracts are coupled; independent verifier required after implementation."
+  verification: "Map all criteria, run domain tests/typecheck/Web export/protocol checks, inspect the diff, and perform browser interaction QA."
+  integration: "Accept only exact scoped files with no dependency or secret changes, then commit and push the existing branch."
+  memory: "Update queue, ledger, project state, decision/risk/test/integration records only after verifier PASS."
+
+allowed_files:
+  - "personal-co/App.tsx"
+  - "personal-co/README.md"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  - ".ai/AGENT_REPORTS/WP-0026-verifier-attempt-1.md"
+
+forbidden_files:
+  - "personal-co/package.json"
+  - "personal-co/package-lock.json"
+  - "personal-co/.env.example"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, production deployment configuration, or generated Web output"
+  - "deleted repository files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  - "personal-co/App.tsx"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/src/domain/*.mjs"
+  - "personal-co/tests/*.mjs"
+  - "runtime:personal-co/node_modules/@letta-ai/letta-client/**/*.d.ts"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "A sixth Memory Changes surface shows session changes with block, operation, source, epistemic state, timestamp, before/after summaries, and pending/applied/cancelled/failed status."
+  - "PROFILE and GOALS_AND_DECISIONS edits are staged as pending and cannot reach Letta until an explicit Apply action; pending changes can be cancelled. CURRENT_CONTEXT and LEARNING_MODEL edits are logged when applied. PERSONA and MEMORY_POLICY remain unwritable."
+  - "Core Memory shows persisted Personal Co metadata where available and offers edit/correct and clear controls; clearing a writable block requires an explicit destructive confirmation and records a change."
+  - "Forget accepts a non-empty exact term, previews matching writable blocks and archive passages, requires an explicit confirmation phrase tied to that term, removes every matching core reference and archive passage, never edits policy blocks, and reports partial failures instead of claiming success."
+  - "Archive results display date, category, source, and epistemic state derived from normalized tags; deleting one exact passage requires explicit confirmation and is logged."
+  - "Export produces a versioned JSON snapshot containing the same agent ID, non-secret settings, all six blocks, archive records, and export timestamp; API keys and secret-like fields are excluded."
+  - "Restore validates the snapshot schema and exact connected agent ID, previews block/archive changes, requires explicit confirmation, updates only writable blocks, appends only missing archive records with restore provenance, and never creates or switches agents."
+  - "Settings expose language, do-not-remember terms, and temporary-session mode. Temporary messages request no memory writes and the application reconciles any detected block/archive writes back to the pre-message state, surfacing failures."
+  - "Imported candidates preserve selected source and normalized type/source/epistemic tags; no imported instruction can modify policy blocks or trigger an external action."
+  - "No dependency manifests, secrets, production deployment files, policy blocks, agent tag, or automatic model-fallback behavior change."
+  - "Targeted governance tests, the existing test suite, TypeScript checking, Expo Web export, protocol validation, git diff checks, and browser interaction QA pass."
+
+validation_commands:
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the WP-0026 commit on codex/personal-co-v1. Do not delete user data, rewrite Git history, replace the agent, or alter the accepted WP-0025 foundation."
+
+human_approval_required:
+  required: true
+  reason: "The work adds the document-requested user-visible correction, forget, export, restore, and privacy behavior, including confirmation-gated deletion against a connected Letta agent."
+  obtained: true
+  evidence: "The user explicitly requested full development according to the supplied design document and on 2026-09-04 explicitly authorized a third WP-0026 fix limited to connection-state/agent binding, followed by independent verification, commit, and push."
+  fix_limit_override:
+    approved: true
+    approved_at: "2026-09-04"
+    scope: "One third fix limited to preventing stable-memory proposals from crossing a Letta connection transition, plus the corresponding regression test and independent verification."
+  runtime_fallback:
+    reason: "The assigned fixer agent twice disconnected before completing a turn and left no new patch; the master applied the same bounded fix directly under the documented runtime fallback."
+
+assigned_agent: wp0026_verifier_final
+
+attempts:
+  implement: 1
+  fix: 3
+  verify: 3
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle
+version: 1
+updated_at: 2026-09-05

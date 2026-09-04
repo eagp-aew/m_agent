@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-04
+updated_at: 2026-09-05
 
 active_milestone:
   id: M-0002
@@ -8,12 +8,12 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0025-personal-co-foundation
-  title: "Build the Personal Co V1 application foundation"
+  task_id: WP-0026-memory-governance-portability
+  title: "Add Personal Co memory governance and portable snapshots"
   status: ACCEPTED
   scope_type: implementation
-  assigned_agent: wp0025_verifier_retry
-  work_package_path: ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
+  assigned_agent: wp0026_verifier_final
+  work_package_path: ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
 
 current_state_machine_state: DONE
 
@@ -58,8 +58,17 @@ open_decisions:
     owner: master
     status: CLOSED
     resolution: "WP-0021-runtime-export-bundle defined the runtime bundle boundary, adoption docs, and validator checks."
+  - id: OD-0026
+    question: "May Codex exceed WP-0026's two-fix limit for one bounded repair of the reconnect-interval pending-change race, followed by independent verification?"
+    source: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+    owner: human
+    status: CLOSED
+    resolution: "Human explicitly authorized one third fix limited to the connection-state/agent-binding race, followed by independent verification and push only after PASS."
 
 failure_counts_by_task:
+  WP-0026-memory-governance-portability:
+    verify: 3
+    fix: 3
   WP-0025-personal-co-foundation:
     verify: 1
     fix: 1
@@ -124,6 +133,34 @@ failure_counts_by_task:
 failure_signatures:
   repeat_stop_threshold: 2
   entries:
+    - work_package_id: WP-0026-memory-governance-portability
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:pending-stable-change-survives-agent-reconnect
+      seen_count: 2
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+    - work_package_id: WP-0026-memory-governance-portability
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:snapshot-restore-apply-omits-current-agent-id-revalidation
+      seen_count: 1
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: ".ai/AGENT_REPORTS/WP-0026-verifier-attempt-1.md"
+    - work_package_id: WP-0026-memory-governance-portability
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:forget-execute-trusts-stale-unbound-preview
+      seen_count: 1
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: ".ai/AGENT_REPORTS/WP-0026-verifier-attempt-1.md"
+    - work_package_id: WP-0026-memory-governance-portability
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:react-native-alert-noop-on-expo-web
+      seen_count: 1
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: "In-app browser QA clicked PROFILE Clear at http://localhost:8087; no dialog or page confirmation appeared and no action was staged. Archive deletion uses the same unsupported Web Alert path."
     - work_package_id: WP-0025-personal-co-foundation
       classification: IMPLEMENTATION_BUG
       signature: IMPLEMENTATION_BUG:agent-list-omits-required-tag-relationship
@@ -168,7 +205,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0025-personal-co-foundation
+    work_package_id: WP-0026-memory-governance-portability
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -186,32 +223,38 @@ quality_metrics:
     child_reports_missing: 0
     child_scope_violations: 0
     recursive_delegation_violations: 0
-    fix_attempts: 1
-    repeated_failure_detected: false
+    fix_attempts: 3
+    repeated_failure_detected: true
     human_approval_required: true
     human_approval_obtained: true
+    human_fix_limit_override_obtained: true
     diff_size:
-      files: 30
-      insertions: 10747
-      deletions: 53
-      note: "Counts include the npm-generated package lock, original application foundation, verification evidence, and durable memory closure."
+      files: 18
+      insertions: 2298
+      deletions: 95
+      note: "Final counts include seven newly tracked WP-0026 files and all scoped application/memory edits relative to accepted WP-0025 HEAD."
     files_changed:
-      - "README.md"
-      - ".ai/AGENT_REPORTS/WP-0025-verifier-attempt-1.md"
-      - ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+      - ".ai/AGENT_REPORTS/WP-0026-verifier-attempt-1.md"
+      - ".ai/AGENT_REPORTS/WP-0026-verifier.md"
       - ".ai/DECISIONS.md"
       - ".ai/INTEGRATION_LOG.md"
       - ".ai/MASTER_LEDGER.yaml"
-      - ".ai/MISSION.md"
       - ".ai/PROJECT_STATE.md"
       - ".ai/RISK_REGISTER.md"
       - ".ai/TASK_QUEUE.yaml"
       - ".ai/TEST_MATRIX.md"
-      - ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
-      - "personal-co/**"
+      - ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
+      - "personal-co/App.tsx"
+      - "personal-co/README.md"
+      - "personal-co/src/domain/changes.mjs"
+      - "personal-co/src/domain/imports.mjs"
+      - "personal-co/src/domain/privacy.mjs"
+      - "personal-co/src/domain/snapshot.mjs"
+      - "personal-co/src/services/letta.ts"
+      - "personal-co/tests/governance.test.mjs"
   scope_check:
     status: PASS
-    evidence: "Application writes are limited to personal-co/**; master-owned writes are limited to the root entrypoint and durable memory/report files explicitly allowed by WP-0025."
+    evidence: "Independent verifier attempt 3 confirmed every changed or untracked path is explicitly allowed and no forbidden file or deletion is present."
   validation:
     status: PASS
     commands:
@@ -224,16 +267,16 @@ quality_metrics:
       - "git status --short --untracked-files=all"
   verifier_status:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+    evidence: ".ai/AGENT_REPORTS/WP-0026-verifier.md maps 11/11 acceptance criteria and records 21/21 tests, typecheck, Web export, protocol checks, focused reconnect reproduction, scope checks, and root browser reconnect-window QA."
 
 execution_budget:
   max_steps: 24
   max_tool_calls: 160
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
   cancellation:
     owner: master
-    condition: "Stop on secrets, auth/permission changes beyond local Letta connection settings, deletion, production deployment mutation, unrelated scaffold refactors, or inability to validate the dependency tree."
+    condition: "Stop on dependency changes, file deletion, agent-ID replacement, policy-block writes, non-confirmed destructive actions, secret persistence, production deployment mutation, or inability to test deterministic governance behavior."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

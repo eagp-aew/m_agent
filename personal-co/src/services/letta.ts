@@ -6,7 +6,9 @@ import {
   planAgentConfigurationUpdate,
   selectTaggedAgent,
 } from '../domain/agent.mjs';
-import { createMemoryBlocks } from '../domain/memory.mjs';
+import { parseArchiveTags } from '../domain/imports.mjs';
+import { createMemoryBlocks, POLICY_MEMORY_LABELS } from '../domain/memory.mjs';
+import { messageEnvelope, planTemporaryReconciliation } from '../domain/privacy.mjs';
 import { MEMORY_POLICY_TEXT, PERSONA_TEXT, SYSTEM_PROMPT } from '../domain/policy.mjs';
 
 export const PERSONAL_CO_AGENT_TAG = 'personal-co-v1';
@@ -17,6 +19,7 @@ export type AgentBlock = {
   value: string;
   readOnly?: boolean;
   read_only?: boolean;
+  metadata?: Record<string, unknown> | null;
 };
 
 export type AgentSummary = {
@@ -39,6 +42,25 @@ export type ArchiveItem = {
   text: string;
   tags: string[];
   createdAt?: string;
+  updatedAt?: string;
+  category: string;
+  source: string;
+  epistemicState: string;
+  date: string;
+  provenance: string;
+};
+
+export type AgentMemorySnapshot = {
+  blocks: AgentBlock[];
+  archive: ArchiveItem[];
+};
+
+export type MemoryReconciliationResult = {
+  success: boolean;
+  failures: string[];
+  restoredBlocks: string[];
+  deletedArchiveIds: string[];
+  state: AgentMemorySnapshot;
 };
 
 function stringValue(value: unknown): string {
@@ -117,18 +139,27 @@ export class PersonalCoLettaClient {
       value: block.value,
       readOnly: block.read_only,
       read_only: block.read_only,
+      metadata: block.metadata,
     }));
   }
 
-  async updateBlock(block: AgentBlock, value: string): Promise<AgentBlock> {
+  async updateBlock(
+    block: AgentBlock,
+    value: string,
+    metadata: Record<string, unknown> | null = block.metadata ?? null,
+  ): Promise<AgentBlock> {
+    if (POLICY_MEMORY_LABELS.includes(block.label) || block.readOnly === true || block.read_only === true) {
+      throw new Error(`${block.label} is a read-only policy block.`);
+    }
     if (!block.id) throw new Error(`The ${block.label} block has no server id.`);
-    const updated = await this.client.blocks.update(block.id, { value });
+    const updated = await this.client.blocks.update(block.id, { value, metadata });
     return {
       id: updated.id,
       label: updated.label ?? block.label,
       value: updated.value,
       readOnly: updated.read_only,
       read_only: updated.read_only,
+      metadata: updated.metadata,
     };
   }
 
@@ -146,9 +177,21 @@ export class PersonalCoLettaClient {
       .filter((message): message is ChatMessage => message !== null);
   }
 
-  async sendMessage(agentId: string, content: string): Promise<ChatMessage[]> {
+  async sendMessage(
+    agentId: string,
+    content: string,
+    options: { requestNoMemoryWrites?: boolean; language?: string } = {},
+  ): Promise<ChatMessage[]> {
+    const messages = messageEnvelope(
+      content,
+      options.requestNoMemoryWrites === true,
+      options.language,
+    ) as Array<{
+      role: 'user' | 'system';
+      content: string;
+    }>;
     const response = await this.client.agents.messages.create(agentId, {
-      messages: [{ role: 'user', content }],
+      messages,
       use_assistant_message: true,
       stream_tokens: false,
       streaming: false,
@@ -165,19 +208,119 @@ export class PersonalCoLettaClient {
   }
 
   async listArchive(agentId: string, search = ''): Promise<ArchiveItem[]> {
-    const passages = await this.client.agents.passages.list(agentId, { limit: 100, search: search || undefined });
-    return passages.map((passage, index) => {
-      const item = passage as unknown as Record<string, unknown>;
+    const passages: Array<Record<string, unknown>> = [];
+    let after: string | undefined;
+    const seenCursors = new Set<string>();
+    const seenPassageIds = new Set<string>();
+    do {
+      const page = await this.client.agents.passages.list(agentId, {
+        limit: 100,
+        search: search || undefined,
+        after,
+      });
+      const batch = page.map((passage) => passage as unknown as Record<string, unknown>);
+      for (const passage of batch) {
+        const id = stringValue(passage.id);
+        if (!id || !seenPassageIds.has(id)) passages.push(passage);
+        if (id) seenPassageIds.add(id);
+      }
+      const nextCursor = batch.length === 100 ? stringValue(batch.at(-1)?.id) : '';
+      if (!nextCursor || seenCursors.has(nextCursor)) break;
+      seenCursors.add(nextCursor);
+      after = nextCursor;
+    } while (after);
+
+    return passages.map((item, index) => {
+      const id = stringValue(item.id);
+      if (!id) throw new Error(`Archive passage ${index + 1} has no server ID; destructive controls are disabled.`);
+      const tags = Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [];
+      const createdAt = stringValue(item.created_at) || undefined;
+      const metadata = parseArchiveTags(tags, createdAt);
       return {
-        id: stringValue(item.id) || `passage-${index}`,
+        id,
         text: stringValue(item.text) || stringValue(item.content),
-        tags: Array.isArray(item.tags) ? item.tags.filter((tag): tag is string => typeof tag === 'string') : [],
-        createdAt: stringValue(item.created_at) || undefined,
+        tags,
+        createdAt,
+        updatedAt: stringValue(item.updated_at) || undefined,
+        ...metadata,
       };
     });
   }
 
-  async archiveText(agentId: string, text: string, tags: string[]): Promise<void> {
-    await this.client.agents.passages.create(agentId, { text, tags });
+  async archiveText(agentId: string, text: string, tags: string[], createdAt?: string | null): Promise<void> {
+    await this.client.agents.passages.create(agentId, {
+      text,
+      tags,
+      created_at: createdAt || undefined,
+    });
+  }
+
+  async deleteArchiveItem(agentId: string, passageId: string): Promise<void> {
+    await this.client.agents.passages.delete(passageId, { agent_id: agentId });
+  }
+
+  async captureAgentMemory(agentId: string): Promise<AgentMemorySnapshot> {
+    const [blocks, archive] = await Promise.all([
+      this.listBlocks(agentId),
+      this.listArchive(agentId),
+    ]);
+    return { blocks, archive };
+  }
+
+  async reconcileTemporaryMemory(
+    agentId: string,
+    before: AgentMemorySnapshot,
+  ): Promise<MemoryReconciliationResult> {
+    let after: AgentMemorySnapshot;
+    try {
+      after = await this.captureAgentMemory(agentId);
+    } catch (error) {
+      return {
+        success: false,
+        failures: [`Could not inspect memory after the private message: ${error instanceof Error ? error.message : 'unknown error'}`],
+        restoredBlocks: [],
+        deletedArchiveIds: [],
+        state: before,
+      };
+    }
+    const plan = planTemporaryReconciliation(before, after);
+    const failures = [...plan.violations];
+    const restoredBlocks: string[] = [];
+    const deletedArchiveIds: string[] = [];
+
+    for (const block of plan.blockRestores) {
+      try {
+        await this.updateBlock(block, block.value, block.metadata ?? null);
+        restoredBlocks.push(block.label);
+      } catch (error) {
+        failures.push(`Could not restore ${block.label}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      }
+    }
+    for (const item of plan.archiveDeletes) {
+      try {
+        await this.deleteArchiveItem(agentId, item.id);
+        deletedArchiveIds.push(item.id);
+      } catch (error) {
+        failures.push(`Could not remove temporary archive passage ${item.id}: ${error instanceof Error ? error.message : 'unknown error'}`);
+      }
+    }
+
+    let state = after;
+    try {
+      state = await this.captureAgentMemory(agentId);
+      const remaining = planTemporaryReconciliation(before, state);
+      if (remaining.blockRestores.length || remaining.archiveDeletes.length || remaining.violations.length) {
+        failures.push('Verification found unreconciled memory differences after rollback.');
+      }
+    } catch (error) {
+      failures.push(`Could not verify reconciled memory: ${error instanceof Error ? error.message : 'unknown error'}`);
+    }
+    return {
+      success: failures.length === 0,
+      failures,
+      restoredBlocks,
+      deletedArchiveIds,
+      state,
+    };
   }
 }

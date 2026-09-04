@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-04
+updated_at: 2026-09-05
 
 queue:
   - task_id: WP-0000-bootstrap
@@ -284,6 +284,17 @@ queue:
     acceptance_summary: "Deliver an original Expo Web foundation with a single persistent Letta agent, fixed memory policy, import safeguards, learning-state tests, and a verified production-style Web export."
     work_package_path: ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  - task_id: WP-0026-memory-governance-portability
+    title: "Add Personal Co memory governance and portable snapshots"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0026_verifier_final
+    blocked_by:
+      - WP-0025-personal-co-foundation
+    acceptance_summary: "Accepted Memory Changes, confirmation-gated correction and forget controls, privacy modes, archive provenance, agent-bound connection transitions, and secret-free same-agent export/restore without new dependencies."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
 
 status_values:
   - DRAFT

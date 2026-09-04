@@ -5,10 +5,11 @@ Personal Co is an original Expo Web foundation for a single, durable thinking pa
 ## Product surfaces
 
 - **Chat** — converse with the one agent tagged `personal-co-v1`.
-- **Core Memory** — edit `PROFILE`, `CURRENT_CONTEXT`, `GOALS_AND_DECISIONS`, and `LEARNING_MODEL`; inspect read-only `PERSONA` and `MEMORY_POLICY`.
-- **Archive** — search durable passages without promoting uncertain material into core memory.
-- **Import** — preview pasted lines as `external_import` archive candidates.
-- **Settings** — configure the Letta base URL, model handle, embedding handle, and an optional session-only API key.
+- **Core Memory** — correct or clear the four writable blocks, inspect persisted Personal Co metadata, and keep `PERSONA` and `MEMORY_POLICY` read-only.
+- **Memory Changes** — review session changes, apply or cancel stable proposals, and preview exact-term forget operations before confirmation.
+- **Archive** — search structured durable passages and confirm deletion of one exact passage.
+- **Import** — preview pasted lines with normalized type, source, date, and epistemic provenance.
+- **Settings** — configure the Letta connection, privacy scopes, language, and portable snapshot export/restore.
 
 The adapter never performs cross-provider fallback. Agent creation and configuration updates set `enable_sleeptime: false` and reject duplicate agents carrying the Personal Co tag. The documented presets are DeepSeek V4 Pro for routine use and GPT-5.6 Terra as a manual quality switch; model availability still depends on the handles registered by your Letta server.
 
@@ -37,6 +38,12 @@ npm run export:web
 ## Memory and import guarantees
 
 The domain policy recognizes `confirmed`, `observed`, `inferred`, `hypothesis`, and `superseded`. Uncertain information is archive-first. Stable profile and goal changes require confirmation, while policy blocks reject edits. Imported text starts as an `external_import` archive candidate and cannot directly mutate stable memory. Learning follows the documented `exposed`, `developing`, `usable`, and `needs_review` states: reading alone stays `exposed`, practice can become `developing`, application or transfer evidence is required for `usable`, and contradictory evidence triggers `needs_review`.
+
+`PROFILE` and `GOALS_AND_DECISIONS` corrections remain pending until an explicit Apply action in Memory Changes. Clearing any writable block has a destructive confirmation, and exact-term forget requires the displayed `FORGET <term>` phrase before it removes literal references from writable blocks and archive passages. Operation failures are recorded individually; a partial failure is never reported as full success.
+
+Temporary sessions and messages containing a configured do-not-remember term send a no-memory system request. Because an agent can still attempt a write, the app snapshots blocks and archive before the message, restores changed writable blocks, removes newly added archive passages, verifies the result, and surfaces any reconciliation failure. It does not claim that failed rollback calls succeeded.
+
+Portable export is a versioned, secret-filtered JSON snapshot of the same agent ID, six blocks, non-secret settings, and archive records. Restore validates that exact connected agent ID, previews changes, updates only writable blocks, and appends only archive records not already present with `provenance:restore`. It never imports or creates an agent. This portable snapshot is **not** a PostgreSQL dump or full Letta database backup; server-level backup and recovery remain an operator responsibility.
 
 ## Architecture reference
 

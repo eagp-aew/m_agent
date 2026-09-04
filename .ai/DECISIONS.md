@@ -397,6 +397,25 @@
   - Tests cover the highest-risk pure contracts, including duplicate-agent rejection, exact existing memory schema, and same-ID updates.
   - Deployment success still depends on a reachable Letta server with the configured handles registered.
 
+## DEC-0025: Bind persistent-memory actions to one connected agent context
+
+- Date: 2026-09-05
+- Status: accepted
+- Context:
+  - The design requires one persistent Letta agent and explicit user control over durable memory changes.
+  - A pending stable-memory proposal must never cross a connection transition and apply to a different agent, even if it is created during the asynchronous reconnect window.
+  - Export, restore, forget, archive deletion, and temporary-session reconciliation need honest same-agent behavior without claiming server-level backup guarantees.
+- Decision:
+  - Treat `connection.status === connected`, a present client, and an exact current agent ID as one indivisible authorization context for every persistent-memory action.
+  - Store the immutable agent ID on each pending stable-memory proposal, reject unbound proposals, cancel proposals at every connection boundary, and revalidate the binding immediately before Apply.
+  - Keep PERSONA and MEMORY_POLICY unwritable; require explicit confirmation for stable edits, clear, forget, passage deletion, and restore.
+  - Export only secret-filtered portable application data and restore only to the exact connected agent without creating or switching agents.
+  - Treat temporary-session rollback as best-effort reconciliation that reports irrecoverable live-backend changes rather than claiming success.
+- Consequences:
+  - Cross-agent proposal races fail closed and have a dedicated regression test.
+  - Memory governance and portable snapshots remain compatible with the single-agent foundation.
+  - Full V1 acceptance still requires live Letta integration evidence and does not equate portable JSON snapshots with database backup.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -425,3 +444,4 @@
 | DEC-0022 | 2026-05-07 | accepted | Require child implementer write leases |
 | DEC-0023 | 2026-05-07 | accepted | Account for historical work-package exceptions |
 | DEC-0024 | 2026-09-04 | accepted | Adopt the Personal Co V1 foundation architecture |
+| DEC-0025 | 2026-09-05 | accepted | Bind persistent-memory actions to one connected agent context |
