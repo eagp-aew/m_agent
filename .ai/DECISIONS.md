@@ -378,6 +378,25 @@
   - Future accepted work cannot silently omit a work package.
   - Historical exceptions remain auditable instead of pretending the old evidence shape existed.
 
+## DEC-0024: Adopt the Personal Co V1 foundation architecture
+
+- Date: 2026-09-04
+- Status: accepted
+- Context:
+  - The supplied product and technical design requires a desktop-first Expo Web client backed by one persistent self-hosted Letta agent.
+  - The design fixes the V1 memory model, epistemic states, import safeguards, manual model switching, and learning-state rules.
+  - The referenced `letta-ai/co` repository has no declared license at the reviewed commit, so direct source, asset, or text reuse would create avoidable licensing risk.
+- Decision:
+  - Build an original implementation under `personal-co/` and use `letta-ai/co` only as an architectural reference pinned to commit `0daccb8f2d69f40bcbc01994f9fb3c2c183f7229`.
+  - Reuse exactly one agent tagged `personal-co-v1`; fail closed on duplicates or a nonconforming existing six-block memory schema.
+  - Keep exactly four writable user blocks and two read-only policy blocks, route uncertainty to archive, and require confirmation for stable memory and external writes.
+  - Keep model and embedding handles configurable, use the document's DeepSeek, GPT-5.6 Terra, and Ollama values as deployment handles, and provide no automatic cross-provider fallback.
+  - Treat WP-0025 as a verified foundation milestone; live Letta interoperability, Memory Changes, forget/export, and backup/restore remain follow-up work before full V1 completion.
+- Consequences:
+  - The repository is now an application project that retains the Codex direction runtime for controlled delivery.
+  - Tests cover the highest-risk pure contracts, including duplicate-agent rejection, exact existing memory schema, and same-ID updates.
+  - Deployment success still depends on a reachable Letta server with the configured handles registered.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -405,3 +424,4 @@
 | DEC-0021 | 2026-05-07 | accepted | Enforce DONE ledger closure |
 | DEC-0022 | 2026-05-07 | accepted | Require child implementer write leases |
 | DEC-0023 | 2026-05-07 | accepted | Account for historical work-package exceptions |
+| DEC-0024 | 2026-09-04 | accepted | Adopt the Personal Co V1 foundation architecture |

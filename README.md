@@ -1,6 +1,19 @@
-# Codex Multi-Agent Direction Guide
+# Personal Co
 
-This is the Codex-ready direction-system scaffold. The root is intentionally lean: durable protocol detail lives under `.agents/skills/direction-guide/` and `.ai/`, while root docs stay limited to setup and repository entrypoints.
+Personal Co is a local-first personal assistant foundation built with Expo Web and a self-hosted Letta server. The runnable application lives in [`personal-co/`](personal-co/README.md) and currently includes Chat, Core Memory, Archive, safe Import, and Settings surfaces.
+
+```bash
+cd personal-co
+cp .env.example .env
+npm install
+npm run web
+```
+
+The current milestone guarantees one persistent tagged Letta agent, four writable user-memory blocks, two read-only policy blocks, archive-first uncertainty handling, confirmation gates for stable memory and external writes, and manual model switching without automatic provider fallback.
+
+## Codex direction runtime
+
+The repository also carries the Codex-ready direction-system runtime used to plan, verify, and record application work. Durable protocol detail lives under `.agents/skills/direction-guide/` and `.ai/`, while root docs stay limited to setup and repository entrypoints.
 
 It includes the actual hidden directories Codex expects:
 
@@ -18,7 +31,7 @@ Command + Shift + .
 
 to toggle hidden files/folders.
 
-## Current scaffold map
+## Current project map
 
 The current architecture, accepted work history, risky areas, and next recommended work live in `.ai/PROJECT_STATE.md`. Treat that file as the current manifest instead of maintaining a second full file list in this README.
 

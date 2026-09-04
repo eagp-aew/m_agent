@@ -1,19 +1,19 @@
 version: 1
-updated_at: 2026-05-07
+updated_at: 2026-09-04
 
 active_milestone:
-  id: M-0001
-  title: "Bootstrap Codex multi-agent direction workflow"
+  id: M-0002
+  title: "Personal Co V1 foundation"
   owner: "Human + Codex master thread"
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0024-historical-exception-metrics
-  title: "Validate historical work-package exceptions"
+  task_id: WP-0025-personal-co-foundation
+  title: "Build the Personal Co V1 application foundation"
   status: ACCEPTED
-  scope_type: validation
-  assigned_agent: Galileo
-  work_package_path: ".ai/WORK_PACKAGES/WP-0024-historical-exception-metrics.yaml"
+  scope_type: implementation
+  assigned_agent: wp0025_verifier_retry
+  work_package_path: ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
 
 current_state_machine_state: DONE
 
@@ -60,6 +60,9 @@ open_decisions:
     resolution: "WP-0021-runtime-export-bundle defined the runtime bundle boundary, adoption docs, and validator checks."
 
 failure_counts_by_task:
+  WP-0025-personal-co-foundation:
+    verify: 1
+    fix: 1
   WP-0024-historical-exception-metrics:
     verify: 0
     fix: 0
@@ -121,6 +124,20 @@ failure_counts_by_task:
 failure_signatures:
   repeat_stop_threshold: 2
   entries:
+    - work_package_id: WP-0025-personal-co-foundation
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:agent-list-omits-required-tag-relationship
+      seen_count: 1
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: ".ai/AGENT_REPORTS/WP-0025-verifier-attempt-1.md"
+    - work_package_id: WP-0025-personal-co-foundation
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:existing-agent-memory-schema-not-validated
+      seen_count: 1
+      first_seen_at: 2026-09-04
+      last_seen_at: 2026-09-04
+      evidence: ".ai/AGENT_REPORTS/WP-0025-verifier-attempt-1.md"
     - work_package_id: WP-0020-protocol-gate-semantic-hardening
       classification: IMPLEMENTATION_BUG
       signature: IMPLEMENTATION_BUG:report-path-marker-spaced-external-prefix-treated-as-repo-path
@@ -151,16 +168,16 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0024-historical-exception-metrics
+    work_package_id: WP-0025-personal-co-foundation
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
     verifier_mapped_acceptance_criteria: true
     tests_run_or_not_run_reason_documented: true
     memory_files_updated: true
-    exact_file_reservations_recorded: true
-    isolated_worktrees_required: true
-    effective_parallel_write_agents: 1
+    exact_file_reservations_recorded: false
+    isolated_worktrees_required: false
+    effective_parallel_write_agents: 0
     parallel_write_conflicts: 0
     child_agent_requests_require_master_approval: true
     child_agent_requests_approved: 0
@@ -169,43 +186,54 @@ quality_metrics:
     child_reports_missing: 0
     child_scope_violations: 0
     recursive_delegation_violations: 0
-    fix_attempts: 0
+    fix_attempts: 1
     repeated_failure_detected: false
-    human_approval_required: false
+    human_approval_required: true
     human_approval_obtained: true
     diff_size:
-      files: 4
-      insertions: "scoped count not isolated from prior accepted shared-worktree edits"
-      deletions: "scoped count not isolated from prior accepted shared-worktree edits"
-      note: "Scoped WP-0024 implementation touched .ai/METRICS.md, .ai/TEST_MATRIX.md, scripts/validate_protocol.py, and tests/test_validate_protocol.py."
+      files: 30
+      insertions: 10747
+      deletions: 53
+      note: "Counts include the npm-generated package lock, original application foundation, verification evidence, and durable memory closure."
     files_changed:
-      - ".ai/METRICS.md"
+      - "README.md"
+      - ".ai/AGENT_REPORTS/WP-0025-verifier-attempt-1.md"
+      - ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+      - ".ai/DECISIONS.md"
+      - ".ai/INTEGRATION_LOG.md"
+      - ".ai/MASTER_LEDGER.yaml"
+      - ".ai/MISSION.md"
+      - ".ai/PROJECT_STATE.md"
+      - ".ai/RISK_REGISTER.md"
+      - ".ai/TASK_QUEUE.yaml"
       - ".ai/TEST_MATRIX.md"
-      - "scripts/validate_protocol.py"
-      - "tests/test_validate_protocol.py"
+      - ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
+      - "personal-co/**"
   scope_check:
     status: PASS
-    evidence: "Verifier confirmed WP-0024 stayed within scoped metrics/validator/test files and introduced no dependencies, deletions, production config, auth/payment/permissions/secrets, public APIs, broad refactors, or historical fact rewrites."
+    evidence: "Application writes are limited to personal-co/**; master-owned writes are limited to the root entrypoint and durable memory/report files explicitly allowed by WP-0025."
   validation:
     status: PASS
     commands:
-      - "python3 -B -m unittest tests/test_validate_protocol.py"
+      - "cd personal-co && npm test"
+      - "cd personal-co && npm run typecheck"
+      - "cd personal-co && npm run export:web"
       - "python3 -B scripts/validate_protocol.py"
       - "python3 -B scripts/protocol_gate.py audit"
       - "git diff --check"
       - "git status --short --untracked-files=all"
   verifier_status:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
+    evidence: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
 
 execution_budget:
-  max_steps: 10
-  max_tool_calls: 80
+  max_steps: 24
+  max_tool_calls: 160
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
   cancellation:
     owner: master
-    condition: "Stop on dependency changes, deletion, public API changes, production config, secrets, broad refactors, or changes that rewrite historical facts without evidence."
+    condition: "Stop on secrets, auth/permission changes beyond local Letta connection settings, deletion, production deployment mutation, unrelated scaffold refactors, or inability to validate the dependency tree."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

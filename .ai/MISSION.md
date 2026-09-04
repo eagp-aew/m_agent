@@ -1,12 +1,12 @@
 # Mission
 
-This repository is the working scaffold for refining a Codex-native multi-agent direction system. Its purpose is to improve the master-agent structure, role boundaries, work-package protocol, verification flow, and durable memory practices used by Codex inside a repo.
+This repository develops Personal Co: a local-first personal assistant whose conversations, curated memory, archive, import flow, and model settings share one persistent self-hosted Letta agent.
 
-The mission of this scaffold is to:
+The mission is to:
 
-- keep Codex context clean;
-- delegate bounded work to specialized agents;
-- verify every implementation independently;
-- preserve durable project memory in `.ai/` files;
-- produce small, reviewable diffs;
-- avoid treating this repo as an application project unless the scaffold is copied into one.
+- preserve user agency through inspectable, editable, and exportable memory;
+- separate stable profile and goals from temporary context and uncertain archive evidence;
+- keep model switching manual while preserving the same agent identity and memory;
+- require confirmation before stable-memory changes or external writes;
+- build the documented V1 incrementally with tests, independent verification, and durable `.ai/` project memory;
+- retain the Codex direction runtime as the repository's controlled delivery protocol.

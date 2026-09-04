@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-05-07
+updated_at: 2026-09-04
 
 queue:
   - task_id: WP-0000-bootstrap
@@ -274,6 +274,16 @@ queue:
     acceptance_summary: "Metrics now distinguish post-enforcement 100% work-package coverage from four enumerated historical pre-enforcement exceptions, and validator/tests reject future accepted work without work_package_path."
     work_package_path: ".ai/WORK_PACKAGES/WP-0024-historical-exception-metrics.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0024-verifier.md"
+  - task_id: WP-0025-personal-co-foundation
+    title: "Build the Personal Co V1 application foundation"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0025_verifier_retry
+    blocked_by: []
+    acceptance_summary: "Deliver an original Expo Web foundation with a single persistent Letta agent, fixed memory policy, import safeguards, learning-state tests, and a verified production-style Web export."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
 
 status_values:
   - DRAFT

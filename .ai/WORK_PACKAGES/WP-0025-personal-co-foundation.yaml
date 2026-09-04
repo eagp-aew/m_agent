@@ -1,0 +1,134 @@
+task_id: WP-0025-personal-co-foundation
+status: ACCEPTED
+objective: "Adopt this repository as the Personal Co application workspace and deliver a runnable, original Expo Web foundation that follows the supplied product and technical design."
+why: "The user asked for the documented Personal Co product to be implemented and pushed to eagp-aew/m_agent. The repository currently contains only the reusable Codex direction scaffold, so the first application milestone must establish the Web client, single-agent Letta integration, fixed memory model, safety policy, and executable validation."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-04"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+    - "external:https://github.com/letta-ai/co"
+    - "external:https://github.com/letta-ai/co/tree/0daccb8f2d69f40bcbc01994f9fb3c2c183f7229"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  superseded_by: null
+
+risk_class: application_behavior
+
+context_profile: full
+context_profile_reason: "This milestone changes repository purpose, adds an application and dependency manifests, and requires durable memory closure plus independent verification."
+
+fallback_verification:
+  allowed: false
+  reason: "The work adds dependency manifests and user-visible application behavior."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 24
+  max_tool_calls: 160
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on secrets, auth/permission changes beyond local Letta connection settings, deletion, production deployment mutation, unrelated scaffold refactors, or inability to validate the dependency tree."
+
+allowed_files:
+  - "personal-co/**"
+  - "README.md"
+  - ".gitignore"
+  - ".ai/WORK_PACKAGES/WP-0025-personal-co-foundation.yaml"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/MISSION.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+  - ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  - ".ai/AGENT_REPORTS/WP-0025-verifier-attempt-1.md"
+
+forbidden_files:
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, or production configuration"
+  - "deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+  - "external:https://github.com/letta-ai/co"
+  - "runtime:/private/tmp/letta-co-reference"
+
+acceptance_criteria:
+  - "A runnable Expo Web application exists under personal-co with Chat, Core Memory, Archive, Import, and Settings surfaces."
+  - "The application finds or creates exactly one Letta agent by the personal-co-v1 tag, uses a configurable Letta base URL/model/embedding handle, disables sleeptime, and exposes no automatic cross-provider fallback."
+  - "Agent initialization uses exactly four writable user memory blocks (PROFILE, CURRENT_CONTEXT, GOALS_AND_DECISIONS, LEARNING_MODEL) plus PERSONA and MEMORY_POLICY policy blocks; dynamic memory categories are not created."
+  - "The system prompt distinguishes confirmed, observed, inferred, hypothesis, and superseded states; defaults uncertain information to archive; protects stable profile/goal updates; and requires confirmation before external writes."
+  - "External imports default to external_import archive candidates and do not mutate PROFILE or GOALS_AND_DECISIONS without explicit confirmation."
+  - "Learning state logic prevents a read-only exposure from becoming usable without application or transfer evidence."
+  - "No API keys or generated secrets are committed; settings and .env.example contain placeholders only."
+  - "Targeted domain tests, TypeScript checking, Expo Web export, protocol validation, and git diff checks pass."
+  - "The implementation is original and records letta-ai/co as an architectural reference without copying its unlicensed source."
+
+validation_commands:
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && npm run export:web"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the WP-0025 application, root entrypoint, and durable memory changes on the codex/personal-co-v1 branch; do not rewrite the remote default branch or delete scaffold history."
+
+human_approval_required:
+  required: true
+  reason: "The milestone adds the document-specified Expo, React Native Web, and Letta client dependencies and introduces the requested user-visible Personal Co application. Approval is limited to those documented surfaces."
+  obtained: true
+  evidence: "The user explicitly requested development according to the supplied design document, which names the Expo Web and Letta SDK baseline, and requested the progress be uploaded to eagp-aew/m_agent."
+
+assigned_agent: wp0025_verifier_retry
+
+attempts:
+  implement: 2
+  fix: 1
+  verify: 2
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - tests_run
+  - verifier_report
+  - risks
+  - follow_up_tasks

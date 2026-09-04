@@ -1,6 +1,6 @@
 # Test Matrix
 
-This repository is a Codex multi-agent direction-system scaffold, not an application with a package manager or runtime test suite. Use deterministic scaffold and documentation checks until a dedicated validator is introduced.
+This repository contains the Personal Co Expo Web application and its Codex direction runtime. Run application checks for product changes and retain deterministic protocol checks for `.ai/`, `.agents/`, `.codex/`, and validation-script changes.
 
 ## Default validation order
 
@@ -15,6 +15,11 @@ This repository is a Codex multi-agent direction-system scaffold, not an applica
 
 | Area | Command | When to run | Notes |
 |---|---|---|---|
+| Personal Co domain tests | `cd personal-co && npm test` | Any application behavior change | Covers fixed memory, confirmation gates, archive imports, learning evidence, tagged-agent selection, exact existing schema, and same-ID updates. |
+| Personal Co typecheck | `cd personal-co && npm run typecheck` | Any TypeScript or JavaScript contract change | Checks Expo UI and the typed Letta SDK adapter. |
+| Personal Co Web export | `cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web` | Before accepting a UI or application milestone | Produces the ignored static Web bundle under `personal-co/dist/`. |
+| Personal Co browser smoke | `cd personal-co && npm run web` | Responsive UI changes | Manually exercise the five surfaces at desktop and narrow mobile widths. |
+| Live Letta integration | Not yet automated | Letta server, agent lifecycle, messaging, archive, or model-handle changes | Requires a reachable self-hosted Letta server and registered model/embedding handles. |
 | Scaffold presence | `test -f .agents/skills/direction-guide/SKILL.md && test -f .codex/config.toml && test -f AGENTS.md` | Any scaffold change | Confirms core entrypoints exist. |
 | Agent definitions | `test -f .codex/agents/explorer.toml && test -f .codex/agents/implementer.toml && test -f .codex/agents/verifier.toml && test -f .codex/agents/fixer.toml && test -f .codex/agents/integrator.toml && test -f .codex/agents/security-reviewer.toml` | Changes under `.codex/agents/` | Confirms the MVP role set exists. |
 | Skill metadata | `python3 scripts/validate_protocol.py` | Changes to `direction-guide` | Confirms `SKILL.md` frontmatter is parseable and includes `name` and `description`. |
@@ -86,7 +91,7 @@ Checks:
 6. Verify verifier-equivalent evidence or explicit human override is required for acceptance: `rg -n "fallback verification|verifier-equivalent evidence|explicit human override" AGENTS.md .ai/MASTER_CONTRACT.md .agents/skills/direction-guide`.
 7. Verify repeated failure escalation is documented: `rg -n "repeat_stop_threshold|same failure signature appears twice|two failed fix attempts|ESCALATED" .ai/MASTER_LEDGER.yaml .agents/skills/direction-guide .agents/skills/direction-guide/references/failure-signatures.md`.
 
-Expected result: PASS only if the checks support the current guarded parallel baseline and no application source files are modified.
+Expected result: PASS only if the checks support the current guarded parallel baseline and application changes remain inside their approved work-package scope.
 
 Preferred command: `python3 scripts/validate_protocol.py`.
 

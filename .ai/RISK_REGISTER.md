@@ -17,6 +17,10 @@
 | R-0013 | medium | exportability | This repo is still a scaffold and may be copied into real projects with development-only memory or without a clear runtime bundle boundary. | WP-0021 defines reusable runtime assets, adoption docs, and export-bundle validation. Keep the export file list current as runtime assets evolve. | mitigated |
 | R-0014 | medium | memory | DONE ledger state may retain stale active runs, reservations, worktrees, active batches, write-agent counts, or null metrics. | WP-0022 adds validator and fixture coverage for DONE ledger closure. | mitigated |
 | R-0015 | medium | metrics | Historical accepted tasks without work packages may make work-package coverage metrics overclaim. | WP-0024 enumerates the only historical exceptions and validates that future accepted work has `work_package_path`. | mitigated |
+| R-0016 | medium | integration | The Letta adapter is typechecked but has not been exercised against the user's live self-hosted server. | Run create/reuse/message/archive/model-switch integration checks against the target deployment before full V1 acceptance. | open |
+| R-0017 | medium | configuration | The documented DeepSeek, OpenAI, and Ollama handles may not be registered on the target Letta deployment. | Keep handles configurable and verify availability during live integration; do not add automatic fallback. | open |
+| R-0018 | medium | product completeness | The current foundation lacks Memory Changes, forget/export, and backup/restore from the full V1 definition. | Track them as explicit follow-up work and describe WP-0025 as a foundation milestone. | open |
+| R-0019 | low | dependencies | Package installation succeeded, but the initial registry audit request timed out. | Run an explicit dependency security audit when registry access is reliable and review actionable production findings. | open |
 
 ## Risk severity
 

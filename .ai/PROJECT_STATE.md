@@ -2,26 +2,35 @@
 
 ## Mission
 
-This repository is a Codex multi-agent direction-system scaffold, used to refine the master-agent structure and operating protocol. It is not an application repository with product features; its durable assets are Markdown guidance, Codex agent definitions, the `direction-guide` skill, and `.ai/` project memory templates. The project goal is to make the master thread, work-package flow, subagent roles, verification gates, and memory updates practical, conservative, and repeatable inside Codex. Real work packages should improve this direction system itself unless the scaffold is copied into another software project.
+This repository develops Personal Co, a local-first personal assistant backed by one persistent self-hosted Letta agent. The application lives under `personal-co/`; the existing Codex direction runtime remains the delivery and durable-memory layer for planning, verification, and project history.
 
 ## Current milestone
 
-- Milestone: Bootstrap Codex multi-agent direction workflow
+- Milestone: Personal Co V1 foundation
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: none (latest accepted: WP-0024-historical-exception-metrics; next recommended: manual eval exercise for child-agent request flow)
+- Active work package: none (latest accepted: WP-0025-personal-co-foundation; next recommended: live Letta integration and remaining V1 memory-management surfaces)
 
 ## Important constraints
 
-- This repository is scaffold/documentation for the agent system; do not invent application-code tasks here.
+- Preserve exactly one `personal-co-v1` tagged Letta agent across sessions and manual model changes.
+- Keep the V1 memory schema fixed to four writable user blocks plus two read-only policy blocks; do not add dynamic block categories.
+- Keep uncertain information in archive and require confirmation for stable profile/goals or external writes.
+- Do not add automatic cross-provider fallback in V1.
 - Do not add dependencies without approval.
-- Do not edit auth/security/payment/migrations/production config without approval if this scaffold is later copied into an application repo.
+- Do not edit auth/security/payment/migrations/production config without approval.
 - Do not delete files without explicit human approval.
-- Keep changes scoped to Codex guidance, agent definitions, project memory, and validation docs unless a work package explicitly says otherwise.
+- Keep changes scoped to an approved work package and preserve the Codex protocol assets.
 
 ## Current architecture summary
 
-The repo is organized around Codex-native orchestration:
+The repo combines the Personal Co application with Codex-native orchestration:
+
+- `personal-co/App.tsx` provides responsive Expo Web surfaces for Chat, Core Memory, Archive, Import, and Settings.
+- `personal-co/src/services/letta.ts` owns typed Letta client access, exact tagged-agent reuse, memory-schema validation, messaging, archival search, and same-ID configuration updates.
+- `personal-co/src/domain/` contains testable memory, epistemic, import, learning-state, and single-agent rules.
+- `personal-co/src/config.ts` keeps the Letta URL, model handles, and embedding handle configurable; model switching is manual and has no automatic provider fallback.
+- `personal-co/tests/` covers fixed memory blocks, protected writes, archive-first imports, learning evidence, duplicate-agent rejection, existing-schema validation, and same-ID updates.
 
 - Root Markdown files are intentionally lean after approved pruning: `README.md`, `INSTALLATION.md`, and `AGENTS.md` provide entrypoint and setup guidance, while detailed protocol rules live in `.agents/skills/direction-guide/` and `.ai/`.
 - `AGENTS.md` defines repository-level operating rules and approval gates.
@@ -42,8 +51,10 @@ The repo is organized around Codex-native orchestration:
 
 - Risk: The workflow may become too ceremonial before proving value.
   - Mitigation: Use compact one-line module outputs for small master-only tasks while preserving module order and ownership.
-- Risk: Codex may treat this scaffold repo like an application repo and propose irrelevant feature work.
-  - Mitigation: Keep `.ai/` memory explicit that work packages should refine the master-agent direction system itself.
+- Risk: A typed adapter can still differ from a live Letta deployment or its registered handles.
+  - Mitigation: Run the next milestone against the user's self-hosted Letta server before calling the full V1 complete.
+- Risk: The foundation may be mistaken for the complete product described in the design document.
+  - Mitigation: Keep Memory Changes, forget/export, backup/restore, and live interoperability listed as open follow-up work.
 - Risk: Module handoffs and delegation prompts may drift as the seven-module flow is exercised.
   - Mitigation: Keep ownership, Routing Controller readiness, the routing matrix, and delegation checklist requirements explicit in `direction-guide`.
 - Risk: Documentation-only validation and dirty `.ai/` memory can make acceptance evidence ambiguous.
@@ -104,6 +115,7 @@ The repo is organized around Codex-native orchestration:
 | 2026-05-07 | WP-0022-ledger-done-closure-validation | Added DONE ledger closure validation so accepted work cannot leave stale active runs, reservations, worktrees, active batch, write-agent count, or null per-work-package metrics | Unit tests, protocol validator, protocol gate audit, diff check, and independent verifier PASS |
 | 2026-05-07 | WP-0023-child-write-lease-policy | Added child implementer write-lease policy so parent and child implementers cannot concurrently edit the same leased files | Unit tests, protocol validator, protocol gate audit, diff check, and independent verifier PASS |
 | 2026-05-07 | WP-0024-historical-exception-metrics | Made historical work-package exceptions explicit so post-enforcement coverage metrics cannot overclaim | Unit tests, protocol validator, protocol gate audit, diff check, and independent verifier PASS |
+| 2026-09-04 | WP-0025-personal-co-foundation | Added an original Expo Web Personal Co foundation with persistent tagged-agent reuse, fixed memory policy, safe imports, learning-state rules, manual model switching, and five product surfaces | 9/9 tests, typecheck, Web export, 29/29 protocol checks, browser smoke QA, pre-accept gate, and independent verifier PASS |
 
 ## Open questions
 
@@ -111,5 +123,5 @@ The repo is organized around Codex-native orchestration:
 
 ## Next recommended work
 
-1. Exercise one read-only child explorer request and one denied child request in manual eval scenarios before allowing child implementers on application code.
-2. Add deeper fixtures only when the protocol changes again, especially overlapping reservations, child scope violations, and prompt-injection transcripts.
+1. Connect the foundation to the user's self-hosted Letta deployment and run live create/reuse/message/archive/model-switch integration checks.
+2. Implement Memory Changes, forget/export, and backup/restore before declaring the design document's full V1 complete.
