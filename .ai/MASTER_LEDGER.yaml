@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-05
+updated_at: 2026-09-07
 
 active_milestone:
   id: M-0002
@@ -8,12 +8,12 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0026-memory-governance-portability
-  title: "Add Personal Co memory governance and portable snapshots"
+  task_id: WP-0028-model-handle-preflight
+  title: "Preflight exact Letta model handles"
   status: ACCEPTED
   scope_type: implementation
-  assigned_agent: wp0026_verifier_final
-  work_package_path: ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
+  assigned_agent: wp0028_verifier_retry
+  work_package_path: ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
 
 current_state_machine_state: DONE
 
@@ -46,6 +46,12 @@ recursive_delegation:
   recursive_delegation_violations: 0
 
 open_decisions:
+  - id: OD-0027
+    question: "May Codex exceed WP-0027's two-fix limit for one report-only format repair (add the exact recommended_next_action field and remove backticks from the 7/7 score), then rerun report/pre-accept gates?"
+    source: "WP-0027 pre-accept report gate"
+    owner: human
+    status: CLOSED
+    resolution: "Human explicitly authorized one third repair limited to adding recommended_next_action and removing backticks from the 7/7 score, followed by gate replay, continued development, verification, and GitHub push."
   - id: OD-0001
     question: "Should the repo add a lightweight scaffold validation script later, or keep validation as documented shell commands?"
     source: ".ai/PROJECT_STATE.md"
@@ -66,6 +72,12 @@ open_decisions:
     resolution: "Human explicitly authorized one third fix limited to the connection-state/agent-binding race, followed by independent verification and push only after PASS."
 
 failure_counts_by_task:
+  WP-0028-model-handle-preflight:
+    verify: 2
+    fix: 2
+  WP-0027-v1-completion-audit:
+    verify: 3
+    fix: 3
   WP-0026-memory-governance-portability:
     verify: 3
     fix: 3
@@ -133,6 +145,48 @@ failure_counts_by_task:
 failure_signatures:
   repeat_stop_threshold: 2
   entries:
+    - work_package_id: WP-0028-model-handle-preflight
+      classification: VALIDATION_FAILURE
+      signature: VALIDATION_FAILURE:verifier-score-ratio-not-affirmative
+      seen_count: 1
+      first_seen_at: 2026-09-07
+      last_seen_at: 2026-09-07
+      evidence: "command:python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0028-verifier.md"
+    - work_package_id: WP-0028-model-handle-preflight
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:preflight-bypassed-by-testConnection-agent-list
+      seen_count: 1
+      first_seen_at: 2026-09-07
+      last_seen_at: 2026-09-07
+      evidence: ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md"
+    - work_package_id: WP-0027-v1-completion-audit
+      classification: VALIDATION_FAILURE
+      signature: VALIDATION_FAILURE:report-gate-format-after-fix-limit
+      seen_count: 1
+      first_seen_at: 2026-09-05
+      last_seen_at: 2026-09-05
+      evidence: "command:python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+    - work_package_id: WP-0027-v1-completion-audit
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:archive-semantic-search-misclassified-live-blocked
+      seen_count: 1
+      first_seen_at: 2026-09-05
+      last_seen_at: 2026-09-05
+      evidence: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+    - work_package_id: WP-0027-v1-completion-audit
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:requirement-matrix-omits-design-citations
+      seen_count: 1
+      first_seen_at: 2026-09-05
+      last_seen_at: 2026-09-05
+      evidence: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+    - work_package_id: WP-0027-v1-completion-audit
+      classification: SCOPE_VIOLATION
+      signature: SCOPE_VIOLATION:historical-bootstrap-assignment-mutated
+      seen_count: 1
+      first_seen_at: 2026-09-05
+      last_seen_at: 2026-09-05
+      evidence: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
     - work_package_id: WP-0026-memory-governance-portability
       classification: IMPLEMENTATION_BUG
       signature: IMPLEMENTATION_BUG:pending-stable-change-survives-agent-reconnect
@@ -205,7 +259,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0026-memory-governance-portability
+    work_package_id: WP-0028-model-handle-preflight
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -223,60 +277,62 @@ quality_metrics:
     child_reports_missing: 0
     child_scope_violations: 0
     recursive_delegation_violations: 0
-    fix_attempts: 3
-    repeated_failure_detected: true
-    human_approval_required: true
+    fix_attempts: 2
+    repeated_failure_detected: false
+    human_approval_required: false
     human_approval_obtained: true
-    human_fix_limit_override_obtained: true
+    human_fix_limit_override_obtained: false
     diff_size:
-      files: 18
-      insertions: 2298
-      deletions: 95
-      note: "Final counts include seven newly tracked WP-0026 files and all scoped application/memory edits relative to accepted WP-0025 HEAD."
+      files: 4
+      insertions: 272
+      deletions: 8
+      measurement_scope: "WP-0028 product diff only; its durable report/memory artifacts are enumerated below, while the combined pending commit also contains already accepted WP-0027 artifacts."
     files_changed:
-      - ".ai/AGENT_REPORTS/WP-0026-verifier-attempt-1.md"
-      - ".ai/AGENT_REPORTS/WP-0026-verifier.md"
-      - ".ai/DECISIONS.md"
-      - ".ai/INTEGRATION_LOG.md"
+      - "personal-co/src/domain/agent.mjs"
+      - "personal-co/src/services/letta.ts"
+      - "personal-co/tests/agent.test.mjs"
+      - "personal-co/README.md"
+      - ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
+      - ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md"
+      - ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+      - ".ai/TASK_QUEUE.yaml"
       - ".ai/MASTER_LEDGER.yaml"
       - ".ai/PROJECT_STATE.md"
+      - ".ai/DECISIONS.md"
       - ".ai/RISK_REGISTER.md"
-      - ".ai/TASK_QUEUE.yaml"
       - ".ai/TEST_MATRIX.md"
-      - ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
-      - "personal-co/App.tsx"
-      - "personal-co/README.md"
-      - "personal-co/src/domain/changes.mjs"
-      - "personal-co/src/domain/imports.mjs"
-      - "personal-co/src/domain/privacy.mjs"
-      - "personal-co/src/domain/snapshot.mjs"
-      - "personal-co/src/services/letta.ts"
-      - "personal-co/tests/governance.test.mjs"
+      - ".ai/INTEGRATION_LOG.md"
   scope_check:
     status: PASS
-    evidence: "Independent verifier attempt 3 confirmed every changed or untracked path is explicitly allowed and no forbidden file or deletion is present."
+    evidence: ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md confirms the four allowed product files plus master-owned memory only, with no forbidden or deleted file."
   validation:
-    status: PASS
+    status: PENDING
     commands:
-      - "cd personal-co && npm test"
-      - "cd personal-co && npm run typecheck"
-      - "cd personal-co && npm run export:web"
-      - "python3 -B scripts/validate_protocol.py"
-      - "python3 -B scripts/protocol_gate.py audit"
-      - "git diff --check"
-      - "git status --short --untracked-files=all"
+      - "cd personal-co && node --test tests/agent.test.mjs (PASS 8/8)"
+      - "cd personal-co && npm test (PASS 25/25)"
+      - "cd personal-co && npm run typecheck (PASS)"
+      - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web (master PASS)"
+      - "python3 -B scripts/validate_protocol.py (PASS 29/29)"
+      - "python3 -B scripts/protocol_gate.py audit (PASS)"
+      - "git diff --check (PASS)"
+      - "independent real connection-path order trace (attempt 1 FAIL; bounded fix applied, fresh verification pending)"
+      - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web (post-fix master PASS)"
+      - "fresh independent verification: targeted tests PASS 10/10, full tests PASS 27/27, typecheck PASS, protocol PASS 29/29, adversarial adapter checks PASS"
+      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0028-verifier.md (initial FAIL: ratio-valued score field; bounded report-format fix applied, replay pending)"
+      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0028-verifier.md (PASS after bounded report-format fix)"
+      - "python3 -B scripts/protocol_gate.py pre-accept WP-0028-model-handle-preflight --report .ai/AGENT_REPORTS/WP-0028-verifier.md (PASS)"
   verifier_status:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0026-verifier.md maps 11/11 acceptance criteria and records 21/21 tests, typecheck, Web export, protocol checks, focused reconnect reproduction, scope checks, and root browser reconnect-window QA."
+    evidence: ".ai/AGENT_REPORTS/WP-0028-verifier.md maps all 8/8 criteria and records final independent PASS after the bounded fix."
 
 execution_budget:
-  max_steps: 24
-  max_tool_calls: 160
+  max_steps: 18
+  max_tool_calls: 100
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
   cancellation:
     owner: master
-    condition: "Stop on dependency changes, file deletion, agent-ID replacement, policy-block writes, non-confirmed destructive actions, secret persistence, production deployment mutation, or inability to test deterministic governance behavior."
+    condition: "Stop on dependency changes, public API expansion, App/settings redesign, fallback substitution, Agent deletion or identity replacement, secret access, production configuration change, file deletion, or need for live-service credentials."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

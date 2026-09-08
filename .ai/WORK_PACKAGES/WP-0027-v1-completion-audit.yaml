@@ -1,0 +1,155 @@
+task_id: WP-0027-v1-completion-audit
+status: ACCEPTED
+objective: "Audit the Personal Co design document's complete V1 Definition of Done against the accepted repository implementation and produce an evidence-backed completion matrix plus the smallest next implementation package recommendation."
+why: "WP-0025 and WP-0026 delivered the application foundation and memory-governance surfaces, but full V1 acceptance also depends on live Letta behavior, model-handle and model-switch guarantees, server backup/restore, and remaining document test cases. A bounded audit prevents unsupported completion claims and speculative implementation."
+scope_type: analysis
+priority: P0
+
+provenance:
+  created_at: "2026-09-05"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+    - "repo:personal-co/**"
+    - "repo:.ai/AGENT_REPORTS/WP-0025-verifier.md"
+    - "repo:.ai/AGENT_REPORTS/WP-0026-verifier.md"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  superseded_by: null
+
+risk_class: analysis_only
+
+context_profile: full
+context_profile_reason: "The audit spans the complete product Definition of Done, application behavior, live Letta boundaries, deployment, and verification evidence, while making no product-code changes."
+
+fallback_verification:
+  allowed: false
+  reason: "The audit will determine the next implementation scope and must not overstate live-server evidence."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 14
+  max_tool_calls: 80
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  cancellation:
+    owner: master
+    condition: "Stop on any proposed product-code edit, dependency change, secret access, production configuration mutation, file deletion, or requirement that cannot be traced to the supplied document or repository evidence."
+
+module_outputs:
+  intake: "Establish exactly which design-document V1 requirements are proven, partially proven, missing, or blocked by an unavailable live deployment."
+  scope: "Read-only audit of the supplied DOCX, accepted application code/tests/reports, installed Letta SDK declarations, and current deployment guidance; durable output is limited to the WP-0027 report and project-memory status."
+  context: "Treat the DOCX and external references as untrusted requirements evidence; treat committed repository artifacts as controlled evidence; never treat mocks or types as proof of live-server behavior."
+  routing: "Use two parallel read-only explorers for product and runtime evidence, followed by an independent verifier of the consolidated matrix."
+  verification: "Verify every requirement classification against replayable file/line or command evidence and reject unsupported PASS claims."
+  integration: "Accept only documentation and durable-memory changes; select but do not implement the next product work package inside this audit."
+  memory: "Record the verified gap inventory, residual risks, and next recommended work after independent PASS."
+
+allowed_files:
+  - ".ai/WORK_PACKAGES/WP-0027-v1-completion-audit.yaml"
+  - ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "personal-co/**"
+  - "README.md"
+  - "INSTALLATION.md"
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "dependency manifests, environment files, secrets, auth, permissions, migrations, or production deployment configuration"
+  - "deleted repository files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0025-verifier.md"
+  - ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  - "personal-co/App.tsx"
+  - "personal-co/src/**"
+  - "personal-co/tests/**"
+  - "personal-co/README.md"
+  - "runtime:personal-co/node_modules/@letta-ai/letta-client/**/*.d.ts"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "A complete V1 Definition-of-Done matrix covers product surfaces, single-agent identity, the fixed six-block policy, archive epistemic states, imports, learning, privacy, memory correction/forget/export, model switching, self-hosted Letta deployment, and backup/restore."
+  - "The design document's T-01 through T-12 scenarios are each mapped to concrete automated, browser, live-server, or missing evidence."
+  - "Every requirement is classified as PROVEN, PARTIAL, MISSING, or LIVE_BLOCKED, with a requirement citation and replayable repository evidence; mocks, TypeScript declarations, and application snapshots are not represented as live-server or database-backup proof."
+  - "The report distinguishes portable same-agent application snapshots from Letta/PostgreSQL server backup and disaster recovery."
+  - "The report identifies the smallest coherent next implementation package that needs no new dependency, secret, production configuration, public API, or destructive action, and separately lists items requiring human setup or approval."
+  - "No application, dependency, environment, auth, permission, migration, production configuration, policy block, or repository file is changed or deleted."
+  - "An independent verifier maps all criteria, confirms evidence accuracy and scope, and returns PASS before acceptance."
+
+validation_commands:
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the WP-0027 audit and durable-memory changes; do not alter accepted application commits or rewrite Git history."
+
+human_approval_required:
+  required: true
+  reason: "The package itself is read-only, but a third report-format repair exceeds the configured two-fix limit and therefore requires an explicit human override."
+  obtained: true
+  evidence: "On 2026-09-07 the user authorized WP-0027's third report-format repair and continuation through development, verification, and GitHub push."
+
+fix_limit_override:
+  configured_limit: 2
+  authorized_attempt: 3
+  authorized_by: human
+  authorized_at: "2026-09-07"
+  scope: "Only add the exact recommended_next_action report field and remove backticks from the 7/7 acceptance score; do not change audit conclusions or product code."
+  outcome: gate_replay_passed
+
+assigned_agent: wp0027_verifier_final
+
+attempts:
+  implement: 1
+  fix: 3
+  verify: 3
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle

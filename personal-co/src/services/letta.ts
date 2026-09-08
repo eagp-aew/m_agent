@@ -2,6 +2,7 @@ import Letta from '@letta-ai/letta-client';
 
 import type { ConnectionSettings } from '../config';
 import {
+  assertRegisteredModelHandles,
   assertValidExistingAgentBlocks,
   planAgentConfigurationUpdate,
   selectTaggedAgent,
@@ -71,6 +72,20 @@ function messageContent(message: Record<string, unknown>): string {
   return stringValue(message.content) || stringValue(message.assistant_message) || stringValue(message.reasoning);
 }
 
+async function fetchLettaInventory<T>(
+  kind: string,
+  configuredHandle: string,
+  request: () => PromiseLike<T>,
+): Promise<T> {
+  try {
+    return await request();
+  } catch {
+    throw new Error(
+      `Could not verify ${kind} handle "${configuredHandle}": Letta ${kind} inventory request failed.`,
+    );
+  }
+}
+
 export class PersonalCoLettaClient {
   private readonly client: Letta;
 
@@ -82,6 +97,23 @@ export class PersonalCoLettaClient {
   }
 
   async ensureAgent(settings: ConnectionSettings): Promise<AgentSummary> {
+    const configuredModelHandle = settings.modelHandle.trim();
+    const configuredEmbeddingHandle = settings.embeddingHandle.trim();
+    const [models, embeddings] = await Promise.all([
+      fetchLettaInventory('generation model', configuredModelHandle, () =>
+        this.client.models.list(),
+      ),
+      fetchLettaInventory('embedding model', configuredEmbeddingHandle, () =>
+        this.client.models.embeddings.list(),
+      ),
+    ]);
+    const { modelHandle, embeddingHandle } = assertRegisteredModelHandles(
+      configuredModelHandle,
+      configuredEmbeddingHandle,
+      models,
+      embeddings,
+    );
+
     const page = await this.client.agents.list({
       tags: [PERSONAL_CO_AGENT_TAG],
       match_all_tags: true,
@@ -94,13 +126,13 @@ export class PersonalCoLettaClient {
       assertValidExistingAgentBlocks(existing, PERSONAL_CO_AGENT_TAG);
       const update = planAgentConfigurationUpdate(
         existing,
-        settings.modelHandle,
-        settings.embeddingHandle,
+        modelHandle,
+        embeddingHandle,
       );
       if (update) {
         return this.client.agents.update(update.agentId, {
-          model: settings.modelHandle,
-          embedding: settings.embeddingHandle,
+          model: modelHandle,
+          embedding: embeddingHandle,
           enable_sleeptime: false,
         });
       }
@@ -118,8 +150,8 @@ export class PersonalCoLettaClient {
       name: 'Personal Co',
       description: 'One careful personal thinking partner.',
       tags: [PERSONAL_CO_AGENT_TAG],
-      model: settings.modelHandle,
-      embedding: settings.embeddingHandle,
+      model: modelHandle,
+      embedding: embeddingHandle,
       memory_blocks: blocks,
       system: SYSTEM_PROMPT,
       enable_sleeptime: false,
@@ -128,7 +160,7 @@ export class PersonalCoLettaClient {
   }
 
   async testConnection(): Promise<void> {
-    await this.client.agents.list({ limit: 1 });
+    await this.client.health();
   }
 
   async listBlocks(agentId: string): Promise<AgentBlock[]> {

@@ -11,7 +11,7 @@ Personal Co is an original Expo Web foundation for a single, durable thinking pa
 - **Import** — preview pasted lines with normalized type, source, date, and epistemic provenance.
 - **Settings** — configure the Letta connection, privacy scopes, language, and portable snapshot export/restore.
 
-The adapter never performs cross-provider fallback. Agent creation and configuration updates set `enable_sleeptime: false` and reject duplicate agents carrying the Personal Co tag. The documented presets are DeepSeek V4 Pro for routine use and GPT-5.6 Terra as a manual quality switch; model availability still depends on the handles registered by your Letta server.
+The adapter never performs cross-provider fallback. Before listing, creating, or updating an Agent, it fetches both Letta model inventories and requires the trimmed configured generation and embedding handles to exactly equal non-empty registered `handle` fields. Display names, model names, partial matches, case variants, blank entries, and substitutions do not count; an inventory error or unavailable handle fails closed before any Agent lifecycle call. Agent creation and configuration updates set `enable_sleeptime: false` and reject duplicate agents carrying the Personal Co tag. The documented presets are DeepSeek V4 Pro for routine use and GPT-5.6 Terra as a manual quality switch; model availability still depends on the handles registered by your Letta server.
 
 ## Run locally
 
@@ -34,6 +34,8 @@ npm run export:web
 ```
 
 `npm run export:web` writes the static bundle to `dist/`.
+
+The deterministic tests verify the installed Letta SDK inventory contract and exact-handle policy. They do not prove that a particular live server exposes those handles or that its Agent lifecycle works; that still requires a reachable Letta deployment with registered generation and embedding models.
 
 ## Memory and import guarantees
 

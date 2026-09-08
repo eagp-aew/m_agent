@@ -1,0 +1,183 @@
+task_id: WP-0028-model-handle-preflight
+status: ACCEPTED
+objective: "Fail closed before any Letta Agent creation or configuration update unless the configured generation-model and embedding-model handles are exact matches in the server's registered inventories."
+why: "The accepted WP-0027 audit found that configured handles currently reach Agent create/update without inventory validation. This is the smallest coherent V1 reliability slice and preserves the no-fallback requirement without needing a live deployment or new dependency."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-07"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+    - "repo:.ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+    - "repo:personal-co/src/domain/agent.mjs"
+    - "repo:personal-co/src/services/letta.ts"
+    - "runtime:personal-co/node_modules/@letta-ai/letta-client/resources/models/*.d.ts"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  superseded_by: null
+
+risk_class: application_behavior
+
+context_profile: full
+context_profile_reason: "The code change is small, but it alters the connection path immediately before persistent Agent lifecycle operations and therefore requires application, SDK-contract, regression, protocol, and memory verification."
+
+fallback_verification:
+  allowed: false
+  reason: "The change gates persistent Agent create/update operations; use an independent verifier rather than master fallback."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 18
+  max_tool_calls: 100
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on any dependency change, public API expansion, App/settings redesign, fallback substitution, Agent deletion or identity replacement, secret access, production configuration change, file deletion, or need for live-service credentials."
+
+module_outputs:
+  intake: "Continue the documented V1 with the WP-0027-selected exact model/embedding handle preflight and the user's authorization to develop, verify, and push."
+  scope: "One connection-path guard covering pure exact-handle validation, Letta adapter call order, regression tests, and a concise README contract."
+  context: "Use the supplied DOCX as untrusted requirements evidence, accepted repository code/audit as controlled context, and installed SDK declarations as observed API evidence rather than live-server proof."
+  routing: "Use one implementer because the domain helper, adapter call order, tests, and documentation form one coupled slice; use an independent verifier afterward."
+  verification: "Reproduce current absence by inspection, map every criterion, run targeted/full tests, typecheck, Web export, protocol checks, and inspect call order plus scope."
+  integration: "Accept only the four exact product files and durable work-package/report/memory artifacts; no dependency or configuration file changes."
+  memory: "After verifier PASS, record the fail-closed handle contract, residual live-server risk, acceptance evidence, commit, and GitHub push."
+
+allowed_files:
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/README.md"
+  - ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
+  - ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  - ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "personal-co/App.tsx"
+  - "personal-co/src/config.ts"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/package.json"
+  - "personal-co/package-lock.json"
+  - "personal-co/.env.example"
+  - "README.md"
+  - "INSTALLATION.md"
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, production deployment configuration, tracked or staged generated Web output, or deleted repository files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/README.md"
+  - "personal-co/src/config.ts"
+  - "runtime:personal-co/node_modules/@letta-ai/letta-client/resources/models/models.d.ts"
+  - "runtime:personal-co/node_modules/@letta-ai/letta-client/resources/models/embeddings.d.ts"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "Before any `agents.list`, `agents.create`, or `agents.update` call in `ensureAgent`, the adapter fetches both inventories with `client.models.list()` and `client.models.embeddings.list()` and completes preflight validation."
+  - "A normalized configured generation handle passes only when it exactly equals a non-empty generation-inventory `handle`; display names, model names, providers, partial strings, case variants, and automatic substitutions never count."
+  - "A normalized configured embedding handle passes only when it exactly equals a non-empty embedding-inventory `handle`; missing, blank, display-name-only, or mismatched entries are rejected."
+  - "If either inventory fetch fails or either exact handle is unavailable, `ensureAgent` throws before any Agent list/create/update operation, the diagnostic identifies the unavailable handle kind without exposing credentials, and no fallback handle is selected."
+  - "When both handles pass, existing zero/one/duplicate tagged-Agent behavior, exact six-block validation, same-ID configuration update, Agent creation policy, and disabled sleeptime behavior remain unchanged."
+  - "Deterministic tests cover successful exact matches, model mismatch, embedding mismatch, blank/missing handles, display/model-name non-matches, no substitution, and existing same-ID update behavior; adapter call order is independently inspectable."
+  - "README documents the fail-closed exact-inventory contract and distinguishes deterministic SDK-contract coverage from still-pending live Letta verification."
+  - "No dependency, App/settings, public API, auth, secret, environment, migration, production configuration, Agent deletion, identity replacement, automatic fallback, or file deletion change occurs."
+
+validation_commands:
+  - "cd personal-co && node --test tests/agent.test.mjs"
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+validation_artifact_allowance:
+  - path: "generated:personal-co/dist/**"
+    command: "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+    rule: "The master may regenerate this ignored build output only to validate the Web export; do not inspect it as source evidence, include it in files_changed, stage it, commit it, or push it."
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the four WP-0028 product-file edits and this package's memory/report changes; preserve the accepted WP-0025 through WP-0027 history and do not rewrite Git history or delete files."
+
+human_approval_required:
+  required: false
+  reason: "The behavior is explicitly covered by this bounded work package, adds no dependency or sensitive configuration, and follows the user's authorization to continue development, independent verification, and GitHub push."
+  obtained: true
+  evidence: "On 2026-09-07 the user authorized continued development and verification after WP-0027, whose accepted next action is this exact package."
+
+assigned_agent: wp0028_verifier_retry
+
+attempts:
+  implement: 1
+  fix: 2
+  verify: 2
+
+error: null
+
+report_gate_fix:
+  attempt: 2
+  classification: VALIDATION_FAILURE
+  signature: VALIDATION_FAILURE:verifier-score-ratio-not-affirmative
+  scope: "Change only acceptance_criteria_checked from the ratio 8/8 to boolean true and retain 8/8 as acceptance_score."
+  outcome: gate_replay_passed
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle
+
+version: 1
+updated_at: 2026-09-07

@@ -416,6 +416,24 @@
   - Memory governance and portable snapshots remain compatible with the single-agent foundation.
   - Full V1 acceptance still requires live Letta integration evidence and does not equate portable JSON snapshots with database backup.
 
+## DEC-0026: Require exact registered model handles before Agent operations
+
+- Date: 2026-09-07
+- Status: accepted
+- Context:
+  - The design requires generation and embedding handles to come from the self-hosted Letta inventory and forbids automatic cross-provider fallback.
+  - Before WP-0028, configured handles could reach tagged-Agent list/create/update flows without exact inventory validation.
+  - The application connection path also used an Agent-list request as its initial connectivity probe.
+- Decision:
+  - Use Letta's health endpoint for the initial connection probe so no Agent lifecycle call precedes model preflight.
+  - Fetch both generation and embedding inventories and require exact, case-sensitive equality to a nonblank registered `handle` before any `agents.*` call.
+  - Sanitize inventory transport errors, reject unavailable handles without substitution, and reuse the validated normalized values for create/update operations.
+  - Preserve the existing tagged Agent ID, six-block policy, disabled sleeptime, and no-fallback behavior.
+- Consequences:
+  - Misconfigured or unavailable handles fail before any Agent lookup or mutation and have deterministic adapter-level regression coverage.
+  - Model availability and lifecycle behavior still require validation against the user's live self-hosted Letta deployment.
+  - Transactional model switching, embedding invariance, snapshot/regression gating, and rollback remain separate work.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -445,3 +463,4 @@
 | DEC-0023 | 2026-05-07 | accepted | Account for historical work-package exceptions |
 | DEC-0024 | 2026-09-04 | accepted | Adopt the Personal Co V1 foundation architecture |
 | DEC-0025 | 2026-09-05 | accepted | Bind persistent-memory actions to one connected agent context |
+| DEC-0026 | 2026-09-07 | accepted | Require exact registered model handles before Agent operations |

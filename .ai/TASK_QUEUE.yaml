@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-05
+updated_at: 2026-09-07
 
 queue:
   - task_id: WP-0000-bootstrap
@@ -295,6 +295,28 @@ queue:
     acceptance_summary: "Accepted Memory Changes, confirmation-gated correction and forget controls, privacy modes, archive provenance, agent-bound connection transitions, and secret-free same-agent export/restore without new dependencies."
     work_package_path: ".ai/WORK_PACKAGES/WP-0026-memory-governance-portability.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0026-verifier.md"
+  - task_id: WP-0027-v1-completion-audit
+    title: "Audit Personal Co V1 completion evidence"
+    status: ACCEPTED
+    priority: P0
+    scope_type: analysis
+    assigned_agent: wp0027_verifier_final
+    blocked_by:
+      - WP-0026-memory-governance-portability
+    acceptance_summary: "Accepted a verified 41-requirement and T-01 through T-12 evidence matrix, preserved live-server and database-backup boundaries, and selected model-handle preflight as the smallest next implementation package."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0027-v1-completion-audit.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - task_id: WP-0028-model-handle-preflight
+    title: "Preflight exact Letta model handles"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0028_verifier_retry
+    blocked_by:
+      - WP-0027-v1-completion-audit
+    acceptance_summary: "Accepted exact registered generation and embedding handle preflight before every tagged-Agent lifecycle operation, health-only connection probing, fail-closed sanitized errors, no fallback, and preserved same-Agent behavior."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
 
 status_values:
   - DRAFT

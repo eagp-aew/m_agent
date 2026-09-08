@@ -9,7 +9,7 @@ This repository develops Personal Co, a local-first personal assistant backed by
 - Milestone: Personal Co V1 foundation
 - Owner: Human + Codex master thread
 - Status: YELLOW
-- Active work package: WP-0026-memory-governance-portability (ACCEPTED); latest accepted: WP-0026-memory-governance-portability
+- Active work package: WP-0028-model-handle-preflight (ACCEPTED); latest accepted: WP-0028-model-handle-preflight
 
 ## Important constraints
 
@@ -27,10 +27,11 @@ This repository develops Personal Co, a local-first personal assistant backed by
 The repo combines the Personal Co application with Codex-native orchestration:
 
 - `personal-co/App.tsx` provides responsive Expo Web surfaces for Chat, Core Memory, Memory Changes, Archive, Import, and Settings.
-- `personal-co/src/services/letta.ts` owns typed Letta client access, exact tagged-agent reuse, memory-schema validation, messaging, archival search and deletion, exact-term forget, temporary-session reconciliation, and same-ID configuration updates.
+- `personal-co/src/services/letta.ts` owns typed Letta client access, health-only connection probing, exact registered generation/embedding handle preflight before Agent operations, exact tagged-agent reuse, memory-schema validation, messaging, archival search and deletion, exact-term forget, temporary-session reconciliation, and same-ID configuration updates.
 - `personal-co/src/domain/` contains testable memory, epistemic, import, learning-state, single-agent, change-governance, privacy, and portable-snapshot rules.
 - `personal-co/src/config.ts` keeps the Letta URL, model handles, and embedding handle configurable; model switching is manual and has no automatic provider fallback.
-- `personal-co/tests/` covers fixed memory blocks, protected writes, archive-first imports, learning evidence, duplicate-agent rejection, existing-schema validation, same-ID updates, agent-bound proposals, exact forget, temporary privacy, import provenance, and secret-free same-agent snapshot restore.
+- `personal-co/tests/` covers fixed memory blocks, protected writes, archive-first imports, learning evidence, duplicate-agent rejection, exact-handle matching, real adapter ordering and fail-closed inventory errors, existing-schema validation, same-ID updates, agent-bound proposals, exact forget, temporary privacy, import provenance, and secret-free same-agent snapshot restore.
+- The accepted WP-0027 audit maps 41 V1 requirements to 12 PROVEN, 14 PARTIAL, 12 MISSING, and 3 LIVE_BLOCKED outcomes; it selects exact model/embedding handle preflight as the smallest next application package without treating local types or mocks as live-server evidence.
 
 - Root Markdown files are intentionally lean after approved pruning: `README.md`, `INSTALLATION.md`, and `AGENTS.md` provide entrypoint and setup guidance, while detailed protocol rules live in `.agents/skills/direction-guide/` and `.ai/`.
 - `AGENTS.md` defines repository-level operating rules and approval gates.
@@ -52,7 +53,7 @@ The repo combines the Personal Co application with Codex-native orchestration:
 - Risk: The workflow may become too ceremonial before proving value.
   - Mitigation: Use compact one-line module outputs for small master-only tasks while preserving module order and ownership.
 - Risk: A typed adapter can still differ from a live Letta deployment or its registered handles.
-  - Mitigation: Run the next milestone against the user's self-hosted Letta server before calling the full V1 complete.
+  - Mitigation: WP-0028 now fails closed on exact registered handle checks before Agent operations; run the next milestone against the user's self-hosted Letta server before calling the full V1 complete.
 - Risk: Live Letta behavior for governance metadata, paginated passage deletion, and temporary-session reconciliation may differ from the typed adapter and deterministic tests.
   - Mitigation: WP-0026 now fails closed across connection changes and independently passed all application-layer criteria; exercise the accepted flows against the user's server before full V1 acceptance.
 - Risk: Module handoffs and delegation prompts may drift as the seven-module flow is exercised.
@@ -117,13 +118,16 @@ The repo combines the Personal Co application with Codex-native orchestration:
 | 2026-05-07 | WP-0024-historical-exception-metrics | Made historical work-package exceptions explicit so post-enforcement coverage metrics cannot overclaim | Unit tests, protocol validator, protocol gate audit, diff check, and independent verifier PASS |
 | 2026-09-04 | WP-0025-personal-co-foundation | Added an original Expo Web Personal Co foundation with persistent tagged-agent reuse, fixed memory policy, safe imports, learning-state rules, manual model switching, and five product surfaces | 9/9 tests, typecheck, Web export, 29/29 protocol checks, browser smoke QA, pre-accept gate, and independent verifier PASS |
 | 2026-09-05 | WP-0026-memory-governance-portability | Added six-surface memory governance, agent-bound confirmation gates, exact forget and archive deletion, privacy controls, import provenance, and secret-free same-agent export/restore | 21/21 tests, typecheck, Web export, 29/29 protocol checks, reconnect regression, browser reconnect QA, and independent verifier PASS |
+| 2026-09-07 | WP-0027-v1-completion-audit | Audited all 41 V1 requirements and T-01 through T-12, separated application evidence from live Letta/database claims, and selected exact model-handle preflight as the next slice | Independent verifier PASS for 7/7 criteria, 21/21 tests, typecheck, 29/29 protocol checks, report gate, pre-accept gate, and diff check |
+| 2026-09-07 | WP-0028-model-handle-preflight | Added health-only probing plus exact generation/embedding inventory preflight before Agent operations, sanitized fail-closed errors, no fallback, and real adapter ordering regressions | Independent verifier PASS for 8/8 criteria, targeted 10/10 and full 27/27 tests, typecheck, Web export, 29/29 protocol checks, adversarial adapter checks, report gate, and pre-accept gate |
 
 ## Open questions
 
-- None. OD-0026 was resolved on 2026-09-04 when the human explicitly authorized one third fix limited to the connection-state/agent-binding race.
+- None. OD-0027 was resolved on 2026-09-07 when the human explicitly authorized one third repair limited to the two report-format fields, followed by gate replay and continued development.
 
 ## Next recommended work
 
-1. Connect the accepted foundation and governance flows to the user's self-hosted Letta deployment and run live create/reuse/message/archive/forget/restore/model-switch checks.
-2. Continue the remaining design-document V1 work after the live integration boundary is proven.
-3. Evaluate OpenClaw only as an optional channel/Gateway layer after Letta remains the verified single-agent memory source of truth; do not replace the accepted governance model without a separate architecture work package and approval.
+1. Connect the accepted application flows to the user's self-hosted Letta deployment with registered handles and run live create/reuse/message/archive/forget/restore/model-switch checks.
+2. Package transactional same-Agent model switching with snapshot, paused writes, embedding lock, fixed regressions, and rollback before calling model switching complete.
+3. Continue the remaining design-document V1 gaps identified by WP-0027 after the live integration boundary is proven.
+4. Evaluate OpenClaw only as an optional channel/Gateway layer after Letta remains the verified single-agent memory source of truth; do not replace the accepted governance model without a separate architecture work package and approval.
