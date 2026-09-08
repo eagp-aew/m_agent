@@ -1,4 +1,4 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -52,15 +52,18 @@ import {
   createRestorePreview,
 } from './src/domain/snapshot.mjs';
 import {
+  ModelSwitchError,
   PersonalCoLettaClient,
   type AgentBlock,
   type AgentSummary,
   type ArchiveItem,
   type ChatMessage,
+  type PersistentWorkflow,
 } from './src/services/letta';
 
 type Surface = 'Chat' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
 type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
+type ModelSwitchState = 'idle' | 'switching' | 'rollback_locked';
 
 type MemoryChangeRecord = {
   id: string;
@@ -127,7 +130,8 @@ export default function App() {
   const { width } = useWindowDimensions();
   const compact = width < 820;
   const [surface, setSurface] = useState<Surface>('Chat');
-  const [settings, setSettings] = useState<ConnectionSettings>(DEFAULT_SETTINGS);
+  const [draftSettings, setDraftSettings] = useState<ConnectionSettings>(DEFAULT_SETTINGS);
+  const [activeSettings, setActiveSettings] = useState<ConnectionSettings | null>(null);
   const [apiKey, setApiKey] = useState('');
   const [connection, setConnection] = useState<ConnectionState>('offline');
   const [connectionError, setConnectionError] = useState('');
@@ -160,6 +164,9 @@ export default function App() {
   const [restorePreview, setRestorePreview] = useState<ReturnType<typeof createRestorePreview> | null>(null);
   const [restoreConfirmation, setRestoreConfirmation] = useState('');
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [modelSwitchState, setModelSwitchState] = useState<ModelSwitchState>('idle');
+  const [modelSwitchOutcome, setModelSwitchOutcome] = useState('');
+  const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'rollback_locked'>('idle');
 
   const importCandidates = useMemo(
     () => createImportCandidates(importText, importSource),
@@ -171,11 +178,15 @@ export default function App() {
   }
 
   async function connect() {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setConnectionError('Connection changes are unavailable while a model switch or rollback lock is active.');
+      return;
+    }
+    connectionSwitchGuard.current = 'connecting';
     setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
     setConnection('connecting');
     setConnectionError('');
-    setClient(null);
-    setAgent(null);
+    setModelSwitchOutcome('');
     setEditingLabel(null);
     setClearConfirmationLabel(null);
     setForgetPreview(null);
@@ -185,7 +196,7 @@ export default function App() {
     setRestorePreview(null);
     setRestoreConfirmation('');
     try {
-      const normalized = normalizeSettings(settings);
+      const normalized = normalizeSettings(draftSettings);
       const nextClient = new PersonalCoLettaClient(normalized, apiKey);
       await nextClient.testConnection();
       const nextAgent = await nextClient.ensureAgent(normalized);
@@ -194,7 +205,8 @@ export default function App() {
         nextClient.listMessages(nextAgent.id),
         nextClient.listArchive(nextAgent.id),
       ]);
-      setSettings(normalized);
+      setDraftSettings(normalized);
+      setActiveSettings(normalized);
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
       setClient(nextClient);
       setAgent(nextAgent);
@@ -205,14 +217,83 @@ export default function App() {
       setSurface('Chat');
     } catch (error) {
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
-      setConnection('error');
+      setConnection(client && agent && activeSettings ? 'connected' : 'error');
       setConnectionError(error instanceof Error ? error.message : 'Could not connect to Letta.');
+    } finally {
+      if (connectionSwitchGuard.current === 'connecting') connectionSwitchGuard.current = 'idle';
+    }
+  }
+
+  async function switchGenerationModel() {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setModelSwitchOutcome('A connection or model-switch operation is already active.');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected' || !activeSettings) {
+      setModelSwitchOutcome('Connect the exact Personal Co Agent before switching its model.');
+      return;
+    }
+
+    connectionSwitchGuard.current = 'switching';
+    setModelSwitchState('switching');
+    setModelSwitchOutcome('');
+    setConnectionError('');
+    let retainRollbackLock = false;
+    try {
+      const normalizedDraft = normalizeSettings(draftSettings);
+      if (normalizedDraft.baseUrl !== activeSettings.baseUrl) {
+        throw new Error('The draft Base URL differs from the active connection. Reconnect before switching models.');
+      }
+      if (normalizedDraft.embeddingHandle !== activeSettings.embeddingHandle) {
+        throw new Error('Model switching cannot change the active embedding handle. Reconnect only after an explicit migration plan.');
+      }
+      const result = await client.switchGenerationModel({
+        agentId: agent.id,
+        currentModelHandle: activeSettings.modelHandle,
+        targetModelHandle: normalizedDraft.modelHandle,
+        embeddingHandle: activeSettings.embeddingHandle,
+      });
+      const committed = {
+        ...activeSettings,
+        modelHandle: normalizedDraft.modelHandle,
+      };
+      setActiveSettings(committed);
+      setDraftSettings(committed);
+      setAgent(result.agent);
+      setBlocks(result.memory.blocks);
+      setArchive(result.memory.archive);
+      setModelSwitchOutcome(`Switched Agent ${result.agent.id} to ${committed.modelHandle}; memory and embedding invariants were verified.`);
+    } catch (error) {
+      if (error instanceof ModelSwitchError) {
+        if (error.agent) setAgent(error.agent);
+        if (error.memory) {
+          setBlocks(error.memory.blocks);
+          setArchive(error.memory.archive);
+        }
+        retainRollbackLock = error.writesLocked;
+        setModelSwitchState(error.writesLocked ? 'rollback_locked' : 'idle');
+        setModelSwitchOutcome(error.message);
+        if (error.writesLocked) setConnectionError(error.message);
+      } else {
+        setModelSwitchOutcome(error instanceof Error ? error.message : 'Model switch failed before it could be verified.');
+      }
+    } finally {
+      if (retainRollbackLock) {
+        connectionSwitchGuard.current = 'rollback_locked';
+      } else {
+        connectionSwitchGuard.current = 'idle';
+        setModelSwitchState('idle');
+      }
     }
   }
 
   async function sendMessage() {
     const content = draft.trim();
     if (!content || sending) return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setConnectionError('Persistent writes are paused while the connection or model switch is active.');
+      return;
+    }
     if (!client || !agent) {
       setConnectionError('Connect your Letta server in Settings before sending a message.');
       setSurface('Settings');
@@ -224,46 +305,48 @@ export default function App() {
     setSending(true);
     try {
       const decision = privacyDecisionForMessage(content, privacy);
-      const before = await client.captureAgentMemory(agent.id);
-      let sendError: unknown = null;
-      try {
-        const replies = await client.sendMessage(agent.id, content, {
-          requestNoMemoryWrites: decision.requestNoMemoryWrites,
-          language: privacy.language,
-        });
-        setMessages((current) => [
-          ...current,
-          ...(replies.length
-            ? replies
-            : [{ id: `empty-${Date.now()}`, role: 'assistant' as const, content: 'The run completed without an assistant message.' }]),
-        ]);
-      } catch (error) {
-        sendError = error;
-      }
-      if (decision.requestNoMemoryWrites) {
-        const reconciled = await client.reconcileTemporaryMemory(agent.id, before);
-        setBlocks(reconciled.state.blocks);
-        setArchive(reconciled.state.archive);
-        const reconciliationChange = createMemoryChange({
-          block: 'SESSION',
-          operation: 'temporary_reconcile',
-          source: decision.reason,
-          epistemicState: 'confirmed',
-          before: `${reconciled.restoredBlocks.length} block and ${reconciled.deletedArchiveIds.length} archive write(s) detected`,
-          after: reconciled.success ? 'Pre-message memory state restored' : 'Memory reconciliation incomplete',
-          status: reconciled.success ? 'applied' : 'failed',
-          error: reconciled.failures.join(' ') || null,
-        }) as MemoryChangeRecord;
-        appendChanges(reconciliationChange);
-        setGovernanceNotice(
-          reconciled.success
-            ? 'Privacy reconciliation completed and verified.'
-            : `Privacy reconciliation reported failures: ${reconciled.failures.join(' ')}`,
-        );
-      } else {
-        await recordAgentMemoryWrites(before);
-      }
-      if (sendError) throw sendError;
+      await client.runPersistentWorkflow('message and memory reconciliation', async (workflow) => {
+        const before = await workflow.captureAgentMemory(agent.id);
+        let sendError: unknown = null;
+        try {
+          const replies = await workflow.sendMessage(agent.id, content, {
+            requestNoMemoryWrites: decision.requestNoMemoryWrites,
+            language: privacy.language,
+          });
+          setMessages((current) => [
+            ...current,
+            ...(replies.length
+              ? replies
+              : [{ id: `empty-${Date.now()}`, role: 'assistant' as const, content: 'The run completed without an assistant message.' }]),
+          ]);
+        } catch (error) {
+          sendError = error;
+        }
+        if (decision.requestNoMemoryWrites) {
+          const reconciled = await workflow.reconcileTemporaryMemory(agent.id, before);
+          setBlocks(reconciled.state.blocks);
+          setArchive(reconciled.state.archive);
+          const reconciliationChange = createMemoryChange({
+            block: 'SESSION',
+            operation: 'temporary_reconcile',
+            source: decision.reason,
+            epistemicState: 'confirmed',
+            before: `${reconciled.restoredBlocks.length} block and ${reconciled.deletedArchiveIds.length} archive write(s) detected`,
+            after: reconciled.success ? 'Pre-message memory state restored' : 'Memory reconciliation incomplete',
+            status: reconciled.success ? 'applied' : 'failed',
+            error: reconciled.failures.join(' ') || null,
+          }) as MemoryChangeRecord;
+          appendChanges(reconciliationChange);
+          setGovernanceNotice(
+            reconciled.success
+              ? 'Privacy reconciliation completed and verified.'
+              : `Privacy reconciliation reported failures: ${reconciled.failures.join(' ')}`,
+          );
+        } else {
+          await recordAgentMemoryWrites(before, workflow);
+        }
+        if (sendError) throw sendError;
+      });
     } catch (error) {
       setMessages((current) => [
         ...current,
@@ -274,9 +357,12 @@ export default function App() {
     }
   }
 
-  async function recordAgentMemoryWrites(before: { blocks: AgentBlock[]; archive: ArchiveItem[] }) {
+  async function recordAgentMemoryWrites(
+    before: { blocks: AgentBlock[]; archive: ArchiveItem[] },
+    workflow: PersistentWorkflow,
+  ) {
     if (!client || !agent) return;
-    const after = await client.captureAgentMemory(agent.id);
+    const after = await workflow.captureAgentMemory(agent.id);
     const diff = diffAgentMemory(before, after);
     const logged: MemoryChangeRecord[] = [];
     const effectiveBlocks = [...after.blocks];
@@ -299,7 +385,7 @@ export default function App() {
       }
       if (stable) {
         try {
-          const restored = await client.updateBlock(item.before, item.before.value, item.before.metadata ?? null);
+          const restored = await workflow.updateBlock(item.before, item.before.value, item.before.metadata ?? null);
           const index = effectiveBlocks.findIndex((block) => block.label === restored.label);
           if (index >= 0) effectiveBlocks[index] = restored;
           logged.push(stageBlockChange({
@@ -554,9 +640,11 @@ export default function App() {
     const exactTerm = forgetPreview.exactTerm;
     const failures: string[] = [];
     const logged: MemoryChangeRecord[] = [];
+    try {
+      await client.runPersistentWorkflow('forget workflow', async (workflow) => {
     let freshPreview: ReturnType<typeof createForgetPreview>;
     try {
-      const currentMemory = await client.captureAgentMemory(connectedAgentId);
+      const currentMemory = await workflow.captureAgentMemory(connectedAgentId);
       freshPreview = createForgetPreview(exactTerm, currentMemory.blocks, currentMemory.archive, connectedAgentId);
       if (!authorizeForget(freshPreview, forgetConfirmation, connectedAgentId)) {
         throw new Error('Forget confirmation is not valid for the current agent and exact term.');
@@ -581,7 +669,7 @@ export default function App() {
         status: 'applied',
       }) as MemoryChangeRecord;
       try {
-        await client.updateBlock(block, nextValue, buildPersonalCoMetadata(block.metadata, change));
+        await workflow.updateBlock(block, nextValue, buildPersonalCoMetadata(block.metadata, change));
         logged.push(change);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -600,7 +688,7 @@ export default function App() {
         status: 'applied',
       }) as MemoryChangeRecord;
       try {
-        await client.deleteArchiveItem(connectedAgentId, item.id);
+        await workflow.deleteArchiveItem(connectedAgentId, item.id);
         logged.push(change);
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Unknown error';
@@ -611,7 +699,7 @@ export default function App() {
     appendChanges(...logged);
     let verificationPreview: ReturnType<typeof createForgetPreview> | null = null;
     try {
-      const nextMemory = await client.captureAgentMemory(connectedAgentId);
+      const nextMemory = await workflow.captureAgentMemory(connectedAgentId);
       setBlocks(nextMemory.blocks);
       setArchive(nextMemory.archive);
       verificationPreview = createForgetPreview(exactTerm, nextMemory.blocks, nextMemory.archive, connectedAgentId);
@@ -633,6 +721,10 @@ export default function App() {
         ? `Forget could not be proven complete: ${failures.join(' ')}`
         : `Forget completed for ${logged.length} exact match(es); no exact matches remain.`,
     );
+      });
+    } catch (error) {
+      setGovernanceNotice(error instanceof Error ? error.message : 'Forget workflow could not start.');
+    }
   }
 
   function requestArchiveDelete(item: ArchiveItem) {
@@ -688,6 +780,10 @@ export default function App() {
     const logged: MemoryChangeRecord[] = [];
     const failures: string[] = [];
     try {
+      await client.runPersistentWorkflow('archive import workflow', async (workflow) => {
+      const currentMemory = await workflow.captureAgentMemory(agent.id);
+      setBlocks(currentMemory.blocks);
+      setArchive(currentMemory.archive);
       for (const candidate of importCandidates) {
         const authorization = authorizeImportDestination(candidate, 'archive');
         if (authorization.allowed) {
@@ -701,7 +797,7 @@ export default function App() {
             status: 'applied',
           }) as MemoryChangeRecord;
           try {
-            await client.archiveText(agent.id, candidate.content, candidate.normalizedTags);
+            await workflow.archiveText(agent.id, candidate.content, candidate.normalizedTags);
             logged.push(change);
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unknown error';
@@ -712,13 +808,14 @@ export default function App() {
       }
       appendChanges(...logged);
       if (!failures.length) setImportText('');
-      setArchive(await client.listArchive(agent.id));
+      setArchive(await workflow.listArchive(agent.id));
       setSurface('Archive');
       setGovernanceNotice(
         failures.length
           ? `Import completed with partial failures: ${failures.join(' ')}`
           : `Archived ${logged.length} reviewed candidate(s).`,
       );
+      });
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : 'Import failed.');
     } finally {
@@ -727,7 +824,7 @@ export default function App() {
   }
 
   async function exportSnapshot() {
-    if (!client || !agent) {
+    if (!client || !agent || !activeSettings) {
       setConnectionError('Connect your Letta server before exporting a snapshot.');
       setSurface('Settings');
       return;
@@ -738,7 +835,7 @@ export default function App() {
       const memory = await client.captureAgentMemory(agent.id);
       const snapshot = createPortableSnapshot({
         agentId: agent.id,
-        settings: { ...settings, ...privacy },
+        settings: { ...activeSettings, ...privacy },
         blocks: memory.blocks,
         archive: memory.archive,
       });
@@ -787,11 +884,12 @@ export default function App() {
     const failures: string[] = [];
     const logged: MemoryChangeRecord[] = [];
     let parsedSnapshot: unknown;
-    let freshPreview: ReturnType<typeof createRestorePreview>;
     try {
+      await client.runPersistentWorkflow('snapshot restore workflow', async (workflow) => {
+      let freshPreview: ReturnType<typeof createRestorePreview>;
       try {
         parsedSnapshot = JSON.parse(snapshotText);
-        const currentMemory = await client.captureAgentMemory(connectedAgentId);
+        const currentMemory = await workflow.captureAgentMemory(connectedAgentId);
         freshPreview = createRestorePreview(parsedSnapshot, { agentId: connectedAgentId, ...currentMemory });
         if (!authorizeSnapshotRestore(freshPreview, restoreConfirmation, connectedAgentId)) {
           throw new Error('Restore confirmation is not valid for the current snapshot and agent.');
@@ -817,7 +915,7 @@ export default function App() {
         }) as MemoryChangeRecord;
         try {
           if (!item.before) throw new Error(`Connected agent is missing ${item.after.label}.`);
-          await client.updateBlock(
+          await workflow.updateBlock(
             item.before,
             item.after.value,
             buildPersonalCoMetadata(item.after.metadata, change),
@@ -841,7 +939,7 @@ export default function App() {
           status: 'applied',
         }) as MemoryChangeRecord;
         try {
-          await client.archiveText(connectedAgentId, item.text, item.tags, item.createdAt);
+          await workflow.archiveText(connectedAgentId, item.text, item.tags, item.createdAt);
           logged.push(change);
         } catch (error) {
           const message = error instanceof Error ? error.message : 'Unknown error';
@@ -853,7 +951,7 @@ export default function App() {
 
       let verificationPreview: ReturnType<typeof createRestorePreview> | null = null;
       try {
-        const memory = await client.captureAgentMemory(connectedAgentId);
+        const memory = await workflow.captureAgentMemory(connectedAgentId);
         setBlocks(memory.blocks);
         setArchive(memory.archive);
         verificationPreview = createRestorePreview(parsedSnapshot, { agentId: connectedAgentId, ...memory });
@@ -869,13 +967,30 @@ export default function App() {
           ? `Restore could not be proven complete: ${failures.join(' ')}`
           : 'Restore applied to this same agent and verified; no planned changes remain.',
       );
+      });
+    } catch (error) {
+      setGovernanceNotice(error instanceof Error ? error.message : 'Restore workflow could not start.');
     } finally {
       setSnapshotBusy(false);
     }
   }
 
-  const statusLabel = connection === 'connected' ? 'Connected' : connection === 'connecting' ? 'Connecting' : connection === 'error' ? 'Needs attention' : 'Local setup';
-  const memoryControlsDisabled = !client || !agent || !hasConnectedMemoryContext(connection, agent.id);
+  const statusLabel = modelSwitchState === 'switching'
+    ? 'Switching model'
+    : modelSwitchState === 'rollback_locked'
+      ? 'Writes locked'
+      : connection === 'connected'
+        ? 'Connected'
+        : connection === 'connecting'
+          ? 'Connecting'
+          : connection === 'error'
+            ? 'Needs attention'
+            : 'Local setup';
+  const persistentWritesPaused = modelSwitchState !== 'idle' || connectionSwitchGuard.current !== 'idle';
+  const memoryControlsDisabled = persistentWritesPaused
+    || !client
+    || !agent
+    || !hasConnectedMemoryContext(connection, agent.id);
 
   return (
     <View style={styles.app}>
@@ -895,7 +1010,7 @@ export default function App() {
             ))}
           </View>
           <View style={styles.sidebarFooter}>
-            <View style={[styles.statusDot, connection === 'connected' && styles.statusDotGood, connection === 'error' && styles.statusDotError]} />
+            <View style={[styles.statusDot, connection === 'connected' && modelSwitchState === 'idle' && styles.statusDotGood, (connection === 'error' || modelSwitchState === 'rollback_locked') && styles.statusDotError]} />
             <View><Text style={styles.statusLabel}>{statusLabel}</Text><Text style={styles.statusMeta}>personal-co-v1</Text></View>
           </View>
         </View>
@@ -905,7 +1020,7 @@ export default function App() {
         {compact && (
           <View style={styles.mobileHeader}>
             <View><Text style={styles.mobileBrand}>Personal Co</Text><Text style={styles.mobileSurface}>{surface}</Text></View>
-            <Pill tone={connection === 'connected' ? 'good' : connection === 'error' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
+            <Pill tone={connection === 'connected' && modelSwitchState === 'idle' ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
           </View>
         )}
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -927,7 +1042,7 @@ export default function App() {
                 </ScrollView>
                 <View style={styles.composer}>
                   <TextInput value={draft} onChangeText={setDraft} placeholder="Ask, reflect, or make a decision…" placeholderTextColor="#8d8a9b" multiline style={styles.composerInput} onSubmitEditing={() => void sendMessage()} />
-                  <Pressable onPress={() => void sendMessage()} style={[styles.sendButton, (!draft.trim() || sending) && styles.buttonDisabled]} disabled={!draft.trim() || sending}><Text style={styles.sendButtonText}>Send ↑</Text></Pressable>
+                  <Pressable onPress={() => void sendMessage()} style={[styles.sendButton, (!draft.trim() || sending || persistentWritesPaused) && styles.buttonDisabled]} disabled={!draft.trim() || sending || persistentWritesPaused}><Text style={styles.sendButtonText}>Send ↑</Text></Pressable>
                 </View>
               </View>
               <View style={styles.policyStrip}><Text style={styles.policyStripTitle}>Archive-first by design</Text><Text style={styles.policyStripCopy}>Uncertain ideas stay outside stable memory until evidence or your confirmation supports them.</Text></View>
@@ -995,7 +1110,7 @@ export default function App() {
                       <Text style={styles.previewTitle}>{forgetPreview.blockMatches.length} core + {forgetPreview.archiveMatches.length} archive match(es)</Text>
                       <Text style={styles.fieldHelp}>Type exactly: {forgetPreview.confirmationPhrase}</Text>
                       <TextInput value={forgetConfirmation} onChangeText={setForgetConfirmation} autoCapitalize="none" style={styles.fieldInput} />
-                      <Pressable onPress={() => void executeForget()} style={styles.dangerButton}><Text style={styles.primaryButtonText}>Forget every exact match</Text></Pressable>
+                      <Pressable disabled={memoryControlsDisabled} onPress={() => void executeForget()} style={[styles.dangerButton, memoryControlsDisabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Forget every exact match</Text></Pressable>
                     </View>
                   )}
                 </View>
@@ -1021,7 +1136,7 @@ export default function App() {
                       {change.status === 'pending' && (
                         <View style={styles.cardActions}>
                           <Pressable onPress={() => cancelPendingChange(change)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Cancel proposal</Text></Pressable>
-                          <Pressable disabled={!client || !agent || !authorizePendingMemoryChange(change, connection, agent.id)} onPress={() => void applyPendingChange(change)} style={[styles.primaryButton, (!client || !agent || !authorizePendingMemoryChange(change, connection, agent.id)) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Apply to Letta</Text></Pressable>
+                          <Pressable disabled={memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '')} onPress={() => void applyPendingChange(change)} style={[styles.primaryButton, (memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '')) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Apply to Letta</Text></Pressable>
                         </View>
                       )}
                     </View>
@@ -1037,7 +1152,7 @@ export default function App() {
               {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
               <View style={styles.searchRow}><TextInput value={archiveSearch} onChangeText={setArchiveSearch} placeholder="Search archive…" placeholderTextColor="#8d8a9b" style={styles.searchInput} onSubmitEditing={() => void refreshArchive()} /><Pressable style={styles.primaryButton} onPress={() => void refreshArchive()}><Text style={styles.primaryButtonText}>Search</Text></Pressable></View>
               {archive.length === 0 ? <EmptyState symbol="⌁" title="The archive is quiet." copy={connection === 'connected' ? 'Import notes or let conversations create evidence.' : 'Connect Letta to load durable archive passages.'} /> : (
-                <View style={styles.archiveList}>{archive.map((item) => <View key={item.id} style={styles.archiveItem}><View style={styles.archiveMeta}><View style={styles.archivePills}><Pill>{item.category}</Pill><Pill>{item.epistemicState}</Pill></View><Text style={styles.archiveDate}>{item.date}</Text></View><Text style={styles.archiveText}>{item.text}</Text><View style={styles.archiveFooter}><Text style={styles.archiveSource}>Source: {item.source} · {item.provenance}</Text><Pressable onPress={() => requestArchiveDelete(item)} style={styles.secondaryButton}><Text style={styles.dangerButtonText}>Delete exact passage</Text></Pressable></View>{archiveDeleteTarget?.id === item.id && <View style={styles.confirmationBox}><Text style={styles.confirmationTitle}>Delete archive passage {item.id}?</Text><Text style={styles.confirmationCopy}>This removes only the passage shown above. Type exactly: DELETE {item.id}</Text><TextInput value={archiveDeleteConfirmation} onChangeText={setArchiveDeleteConfirmation} autoCapitalize="none" autoCorrect={false} style={styles.fieldInput} /><View style={styles.confirmationActions}><Pressable onPress={() => { setArchiveDeleteTarget(null); setArchiveDeleteConfirmation(''); }} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable><Pressable disabled={!authorizeArchiveDelete(item.id, archiveDeleteConfirmation)} onPress={() => void deleteArchiveItem(item, archiveDeleteConfirmation)} style={[styles.destructiveConfirmButton, !authorizeArchiveDelete(item.id, archiveDeleteConfirmation) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Delete passage</Text></Pressable></View></View>}</View>)}</View>
+                <View style={styles.archiveList}>{archive.map((item) => <View key={item.id} style={styles.archiveItem}><View style={styles.archiveMeta}><View style={styles.archivePills}><Pill>{item.category}</Pill><Pill>{item.epistemicState}</Pill></View><Text style={styles.archiveDate}>{item.date}</Text></View><Text style={styles.archiveText}>{item.text}</Text><View style={styles.archiveFooter}><Text style={styles.archiveSource}>Source: {item.source} · {item.provenance}</Text><Pressable disabled={memoryControlsDisabled} onPress={() => requestArchiveDelete(item)} style={[styles.secondaryButton, memoryControlsDisabled && styles.buttonDisabled]}><Text style={styles.dangerButtonText}>Delete exact passage</Text></Pressable></View>{archiveDeleteTarget?.id === item.id && <View style={styles.confirmationBox}><Text style={styles.confirmationTitle}>Delete archive passage {item.id}?</Text><Text style={styles.confirmationCopy}>This removes only the passage shown above. Type exactly: DELETE {item.id}</Text><TextInput value={archiveDeleteConfirmation} onChangeText={setArchiveDeleteConfirmation} autoCapitalize="none" autoCorrect={false} style={styles.fieldInput} /><View style={styles.confirmationActions}><Pressable onPress={() => { setArchiveDeleteTarget(null); setArchiveDeleteConfirmation(''); }} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Cancel</Text></Pressable><Pressable disabled={memoryControlsDisabled || !authorizeArchiveDelete(item.id, archiveDeleteConfirmation)} onPress={() => void deleteArchiveItem(item, archiveDeleteConfirmation)} style={[styles.destructiveConfirmButton, (memoryControlsDisabled || !authorizeArchiveDelete(item.id, archiveDeleteConfirmation)) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Delete passage</Text></Pressable></View></View>}</View>)}</View>
               )}
             </View>
           )}
@@ -1047,7 +1162,7 @@ export default function App() {
               <SurfaceTitle eyebrow="SAFE IMPORT" title="Bring context in. Keep control." copy="Each non-empty line becomes an external_import archive candidate. Nothing here can silently update your profile or goals." />
               <View style={styles.importLayout}>
                 <View style={styles.importEditor}><Text style={styles.fieldLabel}>Selected source</Text><TextInput value={importSource} onChangeText={setImportSource} placeholder="pasted text" placeholderTextColor="#918fa0" style={styles.fieldInput} /><Text style={styles.fieldLabel}>Paste notes or exported text</Text><TextInput value={importText} onChangeText={setImportText} multiline placeholder={'One observation per line\nProjects feel clearer after a written brief\nConsidering a move next spring'} placeholderTextColor="#918fa0" style={styles.importInput} /><Text style={styles.fieldHelp}>Local preview only until you choose “Archive candidates.”</Text></View>
-                <View style={styles.importPreview}><View style={styles.cardHeader}><Text style={styles.previewTitle}>Review queue</Text><Pill tone="warn">{importCandidates.length} candidate{importCandidates.length === 1 ? '' : 's'}</Pill></View>{importCandidates.length === 0 ? <EmptyState symbol="↗" title="Nothing staged." copy="Paste text to see exactly what would be archived." /> : importCandidates.slice(0, 8).map((candidate: { id: string; content: string; sourceName: string }) => <View key={candidate.id} style={styles.candidate}><Text style={styles.candidateText}>{candidate.content}</Text><View style={styles.candidateMeta}><Text style={styles.candidateTag}>external_import · {candidate.sourceName}</Text><Text style={styles.candidateDestination}>→ archive · observed</Text></View></View>)}{importCandidates.length > 0 && <Pressable disabled={importBusy} onPress={() => void archiveImports()} style={[styles.primaryButton, styles.importButton, importBusy && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{importBusy ? 'Archiving…' : 'Archive candidates'}</Text></Pressable>}</View>
+                <View style={styles.importPreview}><View style={styles.cardHeader}><Text style={styles.previewTitle}>Review queue</Text><Pill tone="warn">{importCandidates.length} candidate{importCandidates.length === 1 ? '' : 's'}</Pill></View>{importCandidates.length === 0 ? <EmptyState symbol="↗" title="Nothing staged." copy="Paste text to see exactly what would be archived." /> : importCandidates.slice(0, 8).map((candidate: { id: string; content: string; sourceName: string }) => <View key={candidate.id} style={styles.candidate}><Text style={styles.candidateText}>{candidate.content}</Text><View style={styles.candidateMeta}><Text style={styles.candidateTag}>external_import · {candidate.sourceName}</Text><Text style={styles.candidateDestination}>→ archive · observed</Text></View></View>)}{importCandidates.length > 0 && <Pressable disabled={importBusy || memoryControlsDisabled} onPress={() => void archiveImports()} style={[styles.primaryButton, styles.importButton, (importBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{importBusy ? 'Archiving…' : 'Archive candidates'}</Text></Pressable>}</View>
               </View>
               <View style={styles.guardrail}><Text style={styles.guardrailIcon}>◇</Text><View><Text style={styles.guardrailTitle}>Stable memory safeguard</Text><Text style={styles.guardrailCopy}>PROFILE and GOALS AND DECISIONS require a separate, explicit confirmation step after import.</Text></View></View>
             </View>
@@ -1057,24 +1172,35 @@ export default function App() {
             <View style={styles.surface}>
               <SurfaceTitle eyebrow="CONNECTION" title="Your Letta, your model choices." copy="Personal Co uses only the handles you provide. It never switches providers automatically." />
               <View style={styles.settingsGrid}>
-                <View style={[styles.card, styles.settingsCard]}>
+                <View style={[styles.card, styles.settingsCard, compact && styles.compactSettingsCard]}>
                   <Text style={styles.sectionTitle}>Letta server</Text>
-                  <Text style={styles.fieldLabel}>Base URL</Text><TextInput autoCapitalize="none" value={settings.baseUrl} onChangeText={(baseUrl) => setSettings((current) => ({ ...current, baseUrl }))} style={styles.fieldInput} />
-                  <Text style={styles.fieldLabel}>API key <Text style={styles.optional}>(optional, session only)</Text></Text><TextInput autoCapitalize="none" secureTextEntry value={apiKey} onChangeText={setApiKey} placeholder="Not stored" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                  <Text style={styles.fieldLabel}>Draft Base URL</Text><TextInput editable={!persistentWritesPaused} autoCapitalize="none" value={draftSettings.baseUrl} onChangeText={(baseUrl) => setDraftSettings((current) => ({ ...current, baseUrl }))} style={[styles.fieldInput, persistentWritesPaused && styles.buttonDisabled]} />
+                  <Text style={styles.fieldLabel}>API key <Text style={styles.optional}>(optional, session only)</Text></Text><TextInput editable={!persistentWritesPaused} autoCapitalize="none" secureTextEntry value={apiKey} onChangeText={setApiKey} placeholder="Not stored" placeholderTextColor="#9693a3" style={[styles.fieldInput, persistentWritesPaused && styles.buttonDisabled]} />
                   <Text style={styles.fieldHelp}>The key stays only in this browser session and is never written to app storage.</Text>
+                  <Text style={styles.activeSetting}>Active: {activeSettings?.baseUrl ?? 'Not connected'}</Text>
                 </View>
-                <View style={[styles.card, styles.settingsCard]}>
+                <View style={[styles.card, styles.settingsCard, compact && styles.compactSettingsCard]}>
                   <Text style={styles.sectionTitle}>Agent configuration</Text>
-                  <Text style={styles.fieldLabel}>Model handle</Text><TextInput autoCapitalize="none" value={settings.modelHandle} onChangeText={(modelHandle) => setSettings((current) => ({ ...current, modelHandle }))} style={styles.fieldInput} />
+                  <Text style={styles.fieldLabel}>Draft model handle</Text><TextInput editable={!persistentWritesPaused} autoCapitalize="none" value={draftSettings.modelHandle} onChangeText={(modelHandle) => setDraftSettings((current) => ({ ...current, modelHandle }))} style={[styles.fieldInput, persistentWritesPaused && styles.buttonDisabled]} />
                   <View style={styles.presetRow}>
-                    <Pressable onPress={() => setSettings((current) => ({ ...current, modelHandle: RECOMMENDED_MODEL_HANDLES.default }))} style={[styles.presetButton, settings.modelHandle === RECOMMENDED_MODEL_HANDLES.default && styles.presetButtonActive]}><Text style={styles.presetButtonText}>DeepSeek V4 Pro · default</Text></Pressable>
-                    <Pressable onPress={() => setSettings((current) => ({ ...current, modelHandle: RECOMMENDED_MODEL_HANDLES.quality }))} style={[styles.presetButton, settings.modelHandle === RECOMMENDED_MODEL_HANDLES.quality && styles.presetButtonActive]}><Text style={styles.presetButtonText}>GPT-5.6 Terra · quality</Text></Pressable>
+                    <Pressable disabled={persistentWritesPaused} onPress={() => setDraftSettings((current) => ({ ...current, modelHandle: RECOMMENDED_MODEL_HANDLES.default }))} style={[styles.presetButton, draftSettings.modelHandle === RECOMMENDED_MODEL_HANDLES.default && styles.presetButtonActive, persistentWritesPaused && styles.buttonDisabled]}><Text style={styles.presetButtonText}>DeepSeek V4 Pro · default</Text></Pressable>
+                    <Pressable disabled={persistentWritesPaused} onPress={() => setDraftSettings((current) => ({ ...current, modelHandle: RECOMMENDED_MODEL_HANDLES.quality }))} style={[styles.presetButton, draftSettings.modelHandle === RECOMMENDED_MODEL_HANDLES.quality && styles.presetButtonActive, persistentWritesPaused && styles.buttonDisabled]}><Text style={styles.presetButtonText}>GPT-5.6 Terra · quality</Text></Pressable>
                   </View>
-                  <Text style={styles.fieldHelp}>Switches are manual and update this same agent ID; Personal Co never falls back automatically.</Text>
-                  <Text style={styles.fieldLabel}>Embedding handle</Text><TextInput autoCapitalize="none" value={settings.embeddingHandle} onChangeText={(embeddingHandle) => setSettings((current) => ({ ...current, embeddingHandle }))} style={styles.fieldInput} />
+                  <Text style={styles.activeSetting}>Active model: {activeSettings?.modelHandle ?? 'Not connected'}</Text>
+                  <Text style={styles.fieldHelp}>Changing the draft does not mutate the Agent. Use the guarded action below to switch only this same Agent ID; Personal Co never falls back automatically.</Text>
+                  <Text style={styles.fieldLabel}>Draft embedding handle</Text><TextInput editable={!persistentWritesPaused} autoCapitalize="none" value={draftSettings.embeddingHandle} onChangeText={(embeddingHandle) => setDraftSettings((current) => ({ ...current, embeddingHandle }))} style={[styles.fieldInput, persistentWritesPaused && styles.buttonDisabled]} />
+                  <Text style={styles.activeSetting}>Active embedding (locked during model switch): {activeSettings?.embeddingHandle ?? 'Not connected'}</Text>
                   <View style={styles.fixedRow}><View><Text style={styles.fixedTitle}>Sleeptime</Text><Text style={styles.fieldHelp}>Disabled for the single-agent foundation</Text></View><Pill>Off</Pill></View>
+                  <Pressable
+                    disabled={!client || !agent || !activeSettings || connection !== 'connected' || persistentWritesPaused}
+                    onPress={() => void switchGenerationModel()}
+                    style={[styles.primaryButton, (!client || !agent || !activeSettings || connection !== 'connected' || persistentWritesPaused) && styles.buttonDisabled]}
+                  >
+                    {modelSwitchState === 'switching' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Switch this Agent to draft model</Text>}
+                  </Pressable>
+                  {modelSwitchOutcome ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{modelSwitchOutcome}</Text></View> : null}
                 </View>
-                <View style={[styles.card, styles.settingsCard]}>
+                <View style={[styles.card, styles.settingsCard, compact && styles.compactSettingsCard]}>
                   <Text style={styles.sectionTitle}>Privacy and language</Text>
                   <Text style={styles.fieldLabel}>Response language</Text>
                   <View style={styles.presetRow}>
@@ -1095,13 +1221,13 @@ export default function App() {
                     <Text style={styles.previewTitle}>{restorePreview.blockChanges.length} writable block change(s) · {restorePreview.archiveAdds.length} missing archive record(s)</Text>
                     <Text style={styles.fieldHelp}>Policy blocks will not be written. Type exactly: {restorePreview.confirmationPhrase}</Text>
                     <TextInput value={restoreConfirmation} onChangeText={setRestoreConfirmation} autoCapitalize="none" style={styles.fieldInput} />
-                    <Pressable disabled={snapshotBusy} onPress={() => void applySnapshotRestore()} style={styles.dangerButton}><Text style={styles.primaryButtonText}>Apply to this same agent</Text></Pressable>
+                    <Pressable disabled={snapshotBusy || memoryControlsDisabled} onPress={() => void applySnapshotRestore()} style={[styles.dangerButton, (snapshotBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Apply to this same agent</Text></Pressable>
                   </View>
                 )}
               </View>
               {connectionError ? <View style={styles.errorBox}><Text style={styles.errorText}>{connectionError}</Text></View> : null}
               {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
-              <View style={styles.connectRow}><Pressable onPress={() => void connect()} disabled={connection === 'connecting'} style={[styles.primaryButton, styles.connectButton, connection === 'connecting' && styles.buttonDisabled]}>{connection === 'connecting' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{connection === 'connected' ? 'Reconnect agent' : 'Connect & initialize'}</Text>}</Pressable><Text style={styles.connectHint}>Finds or creates the one agent tagged personal-co-v1.</Text></View>
+              <View style={styles.connectRow}><Pressable onPress={() => void connect()} disabled={connection === 'connecting' || modelSwitchState !== 'idle'} style={[styles.primaryButton, styles.connectButton, (connection === 'connecting' || modelSwitchState !== 'idle') && styles.buttonDisabled]}>{connection === 'connecting' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{connection === 'connected' ? 'Apply draft & reconnect' : 'Connect & initialize'}</Text>}</Pressable><Text style={[styles.connectHint, compact && styles.compactConnectHint]}>Finds or creates the one agent tagged personal-co-v1. Existing Agents are never reconfigured by reconnect.</Text></View>
             </View>
           )}
         </ScrollView>
@@ -1227,6 +1353,7 @@ const styles = StyleSheet.create({
   guardrailCopy: { color: muted, fontSize: 12, marginTop: 4, lineHeight: 18 },
   settingsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 15 },
   settingsCard: { gap: 8 },
+  compactSettingsCard: { width: '100%', minWidth: 0, flexBasis: 'auto', flexGrow: 0, padding: 16 },
   sectionTitle: { color: ink, fontSize: 17, fontWeight: '800', marginBottom: 5 },
   fieldLabel: { color: '#4d4956', fontSize: 11, fontWeight: '800', marginTop: 7 },
   fieldInput: { height: 45, borderRadius: 10, borderWidth: 1, borderColor: '#dcd6cf', backgroundColor: '#faf9f7', paddingHorizontal: 13, color: ink, fontSize: 13 },
@@ -1236,6 +1363,7 @@ const styles = StyleSheet.create({
   presetButtonActive: { borderColor: violet, backgroundColor: '#f0edff' },
   presetButtonText: { color: '#575260', fontSize: 10, fontWeight: '800' },
   fieldHelp: { color: '#898591', fontSize: 10, lineHeight: 15 },
+  activeSetting: { color: '#514489', fontSize: 10, lineHeight: 15, fontWeight: '700' },
   optional: { fontWeight: '500', color: '#938e9a' },
   fixedRow: { borderTopWidth: 1, borderTopColor: line, marginTop: 10, paddingTop: 13, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   fixedTitle: { color: ink, fontSize: 12, fontWeight: '800' },
@@ -1266,6 +1394,7 @@ const styles = StyleSheet.create({
   connectRow: { marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 13 },
   connectButton: { minWidth: 175 },
   connectHint: { color: muted, fontSize: 11 },
+  compactConnectHint: { width: '100%', minWidth: 0, flexShrink: 1 },
   bottomNav: { height: 67, flexDirection: 'row', borderTopWidth: 1, borderTopColor: line, backgroundColor: '#fff', paddingHorizontal: 4, paddingBottom: 4 },
   bottomNavItem: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3 },
   bottomNavSymbol: { color: '#96919d', fontSize: 17 },

@@ -317,6 +317,17 @@ queue:
     acceptance_summary: "Accepted exact registered generation and embedding handle preflight before every tagged-Agent lifecycle operation, health-only connection probing, fail-closed sanitized errors, no fallback, and preserved same-Agent behavior."
     work_package_path: ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  - task_id: WP-0029-transactional-model-switch
+    title: "Add guarded same-Agent model switching"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0029_verifier_retry
+    blocked_by:
+      - WP-0028-model-handle-preflight
+    acceptance_summary: "Accepted guarded same-Agent model switching with callback-scoped workflow leases, complete fail-closed snapshot pagination, embedding and Block/Archive invariants, verified compensation, retained lock on rollback failure, and responsive Settings controls."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0029-transactional-model-switch.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
 
 status_values:
   - DRAFT

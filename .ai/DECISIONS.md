@@ -434,6 +434,26 @@
   - Model availability and lifecycle behavior still require validation against the user's live self-hosted Letta deployment.
   - Transactional model switching, embedding invariance, snapshot/regression gating, and rollback remain separate work.
 
+## DEC-0027: Make model switching an application transaction
+
+- Date: 2026-09-07
+- Status: accepted
+- Context:
+  - The design requires a generation-model change to retain the exact Agent ID, embedding, fixed Blocks, and Archive, with writes paused and rollback available.
+  - A reconnect-time configuration update cannot establish a complete snapshot boundary or distinguish a deliberate model switch from configuration drift.
+  - Multi-step UI workflows can outlive a single adapter call, so a mutation counter alone cannot provide a safe switch boundary.
+- Decision:
+  - Reject model or embedding mismatches during ordinary reconnect; only the explicit switch flow may change the generation model.
+  - Acquire a callback-scoped application-instance workflow lease, synchronously latch the write barrier, drain active work, validate exact target/current inventories, and capture complete Block and Archive state with fail-closed pagination.
+  - Patch only the generation model and disabled-sleeptime flag on the existing Agent ID; never send an embedding change or create, delete, or replace the Agent.
+  - Verify fresh Agent identity, embedding, six-block schema, Block limits/content/metadata, and canonical Archive content after the update.
+  - On any post-attempt failure, compensate to the original model and verify the rollback; retain the write lock when rollback cannot be proven.
+  - Treat this as a local application transaction only. Database snapshots, live provider behavior, and coordination with external clients remain separate deployment concerns.
+- Consequences:
+  - Deterministic tests now prove local success, barriers, invariant failures, compensation, and fail-closed rollback behavior.
+  - Current application workflows must await every operation started through the scoped workflow facade.
+  - A live Letta deployment and server/operator-level write pause are still required to validate cross-client and database-level safety.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -464,3 +484,4 @@
 | DEC-0024 | 2026-09-04 | accepted | Adopt the Personal Co V1 foundation architecture |
 | DEC-0025 | 2026-09-05 | accepted | Bind persistent-memory actions to one connected agent context |
 | DEC-0026 | 2026-09-07 | accepted | Require exact registered model handles before Agent operations |
+| DEC-0027 | 2026-09-07 | accepted | Make model switching an application transaction |

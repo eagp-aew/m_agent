@@ -8,12 +8,12 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0028-model-handle-preflight
-  title: "Preflight exact Letta model handles"
+  task_id: WP-0029-transactional-model-switch
+  title: "Add guarded same-Agent model switching"
   status: ACCEPTED
   scope_type: implementation
-  assigned_agent: wp0028_verifier_retry
-  work_package_path: ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
+  assigned_agent: wp0029_verifier_retry
+  work_package_path: ".ai/WORK_PACKAGES/WP-0029-transactional-model-switch.yaml"
 
 current_state_machine_state: DONE
 
@@ -72,6 +72,9 @@ open_decisions:
     resolution: "Human explicitly authorized one third fix limited to the connection-state/agent-binding race, followed by independent verification and push only after PASS."
 
 failure_counts_by_task:
+  WP-0029-transactional-model-switch:
+    verify: 2
+    fix: 1
   WP-0028-model-handle-preflight:
     verify: 2
     fix: 2
@@ -259,7 +262,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0028-model-handle-preflight
+    work_package_id: WP-0029-transactional-model-switch
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -277,24 +280,25 @@ quality_metrics:
     child_reports_missing: 0
     child_scope_violations: 0
     recursive_delegation_violations: 0
-    fix_attempts: 2
+    fix_attempts: 1
     repeated_failure_detected: false
     human_approval_required: false
     human_approval_obtained: true
     human_fix_limit_override_obtained: false
     diff_size:
-      files: 4
-      insertions: 272
-      deletions: 8
-      measurement_scope: "WP-0028 product diff only; its durable report/memory artifacts are enumerated below, while the combined pending commit also contains already accepted WP-0027 artifacts."
+      files: 5
+      insertions: 1372
+      deletions: 164
+      measurement_scope: "Exact WP-0029 product diff across the five allowed application files; durable work-package, report, and project-memory artifacts are listed separately below."
     files_changed:
-      - "personal-co/src/domain/agent.mjs"
+      - "personal-co/App.tsx"
+      - "personal-co/src/domain/model-switch.mjs"
       - "personal-co/src/services/letta.ts"
-      - "personal-co/tests/agent.test.mjs"
+      - "personal-co/tests/model-switch.test.mjs"
       - "personal-co/README.md"
-      - ".ai/WORK_PACKAGES/WP-0028-model-handle-preflight.yaml"
-      - ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md"
-      - ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+      - ".ai/WORK_PACKAGES/WP-0029-transactional-model-switch.yaml"
+      - ".ai/AGENT_REPORTS/WP-0029-verifier-attempt-1.md"
+      - ".ai/AGENT_REPORTS/WP-0029-verifier.md"
       - ".ai/TASK_QUEUE.yaml"
       - ".ai/MASTER_LEDGER.yaml"
       - ".ai/PROJECT_STATE.md"
@@ -304,35 +308,38 @@ quality_metrics:
       - ".ai/INTEGRATION_LOG.md"
   scope_check:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0028-verifier-attempt-1.md confirms the four allowed product files plus master-owned memory only, with no forbidden or deleted file."
+    evidence: "Implementation changed exactly the five allowed product files plus the permitted WP-0029 package, reports, and durable-memory paths; master and verifier found no forbidden, staged, generated, dependency, configuration, or deleted file."
   validation:
-    status: PENDING
+    status: PASS
     commands:
-      - "cd personal-co && node --test tests/agent.test.mjs (PASS 8/8)"
-      - "cd personal-co && npm test (PASS 25/25)"
-      - "cd personal-co && npm run typecheck (PASS)"
+      - "python3 -B scripts/protocol_gate.py pre-implement WP-0029-transactional-model-switch (PASS before implementation)"
+      - "cd personal-co && node --test tests/model-switch.test.mjs (master PASS 9/9)"
+      - "cd personal-co && npm test (master PASS 36/36)"
+      - "cd personal-co && npm run typecheck (master PASS)"
       - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web (master PASS)"
-      - "python3 -B scripts/validate_protocol.py (PASS 29/29)"
-      - "python3 -B scripts/protocol_gate.py audit (PASS)"
-      - "git diff --check (PASS)"
-      - "independent real connection-path order trace (attempt 1 FAIL; bounded fix applied, fresh verification pending)"
-      - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web (post-fix master PASS)"
-      - "fresh independent verification: targeted tests PASS 10/10, full tests PASS 27/27, typecheck PASS, protocol PASS 29/29, adversarial adapter checks PASS"
-      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0028-verifier.md (initial FAIL: ratio-valued score field; bounded report-format fix applied, replay pending)"
-      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0028-verifier.md (PASS after bounded report-format fix)"
-      - "python3 -B scripts/protocol_gate.py pre-accept WP-0028-model-handle-preflight --report .ai/AGENT_REPORTS/WP-0028-verifier.md (PASS)"
+      - "browser desktop Settings smoke (PASS); 390px narrow smoke observed horizontal card clipping for verifier classification"
+      - "python3 -B scripts/validate_protocol.py (master PASS 29/29)"
+      - "python3 -B scripts/protocol_gate.py audit (master PASS)"
+      - "git diff --check (master PASS)"
+      - "independent verifier attempt 1: FAIL — multi-step workflow lease gap, ambiguous Archive pagination, omitted Block limit, and 390px Settings overflow"
+      - "fix attempt 1 targeted tests: PASS 13/13; full tests PASS 40/40; typecheck PASS"
+      - "fix attempt 1 master Web export: PASS"
+      - "fix attempt 1 browser: PASS at 390x844 and 1280x720; Settings content width equals viewport, switch button bounds 51..339 at 390px, no console warnings/errors"
+      - "independent verifier retry: PASS 9/9; targeted tests PASS 13/13, full tests PASS 40/40, focused prior-defect subset PASS 4/4, typecheck PASS, protocol PASS 29/29, audit PASS"
+      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0029-verifier.md (PASS)"
+      - "python3 -B scripts/protocol_gate.py pre-accept WP-0029-transactional-model-switch --report .ai/AGENT_REPORTS/WP-0029-verifier.md (PASS before and after acceptance memory closure)"
   verifier_status:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0028-verifier.md maps all 8/8 criteria and records final independent PASS after the bounded fix."
+    evidence: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
 
 execution_budget:
-  max_steps: 18
-  max_tool_calls: 100
+  max_steps: 24
+  max_tool_calls: 130
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
   cancellation:
     owner: master
-    condition: "Stop on dependency changes, public API expansion, App/settings redesign, fallback substitution, Agent deletion or identity replacement, secret access, production configuration change, file deletion, or need for live-service credentials."
+    condition: "Stop on dependency changes, public API expansion, embedding migration or reindexing, Agent creation/deletion/replacement, database operations, secret access, production configuration changes, file deletion, broad refactors, or need for unavailable live credentials."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

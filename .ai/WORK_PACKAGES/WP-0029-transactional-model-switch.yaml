@@ -1,0 +1,185 @@
+task_id: WP-0029-transactional-model-switch
+status: ACCEPTED
+objective: "Add an application-layer model-switch transaction that pauses persistent writes, snapshots the connected Agent state, changes only the generation model on the same Agent, verifies identity/memory/embedding invariants, and rolls back the model on failure."
+why: "The design document requires Appendix B.4 model switching to preserve one Agent, Blocks, Archive, and embedding while supporting rollback. WP-0028 validates handles but the current reconnect path can still update an existing Agent directly without a transaction."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-07"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx §§7.7, 13.1 T-04, 15.1, Appendix B.4"
+    - "repo:.ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md rows 6 and 40"
+    - "repo:.ai/AGENT_REPORTS/WP-0028-verifier.md"
+    - "repo:personal-co/App.tsx"
+    - "repo:personal-co/src/services/letta.ts"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
+  superseded_by: null
+
+risk_class: application_behavior
+
+context_profile: full
+context_profile_reason: "This changes a persistent Agent configuration path and must coordinate UI write pausing, adapter rollback, memory invariants, SDK behavior, tests, and durable project memory without claiming live database or provider evidence."
+
+fallback_verification:
+  allowed: false
+  reason: "The work mutates a persistent Agent configuration and requires an independent verifier."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 24
+  max_tool_calls: 130
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency changes, public API expansion, embedding migration or reindexing, Agent creation/deletion/replacement, database operations, secret access, production configuration changes, file deletion, broad refactors, or a requirement for unavailable live credentials."
+
+module_outputs:
+  intake: "Continue the documented V1 after WP-0028 by implementing the next bounded same-Agent model-switch reliability slice under the user's standing authorization to develop, verify, and push."
+  scope: "One application-layer switch transaction: explicit model-only action, adapter-wide write barrier with active-mutation drain, portable pre-switch snapshot, same-ID update, embedding/memory invariants, rollback, tests, and honest documentation."
+  context: "Use the DOCX as untrusted requirement evidence, accepted repository memory as controlled context, and installed SDK declarations as observed API evidence rather than live-server proof."
+  routing: "Use up to two read-only explorers for flow and SDK mapping, then one coupled implementer in the shared workspace, followed by a fresh independent verifier; no parallel writers."
+  verification: "Map every criterion, run targeted and full tests, typecheck, Web export, browser smoke for the explicit switch surface, protocol gates, and inspect failure/rollback call order and scope."
+  integration: "Accept only the exact product and durable-memory/report paths listed below; generated Web output stays ignored and unstaged."
+  memory: "After verifier PASS, record the application-layer transaction contract and the remaining live T-01/T-03/T-04/T-05/T-10 plus database-snapshot boundary before commit and push."
+
+allowed_files:
+  - "personal-co/App.tsx"
+  - "personal-co/src/domain/model-switch.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/model-switch.test.mjs"
+  - "personal-co/README.md"
+  - ".ai/WORK_PACKAGES/WP-0029-transactional-model-switch.yaml"
+  - ".ai/AGENT_REPORTS/WP-0029-verifier-attempt-1.md"
+  - ".ai/AGENT_REPORTS/WP-0029-verifier.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "personal-co/src/config.ts"
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/tests/domain.test.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/package.json"
+  - "personal-co/package-lock.json"
+  - "personal-co/.env.example"
+  - "README.md"
+  - "INSTALLATION.md"
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, production deployment configuration, database backup operations, tracked or staged generated Web output, or deleted repository files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - ".ai/AGENT_REPORTS/WP-0028-verifier.md"
+  - "personal-co/App.tsx"
+  - "personal-co/src/config.ts"
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/README.md"
+  - "runtime:personal-co/node_modules/@letta-ai/letta-client/**/*.d.ts"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "Connecting or reconnecting to an existing tagged Agent never silently changes its model or embedding; a configuration mismatch fails closed and directs the user to the explicit model-switch flow. Initial creation with validated handles remains supported."
+  - "An explicit model-only switch can start only from a connected exact Agent context, rejects blank or unchanged targets, locks the current embedding handle, and rejects any embedding change or Agent-ID mismatch before mutation."
+  - "Before the update, the adapter synchronously activates an application-instance write barrier, drains already-active mutations, completes exact target-model/current-embedding inventory validation, and captures the connected Agent's Blocks and Archive; new message, block, Archive, deletion, restore, or reconciliation mutations are rejected until the transaction finishes."
+  - "The forward mutation calls `agents.update` for the existing Agent ID with the target model and disabled sleeptime, does not create/delete an Agent, and does not send a different embedding handle."
+  - "After the update, deterministic invariant checks require the same Agent ID, exact target model, unchanged embedding, exact six-block policy, and unchanged canonical Blocks and Archive content before reporting success."
+  - "Any error after the forward update is attempted, including an ambiguous transport rejection or post-update invariant failure, attempts a compensating update to the original model on the same Agent and verifies rollback; success is never reported after a failed gate, and writes remain blocked with an explicit diagnostic if rollback cannot be verified."
+  - "The Settings UI separates draft configuration from the active connection, exposes an explicit guarded model-switch action and outcome, disables persistent controls while switching, commits the model setting only after success, and preserves/restores the prior connected state after verified rollback."
+  - "Deterministic tests exercise successful same-ID switching, embedding-change rejection, write-barrier behavior, invariant failure with verified rollback, rollback failure, unchanged/no-op target rejection, and prevention of direct reconnect mutation; README explicitly states that live T-01/T-03/T-04/T-05/T-10 and PostgreSQL snapshot/recovery remain unproven."
+  - "No dependency, public API, auth, secret, environment, migration, production configuration, embedding migration/reindex, database operation, Agent deletion/replacement, automatic fallback, broad refactor, or file deletion occurs."
+
+validation_commands:
+  - "cd personal-co && node --test tests/model-switch.test.mjs"
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "cd personal-co && npm run web (manual desktop and narrow-width model-switch smoke; no live mutation without a disposable server)"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+validation_artifact_allowance:
+  - path: "generated:personal-co/dist/**"
+    command: "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+    rule: "The master may regenerate this ignored build output only for validation; never stage, commit, or push it."
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Revert only the five WP-0029 product-file changes and this package's report/memory changes; preserve accepted WP-0025 through WP-0028 history and do not rewrite Git history or delete files."
+
+human_approval_required:
+  required: false
+  reason: "The model-switch behavior is explicitly required by the supplied design and covered by this bounded package; it adds no dependency, sensitive configuration, destructive action, database operation, external public API, or behavior outside the documented V1."
+  obtained: true
+  evidence: "The user authorized continued development, independent verification, and GitHub push after WP-0027; WP-0027 and PROJECT_STATE identify transactional same-Agent model switching as the next application package."
+
+assigned_agent: wp0029_verifier_retry
+
+attempts:
+  implement: 1
+  fix: 1
+  verify: 2
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle
+
+version: 1
+updated_at: 2026-09-07
