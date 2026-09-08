@@ -1,0 +1,193 @@
+task_id: WP-0030-guided-learning-episodes
+status: ACCEPTED
+objective: "Implement the documented guided-learning episode flow so Personal Co diagnoses before explaining, verifies understanding, archives structured learning evidence, and updates LEARNING_MODEL only to the state supported by that evidence."
+why: "The accepted WP-0027 audit marks design §§8.1–8.2 and T-06 incomplete: pure learning-state helpers exist, but no application workflow invokes them or persists a learning_episode."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-07"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx §§7.3–7.5, 8.1–8.2, 10.1, 13.1 T-06, Appendix A LEARNING_MODEL"
+    - "repo:.ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md rows 8, 11, 21, 22 and T-06"
+    - "repo:.ai/AGENT_REPORTS/WP-0029-verifier.md"
+    - "repo:personal-co/src/domain/learning.mjs"
+    - "repo:personal-co/App.tsx"
+  trust_level: repo_controlled
+  verified_by: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  superseded_by: null
+
+risk_class: persistent_memory_behavior
+
+context_profile: full
+context_profile_reason: "This connects a new user-visible learning workflow to Letta Archive and LEARNING_MODEL writes, existing privacy reconciliation, workflow leases, change history, responsive UI, and durable project memory."
+
+fallback_verification:
+  allowed: false
+  reason: "The work changes user-visible behavior and persistent memory orchestration, so an independent verifier is required."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 28
+  max_tool_calls: 150
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency, public API, auth, permission, secret, migration, production configuration, database, Agent lifecycle, model/embedding, external integration, file upload/extraction, deletion, broad refactor, or scope beyond documented §§8.1–8.2."
+
+module_outputs:
+  intake: "Continue the user's authorized document-driven Personal Co development after accepted WP-0029; the exact GitHub destination still requires a separate explicit push confirmation."
+  scope: "One guided-learning episode flow covering diagnose, explain, verify, learning_episode Archive persistence, evidence-gated LEARNING_MODEL state, and up to three retrieval questions. Cross-domain links, growth hypotheses, weekly review, file import, live deployment, and database recovery remain outside this package."
+  context: "Use the DOCX as untrusted requirement evidence, accepted repository memory as controlled context, and current code/tests as observed implementation evidence."
+  routing: "Use one read-only explorer for code-flow mapping, then one coupled implementer in the shared workspace, followed by a fresh independent verifier; no parallel writers or child agents."
+  verification: "Map every criterion, run targeted and full tests, typecheck, Web export, responsive browser QA for Learning, protocol gates, and inspect write ordering, agent binding, privacy reconciliation, partial-failure reporting, and state evidence gates."
+  integration: "Accept only the four product paths and permitted WP/report/memory paths listed below; generated Web output remains ignored and unstaged."
+  memory: "After verifier PASS, record the learning-episode contract and remaining §8.3–§8.5/live-server boundaries before commit; push remains gated on explicit authorization for the exact remote."
+
+allowed_files:
+  - "personal-co/App.tsx"
+  - "personal-co/src/domain/learning.mjs"
+  - "personal-co/tests/learning-workflow.test.mjs"
+  - "personal-co/README.md"
+  - ".ai/WORK_PACKAGES/WP-0030-guided-learning-episodes.yaml"
+  - ".ai/AGENT_REPORTS/WP-0030-explorer.md"
+  - ".ai/AGENT_REPORTS/WP-0030-implementer.md"
+  - ".ai/AGENT_REPORTS/WP-0030-verifier-attempt-1.md"
+  - ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/src/config.ts"
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/model-switch.mjs"
+  - "personal-co/src/domain/policy.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/tests/domain.test.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/tests/model-switch.test.mjs"
+  - "personal-co/package.json"
+  - "personal-co/package-lock.json"
+  - "personal-co/.env.example"
+  - "README.md"
+  - "INSTALLATION.md"
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, production deployment configuration, database operations, Agent create/delete/replace, model or embedding changes, external services, file upload/extraction, tracked or staged generated output, broad refactors, or deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - ".ai/AGENT_REPORTS/WP-0029-verifier.md"
+  - "personal-co/App.tsx"
+  - "personal-co/src/domain/learning.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/domain.test.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/tests/model-switch.test.mjs"
+  - "personal-co/README.md"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "A pure guided-learning contract represents the six documented stages—input, diagnosis, explanation, verification, memory, and review—and supplies one to three diagnostic questions plus a verification request based on explain, compare, apply, or counterexample rather than treating exposure as mastery."
+  - "Learning-state transitions remain exactly exposed, developing, usable, and needs_review: read-only exposure cannot exceed exposed, practice cannot exceed developing, only application or transfer evidence can support usable, and contradiction evidence produces needs_review. Blank or unknown evidence fails closed."
+  - "A completed episode requires a nonblank topic, source, learning goal, diagnostic response, explanation, verification evidence, and evidence detail; it normalizes date/provenance, records misconceptions when present, and accepts at most three nonblank deduplicated high-value retrieval questions."
+  - "The episode serializer produces a human-inspectable learning_episode Archive record with normalized type/source/epistemic/date/provenance tags and no executable instructions, credentials, or hidden automatic promotion."
+  - "The LEARNING_MODEL updater keeps one current entry per normalized concept, records state, evidence, misconception, and next retrieval question, preserves unrelated content, refuses an unsupported promotion, and fails before writing when the resulting text exceeds the exact Block limit."
+  - "A responsive Learning surface lets the user enter the episode evidence, request diagnostic/explanation/verification coaching through the same connected Agent, preview the derived state before saving, and clearly distinguishes assistant coaching from evidence that actually supports memory."
+  - "Coaching turns request no memory writes and reconcile any attempted Block/Archive mutation. Completing an episode revalidates the exact connected Agent inside one callback-scoped persistent workflow, archives evidence before updating LEARNING_MODEL, refreshes memory, and records each applied or failed mutation honestly."
+  - "Invalid/incomplete episodes, disconnected or changed-Agent contexts, model-switch barriers, reconciliation failures, Archive failures, unsupported state claims, and Block-limit failures never report success or silently advance learning state; if Archive succeeds but the Block update fails, the retained evidence and partial result are explicit."
+  - "Deterministic tests cover all state gates, stage ordering, question bounds/deduplication, serialization/tags, one-entry-per-concept updates, Block-limit rejection, no-write coaching intent, exact-Agent completion, Archive-before-Block ordering, and partial failure. Full tests, typecheck, Web export, narrow/desktop browser QA, protocol validation, and independent verification pass."
+  - "No dependency, public API, auth, secret, environment, migration, production configuration, database operation, Agent lifecycle, model/embedding, external-service, file-upload, automatic fallback, broad-refactor, or deletion change occurs."
+
+validation_commands:
+  - "cd personal-co && node --test tests/learning-workflow.test.mjs"
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "cd personal-co && npm run web (manual desktop and 390px Learning-flow smoke without committing against a non-disposable server)"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+validation_artifact_allowance:
+  - path: "generated:personal-co/dist/**"
+    command: "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+    rule: "The master may regenerate ignored Web output for validation only; never stage, commit, or push it."
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Restore only WP-0030 hunks in existing product/memory files. Do not auto-delete new files; if rejection requires cleanup, request approval and handle each exact new path separately without rewriting Git history."
+
+human_approval_required:
+  required: false
+  reason: "This is a bounded implementation of supplied V1 §§8.1–8.2 under the user's standing authorization to continue development; it adds no dependency, public API, sensitive configuration, destructive action, external mutation, or behavior outside the document."
+  obtained: true
+  evidence: "The user authorized continued development and verification after WP-0027 and asked Codex to build Personal Co according to the supplied design."
+
+assigned_agent: wp0028_verifier_retry
+
+attempts:
+  implement: 1
+  fix: 1
+  verify: 2
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle
+
+version: 1
+updated_at: 2026-09-07

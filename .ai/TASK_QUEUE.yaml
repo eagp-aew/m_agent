@@ -328,6 +328,17 @@ queue:
     acceptance_summary: "Accepted guarded same-Agent model switching with callback-scoped workflow leases, complete fail-closed snapshot pagination, embedding and Block/Archive invariants, verified compensation, retained lock on rollback failure, and responsive Settings controls."
     work_package_path: ".ai/WORK_PACKAGES/WP-0029-transactional-model-switch.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0029-verifier.md"
+  - task_id: WP-0030-guided-learning-episodes
+    title: "Add evidence-gated guided learning episodes"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0028_verifier_retry
+    blocked_by:
+      - WP-0029-transactional-model-switch
+    acceptance_summary: "Accepted the documented six-stage guided-learning flow with no-write coaching, factory-bound immutable episodes, evidence-gated LEARNING_MODEL updates, Archive-before-Block persistence, exact new-record read-back, and honest partial failures."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0030-guided-learning-episodes.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
 
 status_values:
   - DRAFT

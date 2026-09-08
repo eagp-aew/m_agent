@@ -34,6 +34,15 @@ import {
   createImportCandidates,
 } from './src/domain/imports.mjs';
 import {
+  EVIDENCE_KINDS,
+  LEARNING_STAGES,
+  VERIFICATION_MODES,
+  buildLearningCoachRequest,
+  deriveLearningState,
+  executeLearningCoaching,
+  executeLearningEpisodePersistence,
+} from './src/domain/learning.mjs';
+import {
   ALL_MEMORY_LABELS,
   authorizeMemoryUpdate,
   createMemoryBlocks,
@@ -61,9 +70,11 @@ import {
   type PersistentWorkflow,
 } from './src/services/letta';
 
-type Surface = 'Chat' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
+type Surface = 'Chat' | 'Learning' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
 type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
 type ModelSwitchState = 'idle' | 'switching' | 'rollback_locked';
+type LearningCoachPhase = 'diagnosis' | 'explanation' | 'verification';
+type LearningFeedbackTone = 'neutral' | 'good' | 'warn';
 
 type MemoryChangeRecord = {
   id: string;
@@ -83,6 +94,7 @@ type MemoryChangeRecord = {
 
 const NAV_ITEMS: { label: Surface; symbol: string; hint: string }[] = [
   { label: 'Chat', symbol: '✦', hint: 'Think together' },
+  { label: 'Learning', symbol: '◎', hint: 'Evidence-gated practice' },
   { label: 'Core Memory', symbol: '◫', hint: 'Six fixed blocks' },
   { label: 'Memory Changes', symbol: '↺', hint: 'Review every change' },
   { label: 'Archive', symbol: '⌁', hint: 'Evidence first' },
@@ -97,6 +109,10 @@ const STARTER_MESSAGES: ChatMessage[] = [
     content: 'I’m ready when you are. Connect a Letta server in Settings, or explore how memory and evidence are handled first.',
   },
 ];
+
+function splitLearningLines(value: string): string[] {
+  return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
+}
 
 function SurfaceTitle({ eyebrow, title, copy }: { eyebrow: string; title: string; copy: string }) {
   return (
@@ -154,6 +170,23 @@ export default function App() {
   const [importText, setImportText] = useState('');
   const [importSource, setImportSource] = useState('pasted text');
   const [importBusy, setImportBusy] = useState(false);
+  const [learningTopic, setLearningTopic] = useState('');
+  const [learningSource, setLearningSource] = useState('conversation');
+  const [learningGoal, setLearningGoal] = useState('');
+  const [learningDiagnosticQuestions, setLearningDiagnosticQuestions] = useState(
+    'What do you already understand about this topic?\nWhere would you use it?',
+  );
+  const [learningDiagnosticResponse, setLearningDiagnosticResponse] = useState('');
+  const [learningExplanation, setLearningExplanation] = useState('');
+  const [learningVerificationMode, setLearningVerificationMode] = useState('explain');
+  const [learningEvidenceKind, setLearningEvidenceKind] = useState('read_only');
+  const [learningEvidenceDetail, setLearningEvidenceDetail] = useState('');
+  const [learningMisconceptions, setLearningMisconceptions] = useState('');
+  const [learningRetrievalQuestions, setLearningRetrievalQuestions] = useState('');
+  const [learningBusy, setLearningBusy] = useState(false);
+  const [learningCoachOutput, setLearningCoachOutput] = useState('');
+  const [learningFeedback, setLearningFeedback] = useState('');
+  const [learningFeedbackTone, setLearningFeedbackTone] = useState<LearningFeedbackTone>('neutral');
   const [privacy, setPrivacy] = useState(() => createPrivacySettings());
   const [doNotRememberText, setDoNotRememberText] = useState('');
   const [forgetTerm, setForgetTerm] = useState('');
@@ -166,12 +199,21 @@ export default function App() {
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [modelSwitchState, setModelSwitchState] = useState<ModelSwitchState>('idle');
   const [modelSwitchOutcome, setModelSwitchOutcome] = useState('');
-  const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'rollback_locked'>('idle');
+  const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'learning' | 'rollback_locked'>('idle');
+  const agentBindingRef = useRef<{ client: PersonalCoLettaClient; agentId: string } | null>(null);
 
   const importCandidates = useMemo(
     () => createImportCandidates(importText, importSource),
     [importSource, importText],
   );
+
+  const learningDerivedState = useMemo(() => {
+    try {
+      return deriveLearningState([{ kind: learningEvidenceKind, detail: learningEvidenceDetail }]);
+    } catch {
+      return null;
+    }
+  }, [learningEvidenceDetail, learningEvidenceKind]);
 
   function appendChanges(...nextChanges: MemoryChangeRecord[]) {
     setChanges((current) => [...nextChanges, ...current]);
@@ -179,7 +221,7 @@ export default function App() {
 
   async function connect() {
     if (connectionSwitchGuard.current !== 'idle') {
-      setConnectionError('Connection changes are unavailable while a model switch or rollback lock is active.');
+      setConnectionError('Connection changes are unavailable while a persistent workflow, model switch, or rollback lock is active.');
       return;
     }
     connectionSwitchGuard.current = 'connecting';
@@ -208,6 +250,7 @@ export default function App() {
       setDraftSettings(normalized);
       setActiveSettings(normalized);
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
+      agentBindingRef.current = { client: nextClient, agentId: nextAgent.id };
       setClient(nextClient);
       setAgent(nextAgent);
       if (nextBlocks.length) setBlocks(nextBlocks);
@@ -217,6 +260,7 @@ export default function App() {
       setSurface('Chat');
     } catch (error) {
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
+      if (!client || !agent || !activeSettings) agentBindingRef.current = null;
       setConnection(client && agent && activeSettings ? 'connected' : 'error');
       setConnectionError(error instanceof Error ? error.message : 'Could not connect to Letta.');
     } finally {
@@ -226,7 +270,7 @@ export default function App() {
 
   async function switchGenerationModel() {
     if (connectionSwitchGuard.current !== 'idle') {
-      setModelSwitchOutcome('A connection or model-switch operation is already active.');
+      setModelSwitchOutcome('A connection, learning workflow, or model-switch operation is already active.');
       return;
     }
     if (!client || !agent || connection !== 'connected' || !activeSettings) {
@@ -354,6 +398,186 @@ export default function App() {
       ]);
     } finally {
       setSending(false);
+    }
+  }
+
+  function learningEpisodeDraft(completedAt = new Date().toISOString()) {
+    return {
+      topic: learningTopic,
+      source: learningSource,
+      learningGoal,
+      diagnosticQuestions: splitLearningLines(learningDiagnosticQuestions),
+      diagnosticResponse: learningDiagnosticResponse,
+      explanation: learningExplanation,
+      verificationMode: learningVerificationMode,
+      evidenceKind: learningEvidenceKind,
+      evidenceDetail: learningEvidenceDetail,
+      misconceptions: splitLearningLines(learningMisconceptions),
+      retrievalQuestions: splitLearningLines(learningRetrievalQuestions),
+      completedAt,
+      provenance: 'user_learning_session',
+    };
+  }
+
+  function currentLearningAgentId(expectedClient: PersonalCoLettaClient): string {
+    const binding = agentBindingRef.current;
+    return binding?.client === expectedClient ? binding.agentId : '__changed_agent__';
+  }
+
+  async function requestLearningCoaching(phase: LearningCoachPhase) {
+    if (learningBusy) return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setLearningFeedbackTone('warn');
+      setLearningFeedback('Learning coaching is unavailable while another persistent workflow or model switch is active.');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected') {
+      setConnectionError('Connect the exact Personal Co Agent before requesting learning coaching.');
+      setSurface('Settings');
+      return;
+    }
+
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    connectionSwitchGuard.current = 'learning';
+    setLearningBusy(true);
+    setLearningCoachOutput('');
+    setLearningFeedback('');
+    try {
+      const prompt = buildLearningCoachRequest({
+        phase,
+        topic: learningTopic,
+        learningGoal,
+        diagnosticQuestions: splitLearningLines(learningDiagnosticQuestions),
+        diagnosticResponse: learningDiagnosticResponse,
+        explanation: learningExplanation,
+        verificationMode: learningVerificationMode,
+      });
+      await expectedClient.runPersistentWorkflow(`learning ${phase} coaching`, async (workflow) => {
+        const result = await executeLearningCoaching({
+          workflow,
+          expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          prompt,
+          language: privacy.language,
+        });
+        setBlocks(result.memory.blocks);
+        setArchive(result.memory.archive);
+        const reconciliation = result.reconciliation;
+        appendChanges(createMemoryChange({
+          block: 'SESSION',
+          operation: 'learning_coaching_reconcile',
+          source: `learning_${phase}`,
+          epistemicState: 'confirmed',
+          before: reconciliation
+            ? `${reconciliation.restoredBlocks.length} block and ${reconciliation.deletedArchiveIds.length} archive write(s) detected`
+            : 'Memory state captured before coaching',
+          after: result.outcome === 'reconciliation_failed'
+            ? 'Memory reconciliation incomplete; coaching discarded'
+            : 'Pre-coaching memory state restored and verified',
+          status: result.outcome === 'reconciliation_failed' ? 'failed' : 'applied',
+          error: result.outcome === 'reconciliation_failed' ? result.error : null,
+          agentId: expectedAgentId,
+        }) as MemoryChangeRecord);
+        if (result.outcome === 'coached') {
+          setLearningCoachOutput(
+            result.replies.length
+              ? result.replies.map((reply: ChatMessage) => reply.content).join('\n\n')
+              : 'The coaching run completed without an assistant message.',
+          );
+          setLearningFeedbackTone('neutral');
+          setLearningFeedback('Assistant coaching is shown separately below. Copy only evidence you personally verified into the form.');
+        } else {
+          setLearningFeedbackTone('warn');
+          setLearningFeedback(`Learning coaching was not accepted: ${result.error}`);
+        }
+      });
+    } catch (error) {
+      setLearningFeedbackTone('warn');
+      setLearningFeedback(`Learning coaching did not run: ${error instanceof Error ? error.message : 'unknown error'}`);
+    } finally {
+      if (connectionSwitchGuard.current === 'learning') connectionSwitchGuard.current = 'idle';
+      setLearningBusy(false);
+    }
+  }
+
+  async function completeLearningEpisode() {
+    if (learningBusy) return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setLearningFeedbackTone('warn');
+      setLearningFeedback('The episode cannot be saved while another persistent workflow or model switch is active.');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected') {
+      setConnectionError('Connect the exact Personal Co Agent before saving a learning episode.');
+      setSurface('Settings');
+      return;
+    }
+
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    const completedAt = new Date().toISOString();
+    connectionSwitchGuard.current = 'learning';
+    setLearningBusy(true);
+    setLearningFeedback('');
+    setLearningFeedbackTone('neutral');
+    try {
+      await expectedClient.runPersistentWorkflow('learning episode completion', async (workflow) => {
+        const result = await executeLearningEpisodePersistence({
+          workflow,
+          expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          episodeInput: learningEpisodeDraft(completedAt),
+          metadataForUpdate: ({ block }: { block: AgentBlock }) => buildPersonalCoMetadata(block.metadata, {
+            source: 'learning_episode',
+            epistemicState: 'observed',
+            operation: 'learning_model_upsert',
+            timestamp: completedAt,
+          }),
+        });
+
+        if (result.outcome !== 'unverified') {
+          setBlocks(result.memory.blocks);
+          setArchive(result.memory.archive);
+        }
+        const auditRecords = result.mutations.map((mutation) => {
+          const target = mutation.target === 'ARCHIVE' ? 'ARCHIVE' : 'LEARNING_MODEL';
+          const status = mutation.status === 'failed' ? 'failed' : 'applied';
+          return createMemoryChange({
+            block: target,
+            operation: target === 'ARCHIVE' ? 'learning_episode_archive' : 'learning_model_upsert',
+            source: result.episode.source,
+            epistemicState: 'observed',
+            before: target === 'ARCHIVE' ? '' : result.learningBlock.value,
+            after: target === 'ARCHIVE' ? result.archiveRecord.text : result.modelUpdate.nextValue,
+            status,
+            error: mutation.error,
+            agentId: expectedAgentId,
+            timestamp: completedAt,
+          }) as MemoryChangeRecord;
+        });
+        if (auditRecords.length) appendChanges(...auditRecords);
+
+        if (result.outcome === 'complete') {
+          setLearningFeedbackTone('good');
+          setLearningFeedback(`Learning episode archived and LEARNING_MODEL verified at “${result.episode.state}” for ${result.episode.topic}.`);
+        } else if (result.outcome === 'archive_only') {
+          setLearningFeedbackTone('warn');
+          setLearningFeedback(`Partial persistence: evidence was archived, but LEARNING_MODEL was not updated. ${result.error}`);
+        } else if (result.outcome === 'unverified') {
+          setLearningFeedbackTone('warn');
+          setLearningFeedback(`Persistence is unverified and is not reported as complete. ${result.error}`);
+        } else {
+          setLearningFeedbackTone('warn');
+          setLearningFeedback(`No learning state was advanced because Archive failed. ${result.error}`);
+        }
+      });
+    } catch (error) {
+      setLearningFeedbackTone('warn');
+      setLearningFeedback(`Learning episode was not saved: ${error instanceof Error ? error.message : 'unknown error'}`);
+    } finally {
+      if (connectionSwitchGuard.current === 'learning') connectionSwitchGuard.current = 'idle';
+      setLearningBusy(false);
     }
   }
 
@@ -489,6 +713,10 @@ export default function App() {
   }
 
   async function applyDirectBlockChange(block: AgentBlock, value: string, operation: string) {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Persistent memory actions are paused while another guarded workflow is active.');
+      return;
+    }
     if (!client || !agent || !hasConnectedMemoryContext(connection, agent.id)) {
       setConnectionError('Connect your Letta server before changing persistent memory.');
       setSurface('Settings');
@@ -524,6 +752,10 @@ export default function App() {
 
   async function applyPendingChange(change: MemoryChangeRecord) {
     if (change.status !== 'pending') return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Persistent memory actions are paused while another guarded workflow is active.');
+      return;
+    }
     if (!client || !agent || !authorizePendingMemoryChange(change, connection, agent.id)) {
       setChanges((current) => current.map((item) => item.id === change.id && item.status === 'pending'
         ? transitionMemoryChange(item, 'cancelled', 'Cancelled because this proposal no longer matches the connected agent.') as MemoryChangeRecord
@@ -625,6 +857,10 @@ export default function App() {
   }
 
   async function executeForget() {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Forget is paused while another guarded workflow is active.');
+      return;
+    }
     if (!client || !agent) {
       setConnectionError('Connect your Letta server before forgetting persistent memory.');
       setSurface('Settings');
@@ -734,6 +970,10 @@ export default function App() {
   }
 
   async function deleteArchiveItem(item: ArchiveItem, confirmation: string) {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Archive deletion is paused while another guarded workflow is active.');
+      return;
+    }
     if (!authorizeArchiveDelete(item.id, confirmation)) {
       setGovernanceNotice(`Enter the exact confirmation phrase: DELETE ${item.id}`);
       return;
@@ -771,6 +1011,10 @@ export default function App() {
   }
 
   async function archiveImports() {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Archive import is paused while another guarded workflow is active.');
+      return;
+    }
     if (!client || !agent) {
       setConnectionError('Connect in Settings before committing archive candidates.');
       setSurface('Settings');
@@ -872,6 +1116,10 @@ export default function App() {
   }
 
   async function applySnapshotRestore() {
+    if (connectionSwitchGuard.current !== 'idle') {
+      setGovernanceNotice('Snapshot restore is paused while another guarded workflow is active.');
+      return;
+    }
     if (!client || !agent || !restorePreview) return;
     if (!authorizeSnapshotRestore(restorePreview, restoreConfirmation, agent.id)) {
       setRestorePreview(null);
@@ -975,7 +1223,9 @@ export default function App() {
     }
   }
 
-  const statusLabel = modelSwitchState === 'switching'
+  const statusLabel = learningBusy
+    ? 'Learning workflow'
+    : modelSwitchState === 'switching'
     ? 'Switching model'
     : modelSwitchState === 'rollback_locked'
       ? 'Writes locked'
@@ -986,7 +1236,9 @@ export default function App() {
           : connection === 'error'
             ? 'Needs attention'
             : 'Local setup';
-  const persistentWritesPaused = modelSwitchState !== 'idle' || connectionSwitchGuard.current !== 'idle';
+  const persistentWritesPaused = learningBusy
+    || modelSwitchState !== 'idle'
+    || connectionSwitchGuard.current !== 'idle';
   const memoryControlsDisabled = persistentWritesPaused
     || !client
     || !agent
@@ -1010,7 +1262,7 @@ export default function App() {
             ))}
           </View>
           <View style={styles.sidebarFooter}>
-            <View style={[styles.statusDot, connection === 'connected' && modelSwitchState === 'idle' && styles.statusDotGood, (connection === 'error' || modelSwitchState === 'rollback_locked') && styles.statusDotError]} />
+            <View style={[styles.statusDot, connection === 'connected' && modelSwitchState === 'idle' && !learningBusy && styles.statusDotGood, (connection === 'error' || modelSwitchState === 'rollback_locked') && styles.statusDotError]} />
             <View><Text style={styles.statusLabel}>{statusLabel}</Text><Text style={styles.statusMeta}>personal-co-v1</Text></View>
           </View>
         </View>
@@ -1020,7 +1272,7 @@ export default function App() {
         {compact && (
           <View style={styles.mobileHeader}>
             <View><Text style={styles.mobileBrand}>Personal Co</Text><Text style={styles.mobileSurface}>{surface}</Text></View>
-            <Pill tone={connection === 'connected' && modelSwitchState === 'idle' ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
+            <Pill tone={connection === 'connected' && modelSwitchState === 'idle' && !learningBusy ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
           </View>
         )}
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -1046,6 +1298,105 @@ export default function App() {
                 </View>
               </View>
               <View style={styles.policyStrip}><Text style={styles.policyStripTitle}>Archive-first by design</Text><Text style={styles.policyStripCopy}>Uncertain ideas stay outside stable memory until evidence or your confirmation supports them.</Text></View>
+            </View>
+          )}
+
+          {surface === 'Learning' && (
+            <View style={styles.surface}>
+              <SurfaceTitle
+                eyebrow="GUIDED LEARNING"
+                title="Learn with evidence, not exposure."
+                copy="Personal Co diagnoses first, explains structure before detail, asks you to demonstrate understanding, then archives the episode before updating one concept in LEARNING_MODEL."
+              />
+              <View style={styles.learningStages}>
+                {LEARNING_STAGES.map((stage: string, index: number) => (
+                  <View key={stage} style={styles.learningStage}>
+                    <Text style={styles.learningStageNumber}>{index + 1}</Text>
+                    <Text style={styles.learningStageLabel}>{stage.replaceAll('_', ' ')}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.learningGrid}>
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>1 · Input and goal</Text>
+                  <Text style={styles.fieldHelp}>Name one concept and what you want to be able to do with it.</Text>
+                  <Text style={styles.fieldLabel}>Topic</Text>
+                  <TextInput editable={!learningBusy} value={learningTopic} onChangeText={setLearningTopic} placeholder="Bayesian updating" placeholderTextColor="#9693a3" style={[styles.fieldInput, learningBusy && styles.buttonDisabled]} />
+                  <Text style={styles.fieldLabel}>Source</Text>
+                  <TextInput editable={!learningBusy} value={learningSource} onChangeText={setLearningSource} placeholder="Book, course, conversation…" placeholderTextColor="#9693a3" style={[styles.fieldInput, learningBusy && styles.buttonDisabled]} />
+                  <Text style={styles.fieldLabel}>Learning goal</Text>
+                  <TextInput editable={!learningBusy} value={learningGoal} onChangeText={setLearningGoal} placeholder="What should you be able to explain or apply?" placeholderTextColor="#9693a3" style={[styles.fieldInput, learningBusy && styles.buttonDisabled]} />
+                </View>
+
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>2 · Diagnose before explaining</Text>
+                  <Text style={styles.fieldHelp}>One question per line. Personal Co permits one to three unique diagnosis questions.</Text>
+                  <TextInput editable={!learningBusy} value={learningDiagnosticQuestions} onChangeText={setLearningDiagnosticQuestions} multiline placeholder="What do you already understand?" placeholderTextColor="#9693a3" style={[styles.compactTextArea, learningBusy && styles.buttonDisabled]} />
+                  <Pressable disabled={learningBusy || memoryControlsDisabled} onPress={() => void requestLearningCoaching('diagnosis')} style={[styles.secondaryOutlineButton, (learningBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>Ask diagnostic coach</Text></Pressable>
+                  <Text style={styles.fieldLabel}>Your diagnostic response</Text>
+                  <TextInput editable={!learningBusy} value={learningDiagnosticResponse} onChangeText={setLearningDiagnosticResponse} multiline placeholder="Answer in your own words before requesting an explanation." placeholderTextColor="#9693a3" style={[styles.learningTextArea, learningBusy && styles.buttonDisabled]} />
+                </View>
+
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>3 · Structure, then detail</Text>
+                  <Text style={styles.fieldHelp}>Record the explanation you actually used. Assistant coaching remains separate below.</Text>
+                  <Pressable disabled={learningBusy || memoryControlsDisabled} onPress={() => void requestLearningCoaching('explanation')} style={[styles.secondaryOutlineButton, (learningBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>Request structured explanation</Text></Pressable>
+                  <TextInput editable={!learningBusy} value={learningExplanation} onChangeText={setLearningExplanation} multiline placeholder="First the map; then only the detail needed for your goal." placeholderTextColor="#9693a3" style={[styles.learningTextArea, learningBusy && styles.buttonDisabled]} />
+                </View>
+
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>4 · Verify understanding</Text>
+                  <Text style={styles.fieldLabel}>Verification method</Text>
+                  <View style={styles.presetRow}>
+                    {VERIFICATION_MODES.map((mode: string) => (
+                      <Pressable key={mode} disabled={learningBusy} onPress={() => setLearningVerificationMode(mode)} style={[styles.presetButton, learningVerificationMode === mode && styles.presetButtonActive, learningBusy && styles.buttonDisabled]}><Text style={styles.presetButtonText}>{mode}</Text></Pressable>
+                    ))}
+                  </View>
+                  <Pressable disabled={learningBusy || memoryControlsDisabled} onPress={() => void requestLearningCoaching('verification')} style={[styles.secondaryOutlineButton, (learningBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>Prepare verification prompt</Text></Pressable>
+                  <Text style={styles.fieldLabel}>Evidence kind</Text>
+                  <View style={styles.presetRow}>
+                    {EVIDENCE_KINDS.map((kind: string) => (
+                      <Pressable key={kind} disabled={learningBusy} onPress={() => setLearningEvidenceKind(kind)} style={[styles.presetButton, learningEvidenceKind === kind && styles.presetButtonActive, learningBusy && styles.buttonDisabled]}><Text style={styles.presetButtonText}>{kind.replaceAll('_', ' ')}</Text></Pressable>
+                    ))}
+                  </View>
+                  <Text style={styles.fieldLabel}>Observed evidence detail</Text>
+                  <TextInput editable={!learningBusy} value={learningEvidenceDetail} onChangeText={setLearningEvidenceDetail} multiline placeholder="What did you explain, compare, apply, transfer, or fail to retrieve?" placeholderTextColor="#9693a3" style={[styles.learningTextArea, learningBusy && styles.buttonDisabled]} />
+                  <View style={styles.statePreview}>
+                    <Text style={styles.statePreviewLabel}>Derived state</Text>
+                    <Text style={styles.statePreviewValue}>{learningDerivedState ?? 'Needs valid evidence'}</Text>
+                    <Text style={styles.fieldHelp}>Reading stops at exposed; practice at developing; only application or transfer reaches usable. Contradiction, failed retrieval, or time decay requires review.</Text>
+                  </View>
+                </View>
+
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>5 · Evidence for memory</Text>
+                  <Text style={styles.fieldLabel}>Misconceptions corrected <Text style={styles.optional}>(one per line)</Text></Text>
+                  <TextInput editable={!learningBusy} value={learningMisconceptions} onChangeText={setLearningMisconceptions} multiline placeholder="What was initially wrong or incomplete?" placeholderTextColor="#9693a3" style={[styles.learningTextArea, learningBusy && styles.buttonDisabled]} />
+                  <Text style={styles.fieldHelp}>The completed record is stored as quoted learning_episode evidence. User fields are never treated as executable instructions.</Text>
+                </View>
+
+                <View style={[styles.card, styles.learningCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>6 · Retrieval plan</Text>
+                  <Text style={styles.fieldHelp}>At most three unique, high-value review questions; one per line.</Text>
+                  <TextInput editable={!learningBusy} value={learningRetrievalQuestions} onChangeText={setLearningRetrievalQuestions} multiline placeholder={'What would falsify this idea?\nWhen should I use it?'} placeholderTextColor="#9693a3" style={[styles.learningTextArea, learningBusy && styles.buttonDisabled]} />
+                  <Pressable disabled={learningBusy || memoryControlsDisabled} onPress={() => void completeLearningEpisode()} style={[styles.primaryButton, styles.learningCompleteButton, (learningBusy || memoryControlsDisabled) && styles.buttonDisabled]}>
+                    {learningBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Archive evidence & update learning model</Text>}
+                  </Pressable>
+                  <Text style={styles.fieldHelp}>All fields and the exact server Block limit are checked before Archive. Archive is written before LEARNING_MODEL; partial persistence is reported explicitly.</Text>
+                </View>
+              </View>
+
+              <View style={styles.learningCoachPanel}>
+                <View style={styles.cardHeader}><Text style={styles.sectionTitle}>Assistant coaching</Text><Pill>not evidence</Pill></View>
+                <Text style={styles.fieldHelp}>Coaching requests no memory writes and is shown only after memory reconciliation succeeds. It never auto-fills verification evidence.</Text>
+                <Text style={styles.learningCoachText}>{learningCoachOutput || 'Request diagnosis, explanation, or verification coaching when connected.'}</Text>
+              </View>
+              {learningFeedback ? (
+                <View style={learningFeedbackTone === 'warn' ? styles.errorBox : styles.noticeBox}>
+                  <Text style={learningFeedbackTone === 'warn' ? styles.errorText : styles.noticeText}>{learningFeedback}</Text>
+                </View>
+              ) : null}
             </View>
           )}
 
@@ -1227,14 +1578,14 @@ export default function App() {
               </View>
               {connectionError ? <View style={styles.errorBox}><Text style={styles.errorText}>{connectionError}</Text></View> : null}
               {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
-              <View style={styles.connectRow}><Pressable onPress={() => void connect()} disabled={connection === 'connecting' || modelSwitchState !== 'idle'} style={[styles.primaryButton, styles.connectButton, (connection === 'connecting' || modelSwitchState !== 'idle') && styles.buttonDisabled]}>{connection === 'connecting' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{connection === 'connected' ? 'Apply draft & reconnect' : 'Connect & initialize'}</Text>}</Pressable><Text style={[styles.connectHint, compact && styles.compactConnectHint]}>Finds or creates the one agent tagged personal-co-v1. Existing Agents are never reconfigured by reconnect.</Text></View>
+              <View style={styles.connectRow}><Pressable onPress={() => void connect()} disabled={connection === 'connecting' || persistentWritesPaused} style={[styles.primaryButton, styles.connectButton, (connection === 'connecting' || persistentWritesPaused) && styles.buttonDisabled]}>{connection === 'connecting' ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>{connection === 'connected' ? 'Apply draft & reconnect' : 'Connect & initialize'}</Text>}</Pressable><Text style={[styles.connectHint, compact && styles.compactConnectHint]}>Finds or creates the one agent tagged personal-co-v1. Existing Agents are never reconfigured by reconnect.</Text></View>
             </View>
           )}
         </ScrollView>
 
         {compact && (
           <View style={styles.bottomNav}>
-            {NAV_ITEMS.map((item) => <Pressable key={item.label} onPress={() => setSurface(item.label)} style={styles.bottomNavItem}><Text style={[styles.bottomNavSymbol, surface === item.label && styles.bottomNavActive]}>{item.symbol}</Text><Text numberOfLines={1} style={[styles.bottomNavLabel, surface === item.label && styles.bottomNavActive]}>{item.label === 'Core Memory' ? 'Memory' : item.label}</Text></Pressable>)}
+            {NAV_ITEMS.map((item) => <Pressable key={item.label} onPress={() => setSurface(item.label)} style={styles.bottomNavItem}><Text style={[styles.bottomNavSymbol, surface === item.label && styles.bottomNavActive]}>{item.symbol}</Text><Text numberOfLines={1} style={[styles.bottomNavLabel, surface === item.label && styles.bottomNavActive]}>{item.label === 'Core Memory' ? 'Memory' : item.label === 'Memory Changes' ? 'Changes' : item.label}</Text></Pressable>)}
           </View>
         )}
       </View>
@@ -1297,6 +1648,20 @@ const styles = StyleSheet.create({
   policyStrip: { marginTop: 16, backgroundColor: '#ece8df', borderRadius: 14, paddingHorizontal: 17, paddingVertical: 13, flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
   policyStripTitle: { color: ink, fontSize: 12, fontWeight: '800' },
   policyStripCopy: { color: muted, fontSize: 12 },
+  learningStages: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 },
+  learningStage: { flexGrow: 1, flexBasis: 120, minWidth: 105, flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#ece8ff', borderWidth: 1, borderColor: '#d8d0ff', borderRadius: 11, paddingHorizontal: 11, paddingVertical: 9 },
+  learningStageNumber: { width: 21, height: 21, borderRadius: 11, backgroundColor: violet, color: '#fff', fontSize: 10, fontWeight: '900', textAlign: 'center', lineHeight: 21 },
+  learningStageLabel: { color: '#514489', fontSize: 10, fontWeight: '900', textTransform: 'uppercase', flexShrink: 1 },
+  learningGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  learningCard: { gap: 8, alignSelf: 'flex-start' },
+  compactLearningCard: { width: '100%', minWidth: 0, flexBasis: 'auto', flexGrow: 0, padding: 16 },
+  learningTextArea: { minHeight: 110, borderRadius: 10, borderWidth: 1, borderColor: '#dcd6cf', backgroundColor: '#faf9f7', padding: 13, color: ink, fontSize: 13, lineHeight: 19, textAlignVertical: 'top' },
+  statePreview: { marginTop: 8, padding: 12, borderRadius: 10, backgroundColor: '#f0edff', borderWidth: 1, borderColor: '#d8d0ff', gap: 4 },
+  statePreviewLabel: { color: '#777185', fontSize: 9, fontWeight: '900', textTransform: 'uppercase', letterSpacing: 0.5 },
+  statePreviewValue: { color: '#514489', fontSize: 18, fontWeight: '900' },
+  learningCompleteButton: { marginTop: 8 },
+  learningCoachPanel: { marginTop: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
+  learningCoachText: { color: ink, fontSize: 13, lineHeight: 20, marginTop: 12, padding: 13, backgroundColor: '#faf8f5', borderRadius: 10, borderWidth: 1, borderColor: '#e4dfd9' },
   memoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   card: { flexGrow: 1, flexBasis: 430, minWidth: 280, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
   policyCard: { backgroundColor: '#f0ede7' },

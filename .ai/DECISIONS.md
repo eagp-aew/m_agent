@@ -454,6 +454,26 @@
   - Current application workflows must await every operation started through the scoped workflow facade.
   - A live Letta deployment and server/operator-level write pause are still required to validate cross-client and database-level safety.
 
+## DEC-0028: Make guided learning evidence-gated and Archive-first
+
+- Date: 2026-09-07
+- Status: accepted
+- Context:
+  - Design §§8.1–8.2 require diagnosis before explanation, observable verification, structured learning evidence, and review prompts rather than treating exposure as mastery.
+  - Assistant coaching must not silently mutate persistent memory or become its own proof of understanding.
+  - A successful completion claim must not be satisfied by mutable client objects or a stale same-text Archive passage.
+- Decision:
+  - Represent guided learning as the exact six stages input, diagnosis, explanation, verification, memory, and review, with one to three diagnosis questions and at most three retrieval questions.
+  - Map read-only, practice, application/transfer, and review-triggering evidence to exposed, developing, usable, and needs_review respectively; reject blank, unknown, or unsupported promotion.
+  - Treat completed episodes as recursively immutable factory objects and reject cloned or coherently mutated evidence/state objects at serializer and LEARNING_MODEL boundaries.
+  - Run assistant coaching with no-write intent and reconciliation; keep coaching text visibly separate from user-supplied verification evidence.
+  - Persist a quoted `learning_episode` to Archive before updating the one managed LEARNING_MODEL entry for the normalized concept.
+  - Report completion only after fresh read-back proves a new Archive ID with exact text, tag set, and timestamp, the exact Block ID/value, and the unchanged Agent binding.
+- Consequences:
+  - Exposure can no longer be promoted to usable through synchronized client-object mutation.
+  - Stale or malformed Archive records cannot produce a false completion result.
+  - Live Letta round-trip behavior and design §§8.3–8.5 remain separate validation and implementation work.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -485,3 +505,4 @@
 | DEC-0025 | 2026-09-05 | accepted | Bind persistent-memory actions to one connected agent context |
 | DEC-0026 | 2026-09-07 | accepted | Require exact registered model handles before Agent operations |
 | DEC-0027 | 2026-09-07 | accepted | Make model switching an application transaction |
+| DEC-0028 | 2026-09-07 | accepted | Make guided learning evidence-gated and Archive-first |
