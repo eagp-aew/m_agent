@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-07
+updated_at: 2026-09-08
 
 queue:
   - task_id: WP-0000-bootstrap
@@ -339,6 +339,17 @@ queue:
     acceptance_summary: "Accepted the documented six-stage guided-learning flow with no-write coaching, factory-bound immutable episodes, evidence-gated LEARNING_MODEL updates, Archive-before-Block persistence, exact new-record read-back, and honest partial failures."
     work_package_path: ".ai/WORK_PACKAGES/WP-0030-guided-learning-episodes.yaml"
     verifier_report_path: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  - task_id: WP-0031-reflection-weekly-review
+    title: "Add transparent reflection and weekly review"
+    status: ACCEPTED
+    priority: P0
+    scope_type: implementation
+    assigned_agent: wp0031_verifier_post_security
+    blocked_by:
+      - WP-0030-guided-learning-episodes
+    acceptance_summary: "Accepted transparent cross-domain reflection, falsifiable growth hypotheses, exact five-section user-triggered weekly reviews, Archive-first same-Agent persistence, and confirmation-only core proposals; the authorized fourth repair closed `(N)` heading parsing and independent verification passed all 11 criteria."
+    work_package_path: ".ai/WORK_PACKAGES/WP-0031-reflection-weekly-review.yaml"
+    verifier_report_path: ".ai/AGENT_REPORTS/WP-0031-verifier-final.md"
 
 status_values:
   - DRAFT

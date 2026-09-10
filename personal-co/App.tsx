@@ -24,6 +24,7 @@ import {
   cancelPendingChangesForConnectionChange,
   createForgetPreview,
   createMemoryChange,
+  executePendingMemoryChange,
   hasConnectedMemoryContext,
   removeExactTerm,
   stageBlockChange,
@@ -42,6 +43,13 @@ import {
   executeLearningCoaching,
   executeLearningEpisodePersistence,
 } from './src/domain/learning.mjs';
+import {
+  CONNECTION_TYPES,
+  WEEKLY_REVIEW_SECTIONS,
+  buildWeeklyReviewCoachRequest,
+  executeWeeklyReviewCoaching,
+  executeWeeklyReviewPersistence,
+} from './src/domain/reflection.mjs';
 import {
   ALL_MEMORY_LABELS,
   authorizeMemoryUpdate,
@@ -70,11 +78,20 @@ import {
   type PersistentWorkflow,
 } from './src/services/letta';
 
-type Surface = 'Chat' | 'Learning' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
+type Surface = 'Chat' | 'Learning' | 'Reflection' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
 type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
 type ModelSwitchState = 'idle' | 'switching' | 'rollback_locked';
 type LearningCoachPhase = 'diagnosis' | 'explanation' | 'verification';
 type LearningFeedbackTone = 'neutral' | 'good' | 'warn';
+type ReflectionConnectionDraft = {
+  id: string;
+  from: string;
+  to: string;
+  relationship: string;
+  sharedMechanism: string;
+  importantDifference: string;
+  futureLearningValue: string;
+};
 
 type MemoryChangeRecord = {
   id: string;
@@ -90,11 +107,14 @@ type MemoryChangeRecord = {
   status: 'pending' | 'applied' | 'cancelled' | 'failed';
   error: string | null;
   agentId: string | null;
+  baseBlockId: string | null;
+  baseBlockValue: string | null;
 };
 
 const NAV_ITEMS: { label: Surface; symbol: string; hint: string }[] = [
   { label: 'Chat', symbol: '✦', hint: 'Think together' },
   { label: 'Learning', symbol: '◎', hint: 'Evidence-gated practice' },
+  { label: 'Reflection', symbol: '◇', hint: 'Weekly review' },
   { label: 'Core Memory', symbol: '◫', hint: 'Six fixed blocks' },
   { label: 'Memory Changes', symbol: '↺', hint: 'Review every change' },
   { label: 'Archive', symbol: '⌁', hint: 'Evidence first' },
@@ -109,6 +129,18 @@ const STARTER_MESSAGES: ChatMessage[] = [
     content: 'I’m ready when you are. Connect a Letta server in Settings, or explore how memory and evidence are handled first.',
   },
 ];
+
+function emptyReflectionConnection(id: string): ReflectionConnectionDraft {
+  return {
+    id,
+    from: '',
+    to: '',
+    relationship: 'transfer',
+    sharedMechanism: '',
+    importantDifference: '',
+    futureLearningValue: '',
+  };
+}
 
 function splitLearningLines(value: string): string[] {
   return value.split(/\r?\n/).map((item) => item.trim()).filter(Boolean);
@@ -187,6 +219,26 @@ export default function App() {
   const [learningCoachOutput, setLearningCoachOutput] = useState('');
   const [learningFeedback, setLearningFeedback] = useState('');
   const [learningFeedbackTone, setLearningFeedbackTone] = useState<LearningFeedbackTone>('neutral');
+  const [reflectionProgress, setReflectionProgress] = useState('');
+  const [reflectionLearningChanges, setReflectionLearningChanges] = useState('');
+  const [reflectionUnfinished, setReflectionUnfinished] = useState('');
+  const [reflectionPatterns, setReflectionPatterns] = useState('');
+  const [reflectionFocus, setReflectionFocus] = useState('');
+  const [reflectionConnections, setReflectionConnections] = useState<ReflectionConnectionDraft[]>([
+    emptyReflectionConnection('connection-1'),
+  ]);
+  const [hypothesisStatement, setHypothesisStatement] = useState('');
+  const [hypothesisConfidence, setHypothesisConfidence] = useState('0.5');
+  const [hypothesisEvidence, setHypothesisEvidence] = useState('');
+  const [hypothesisEvidenceSource, setHypothesisEvidenceSource] = useState('weekly reflection');
+  const [hypothesisAlternative, setHypothesisAlternative] = useState('');
+  const [hypothesisFalsifier, setHypothesisFalsifier] = useState('');
+  const [hypothesisConfirmed, setHypothesisConfirmed] = useState(false);
+  const [reflectionProposalValues, setReflectionProposalValues] = useState<Record<string, string>>({});
+  const [reflectionBusy, setReflectionBusy] = useState(false);
+  const [reflectionCoachOutput, setReflectionCoachOutput] = useState('');
+  const [reflectionFeedback, setReflectionFeedback] = useState('');
+  const [reflectionFeedbackTone, setReflectionFeedbackTone] = useState<LearningFeedbackTone>('neutral');
   const [privacy, setPrivacy] = useState(() => createPrivacySettings());
   const [doNotRememberText, setDoNotRememberText] = useState('');
   const [forgetTerm, setForgetTerm] = useState('');
@@ -199,7 +251,7 @@ export default function App() {
   const [snapshotBusy, setSnapshotBusy] = useState(false);
   const [modelSwitchState, setModelSwitchState] = useState<ModelSwitchState>('idle');
   const [modelSwitchOutcome, setModelSwitchOutcome] = useState('');
-  const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'learning' | 'rollback_locked'>('idle');
+  const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'learning' | 'reflection' | 'memory_change' | 'rollback_locked'>('idle');
   const agentBindingRef = useRef<{ client: PersonalCoLettaClient; agentId: string } | null>(null);
 
   const importCandidates = useMemo(
@@ -581,6 +633,195 @@ export default function App() {
     }
   }
 
+  function reflectionReviewDraft(completedAt = new Date().toISOString()) {
+    const hypothesisFields = [
+      hypothesisStatement,
+      hypothesisEvidence,
+      hypothesisAlternative,
+      hypothesisFalsifier,
+    ];
+    return {
+      progress: splitLearningLines(reflectionProgress),
+      learningStateChanges: splitLearningLines(reflectionLearningChanges),
+      unfinishedThreads: splitLearningLines(reflectionUnfinished),
+      possiblePatterns: splitLearningLines(reflectionPatterns),
+      nextWeekFocus: reflectionFocus,
+      connections: reflectionConnections
+        .filter((item) => [item.from, item.to, item.sharedMechanism, item.importantDifference, item.futureLearningValue]
+          .some((value) => value.trim()))
+        .map(({ id: _id, ...item }) => item),
+      hypotheses: hypothesisFields.some((value) => value.trim()) ? [{
+        statement: hypothesisStatement,
+        status: 'hypothesis',
+        confidence: hypothesisConfidence,
+        evidence: [{
+          detail: hypothesisEvidence,
+          source: hypothesisEvidenceSource,
+          observedAt: completedAt.slice(0, 10),
+        }],
+        alternatives: splitLearningLines(hypothesisAlternative),
+        falsifier: hypothesisFalsifier,
+        userConfirmed: hypothesisConfirmed,
+      }] : [],
+      source: 'weekly reflection',
+      provenance: 'user_confirmed_review',
+      completedAt,
+    };
+  }
+
+  function reflectionSuggestedChanges() {
+    return ['PROFILE', 'GOALS_AND_DECISIONS', 'LEARNING_MODEL', 'CURRENT_CONTEXT']
+      .map((block) => ({ block, after: reflectionProposalValues[block] ?? '' }))
+      .filter((item) => item.after.trim());
+  }
+
+  function updateReflectionConnection(id: string, patch: Partial<ReflectionConnectionDraft>) {
+    setReflectionConnections((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
+  }
+
+  function addReflectionConnection() {
+    setReflectionConnections((current) => {
+      if (current.length >= 3) return current;
+      const nextNumber = current.reduce((highest, item) => {
+        const parsed = Number(item.id.replace('connection-', ''));
+        return Number.isFinite(parsed) ? Math.max(highest, parsed) : highest;
+      }, 0) + 1;
+      return [...current, emptyReflectionConnection(`connection-${nextNumber}`)];
+    });
+  }
+
+  function removeReflectionConnection(id: string) {
+    setReflectionConnections((current) => current.filter((item) => item.id !== id));
+  }
+
+  async function requestReflectionCoaching() {
+    if (reflectionBusy) return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setReflectionFeedbackTone('warn');
+      setReflectionFeedback('Weekly-review coaching is unavailable while another guarded workflow is active.');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected') {
+      setConnectionError('Connect the exact Personal Co Agent before requesting weekly-review coaching.');
+      setSurface('Settings');
+      return;
+    }
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    connectionSwitchGuard.current = 'reflection';
+    setReflectionBusy(true);
+    setReflectionCoachOutput('');
+    setReflectionFeedback('');
+    try {
+      const prompt = buildWeeklyReviewCoachRequest(reflectionReviewDraft());
+      await expectedClient.runPersistentWorkflow('weekly review coaching', async (workflow) => {
+        const result = await executeWeeklyReviewCoaching({
+          workflow,
+          expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          prompt,
+          language: privacy.language,
+        });
+        setBlocks(result.memory.blocks);
+        setArchive(result.memory.archive);
+        const reconciliation = result.reconciliation;
+        appendChanges(createMemoryChange({
+          block: 'SESSION',
+          operation: 'weekly_review_coaching_reconcile',
+          source: 'weekly_review',
+          epistemicState: 'confirmed',
+          before: reconciliation
+            ? `${reconciliation.restoredBlocks.length} block and ${reconciliation.deletedArchiveIds.length} archive write(s) detected`
+            : 'Memory state captured before coaching',
+          after: result.outcome === 'reconciliation_failed'
+            ? 'Memory reconciliation incomplete; coaching discarded'
+            : 'Pre-coaching memory state restored and verified',
+          status: result.outcome === 'reconciliation_failed' ? 'failed' : 'applied',
+          error: result.outcome === 'reconciliation_failed' ? result.error : null,
+          agentId: expectedAgentId,
+        }) as MemoryChangeRecord);
+        if (result.outcome === 'coached') {
+          setReflectionCoachOutput(result.replies.map((reply: ChatMessage) => reply.content).join('\n\n'));
+          setReflectionFeedbackTone('neutral');
+          setReflectionFeedback('Assistant coaching is separate from the evidence you review and explicitly archive.');
+        } else {
+          setReflectionFeedbackTone('warn');
+          setReflectionFeedback(`Weekly-review coaching was not accepted: ${result.error}`);
+        }
+      });
+    } catch (error) {
+      setReflectionFeedbackTone('warn');
+      setReflectionFeedback(`Weekly-review coaching did not run: ${error instanceof Error ? error.message : 'unknown error'}`);
+    } finally {
+      if (connectionSwitchGuard.current === 'reflection') connectionSwitchGuard.current = 'idle';
+      setReflectionBusy(false);
+    }
+  }
+
+  async function completeWeeklyReview() {
+    if (reflectionBusy) return;
+    if (connectionSwitchGuard.current !== 'idle') {
+      setReflectionFeedbackTone('warn');
+      setReflectionFeedback('The weekly review cannot be saved while another guarded workflow is active.');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected') {
+      setConnectionError('Connect the exact Personal Co Agent before saving a weekly review.');
+      setSurface('Settings');
+      return;
+    }
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    const completedAt = new Date().toISOString();
+    connectionSwitchGuard.current = 'reflection';
+    setReflectionBusy(true);
+    setReflectionFeedback('');
+    try {
+      await expectedClient.runPersistentWorkflow('weekly review completion', async (workflow) => {
+        const result = await executeWeeklyReviewPersistence({
+          workflow,
+          expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          reviewInput: reflectionReviewDraft(completedAt),
+          suggestedChanges: reflectionSuggestedChanges(),
+        });
+        if (result.outcome !== 'unverified') {
+          setBlocks(result.memory.blocks);
+          setArchive(result.memory.archive);
+        }
+        appendChanges(...result.mutations.map((mutation) => createMemoryChange({
+          block: 'ARCHIVE',
+          operation: 'weekly_review_archive',
+          source: 'weekly_review',
+          epistemicState: 'observed',
+          before: '',
+          after: result.archiveRecord.text,
+          status: mutation.status === 'failed' ? 'failed' : 'applied',
+          error: mutation.error,
+          agentId: expectedAgentId,
+          timestamp: completedAt,
+        }) as MemoryChangeRecord));
+        if (result.outcome === 'complete') {
+          if (result.proposals.length) appendChanges(...result.proposals as MemoryChangeRecord[]);
+          setReflectionFeedbackTone('good');
+          setReflectionFeedback(`Weekly review archived and verified. ${result.proposals.length} exact-base proposal(s) await your decision in Memory Changes.`);
+        } else if (result.outcome === 'unverified') {
+          setReflectionFeedbackTone('warn');
+          setReflectionFeedback(`Archive persistence is unverified; no core proposal was accepted. ${result.error}`);
+        } else {
+          setReflectionFeedbackTone('warn');
+          setReflectionFeedback(`Weekly review was not saved and no proposal was staged. ${result.error}`);
+        }
+      });
+    } catch (error) {
+      setReflectionFeedbackTone('warn');
+      setReflectionFeedback(`Weekly review did not run: ${error instanceof Error ? error.message : 'unknown error'}`);
+    } finally {
+      if (connectionSwitchGuard.current === 'reflection') connectionSwitchGuard.current = 'idle';
+      setReflectionBusy(false);
+    }
+  }
+
   async function recordAgentMemoryWrites(
     before: { blocks: AgentBlock[]; archive: ArchiveItem[] },
     workflow: PersistentWorkflow,
@@ -620,6 +861,7 @@ export default function App() {
             source: 'agent',
             epistemicState: 'inferred',
             agentId: agent.id,
+            baseBlockId: item.before.id,
           }) as MemoryChangeRecord);
         } catch (error) {
           logged.push(createMemoryChange({
@@ -703,6 +945,7 @@ export default function App() {
         source: 'user',
         epistemicState: 'confirmed',
         agentId: agent.id,
+        baseBlockId: block.id,
       }) as MemoryChangeRecord;
       appendChanges(pending);
       setEditingLabel(null);
@@ -756,29 +999,46 @@ export default function App() {
       setGovernanceNotice('Persistent memory actions are paused while another guarded workflow is active.');
       return;
     }
-    if (!client || !agent || !authorizePendingMemoryChange(change, connection, agent.id)) {
+    const currentBlock = blocks.find((item) => item.label === change.block) ?? null;
+    if (!client || !agent || !authorizePendingMemoryChange(change, connection, agent.id, currentBlock)) {
       setChanges((current) => current.map((item) => item.id === change.id && item.status === 'pending'
         ? transitionMemoryChange(item, 'cancelled', 'Cancelled because this proposal no longer matches the connected agent.') as MemoryChangeRecord
         : item));
       setGovernanceNotice('The pending proposal was cancelled because its connection or agent binding is no longer current.');
       return;
     }
-    const block = blocks.find((item) => item.label === change.block);
-    if (!block || !authorizeMemoryUpdate(change.block, true).allowed) return;
+    if (!currentBlock || !authorizeMemoryUpdate(change.block, true).allowed) return;
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    connectionSwitchGuard.current = 'memory_change';
     try {
-      const updated = await client.updateBlock(
-        block,
-        change.after,
-        buildPersonalCoMetadata(block.metadata, change),
-      );
-      setBlocks((current) => current.map((item) => item.label === change.block ? updated : item));
-      setChanges((current) => current.map((item) => item.id === change.id
-        ? transitionMemoryChange(item, 'applied') as MemoryChangeRecord
-        : item));
+      await expectedClient.runPersistentWorkflow('pending memory proposal apply', async (workflow) => {
+        const result = await executePendingMemoryChange({
+          workflow,
+          change,
+          expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          connection,
+          metadataForUpdate: ({ block }: { block: AgentBlock }) => buildPersonalCoMetadata(block.metadata, change),
+        });
+        setBlocks(result.memory.blocks);
+        setArchive(result.memory.archive);
+        const applied = result.outcome === 'applied';
+        setChanges((current) => current.map((item) => item.id === change.id
+          ? transitionMemoryChange(item, result.outcome === 'cancelled' ? 'cancelled' : applied ? 'applied' : 'failed', result.error) as MemoryChangeRecord
+          : item));
+        setGovernanceNotice(result.outcome === 'cancelled'
+          ? 'The proposal was cancelled without a write because its exact Agent or Block base is stale.'
+          : applied
+            ? `${change.block} proposal applied and verified against its exact base.`
+            : `${change.block} proposal failed: ${result.error}`);
+      });
     } catch (error) {
       setChanges((current) => current.map((item) => item.id === change.id
         ? transitionMemoryChange(item, 'failed', error instanceof Error ? error.message : 'Unknown error') as MemoryChangeRecord
         : item));
+    } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
     }
   }
 
@@ -821,6 +1081,7 @@ export default function App() {
         source: 'user',
         epistemicState: 'confirmed',
         agentId: agent.id,
+        baseBlockId: block.id,
       }) as MemoryChangeRecord);
       setSurface('Memory Changes');
     } else {
@@ -1223,7 +1484,9 @@ export default function App() {
     }
   }
 
-  const statusLabel = learningBusy
+  const statusLabel = reflectionBusy
+    ? 'Reflection workflow'
+    : learningBusy
     ? 'Learning workflow'
     : modelSwitchState === 'switching'
     ? 'Switching model'
@@ -1237,6 +1500,7 @@ export default function App() {
             ? 'Needs attention'
             : 'Local setup';
   const persistentWritesPaused = learningBusy
+    || reflectionBusy
     || modelSwitchState !== 'idle'
     || connectionSwitchGuard.current !== 'idle';
   const memoryControlsDisabled = persistentWritesPaused
@@ -1262,7 +1526,7 @@ export default function App() {
             ))}
           </View>
           <View style={styles.sidebarFooter}>
-            <View style={[styles.statusDot, connection === 'connected' && modelSwitchState === 'idle' && !learningBusy && styles.statusDotGood, (connection === 'error' || modelSwitchState === 'rollback_locked') && styles.statusDotError]} />
+            <View style={[styles.statusDot, connection === 'connected' && modelSwitchState === 'idle' && !learningBusy && !reflectionBusy && styles.statusDotGood, (connection === 'error' || modelSwitchState === 'rollback_locked') && styles.statusDotError]} />
             <View><Text style={styles.statusLabel}>{statusLabel}</Text><Text style={styles.statusMeta}>personal-co-v1</Text></View>
           </View>
         </View>
@@ -1272,7 +1536,7 @@ export default function App() {
         {compact && (
           <View style={styles.mobileHeader}>
             <View><Text style={styles.mobileBrand}>Personal Co</Text><Text style={styles.mobileSurface}>{surface}</Text></View>
-            <Pill tone={connection === 'connected' && modelSwitchState === 'idle' && !learningBusy ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
+            <Pill tone={connection === 'connected' && modelSwitchState === 'idle' && !learningBusy && !reflectionBusy ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
           </View>
         )}
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -1400,6 +1664,122 @@ export default function App() {
             </View>
           )}
 
+          {surface === 'Reflection' && (
+            <View style={styles.surface}>
+              <SurfaceTitle
+                eyebrow="WEEKLY REFLECTION"
+                title="Turn evidence into a careful next step."
+                copy="Create a review only when you choose. Connections stay explanatory, hypotheses stay falsifiable, and every core-memory suggestion waits for a separate Apply decision."
+              />
+              <View style={styles.learningStages}>
+                {WEEKLY_REVIEW_SECTIONS.map((section: string, index: number) => (
+                  <View key={section} style={styles.learningStage}>
+                    <Text style={styles.learningStageNumber}>{index + 1}</Text>
+                    <Text style={styles.learningStageLabel}>{section.replaceAll('_', ' ')}</Text>
+                  </View>
+                ))}
+              </View>
+
+              <View style={styles.reflectionGrid}>
+                <View style={[styles.card, styles.reflectionCard, compact && styles.compactLearningCard]}>
+                  <Text style={styles.sectionTitle}>The exact five-section review</Text>
+                  <Text style={styles.fieldHelp}>Use one evidence item per line. The next-week focus is one nonblank focus, not an automatic task.</Text>
+                  <Text style={styles.fieldLabel}>1 · Progress</Text>
+                  <TextInput editable={!reflectionBusy} value={reflectionProgress} onChangeText={setReflectionProgress} multiline placeholder="What moved forward?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>2 · Learning-state changes</Text>
+                  <TextInput editable={!reflectionBusy} value={reflectionLearningChanges} onChangeText={setReflectionLearningChanges} multiline placeholder="What became exposed, developing, usable, or needs review?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>3 · Unfinished threads</Text>
+                  <TextInput editable={!reflectionBusy} value={reflectionUnfinished} onChangeText={setReflectionUnfinished} multiline placeholder="What remains open?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>4 · Possible patterns</Text>
+                  <TextInput editable={!reflectionBusy} value={reflectionPatterns} onChangeText={setReflectionPatterns} multiline placeholder="Possible, not proven, patterns" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>5 · One next-week focus</Text>
+                  <TextInput editable={!reflectionBusy} value={reflectionFocus} onChangeText={setReflectionFocus} placeholder="One concrete focus" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                </View>
+
+                <View style={[styles.card, styles.reflectionCard, compact && styles.compactLearningCard]}>
+                  <View style={styles.cardHeader}><Text style={styles.sectionTitle}>Cross-domain connections</Text><Pill>optional · max 3</Pill></View>
+                  <Text style={styles.fieldHelp}>A connection must explain both a shared mechanism and an important boundary, plus why it helps future learning.</Text>
+                  {reflectionConnections.map((connectionDraft, index) => (
+                    <View key={connectionDraft.id} style={styles.previewBox}>
+                      <View style={styles.cardHeader}>
+                        <Text style={styles.cardLabel}>Connection {index + 1}</Text>
+                        <Pressable disabled={reflectionBusy} onPress={() => removeReflectionConnection(connectionDraft.id)} style={[styles.secondaryButton, reflectionBusy && styles.buttonDisabled]}><Text style={styles.dangerButtonText}>Remove</Text></Pressable>
+                      </View>
+                      <View style={styles.presetRow}>
+                        {CONNECTION_TYPES.map((relationship: string) => (
+                          <Pressable key={relationship} disabled={reflectionBusy} onPress={() => updateReflectionConnection(connectionDraft.id, { relationship })} style={[styles.presetButton, connectionDraft.relationship === relationship && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{relationship}</Text></Pressable>
+                        ))}
+                      </View>
+                      <Text style={styles.fieldLabel}>From concept or domain</Text>
+                      <TextInput editable={!reflectionBusy} value={connectionDraft.from} onChangeText={(from) => updateReflectionConnection(connectionDraft.id, { from })} placeholder="Bayesian updating" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                      <Text style={styles.fieldLabel}>To a distinct concept or domain</Text>
+                      <TextInput editable={!reflectionBusy} value={connectionDraft.to} onChangeText={(to) => updateReflectionConnection(connectionDraft.id, { to })} placeholder="Project risk" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                      <Text style={styles.fieldLabel}>Shared mechanism</Text>
+                      <TextInput editable={!reflectionBusy} value={connectionDraft.sharedMechanism} onChangeText={(sharedMechanism) => updateReflectionConnection(connectionDraft.id, { sharedMechanism })} multiline placeholder="What mechanism genuinely connects them?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                      <Text style={styles.fieldLabel}>Important difference or boundary</Text>
+                      <TextInput editable={!reflectionBusy} value={connectionDraft.importantDifference} onChangeText={(importantDifference) => updateReflectionConnection(connectionDraft.id, { importantDifference })} multiline placeholder="Where does the analogy stop working?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                      <Text style={styles.fieldLabel}>Future-learning value</Text>
+                      <TextInput editable={!reflectionBusy} value={connectionDraft.futureLearningValue} onChangeText={(futureLearningValue) => updateReflectionConnection(connectionDraft.id, { futureLearningValue })} multiline placeholder="How will this connection improve a future learning task?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                    </View>
+                  ))}
+                  <Pressable disabled={reflectionBusy || reflectionConnections.length >= 3} onPress={addReflectionConnection} style={[styles.secondaryOutlineButton, (reflectionBusy || reflectionConnections.length >= 3) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>Add connection ({reflectionConnections.length}/3)</Text></Pressable>
+                </View>
+
+                <View style={[styles.card, styles.reflectionCard, compact && styles.compactLearningCard]}>
+                  <View style={styles.cardHeader}><Text style={styles.sectionTitle}>Growth hypothesis</Text><Pill tone="warn">not a trait</Pill></View>
+                  <Text style={styles.fieldHelp}>Confirmation records your judgment in Archive evidence. It never promotes a personality label automatically.</Text>
+                  <Text style={styles.fieldLabel}>Falsifiable statement</Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisStatement} onChangeText={setHypothesisStatement} multiline placeholder="Written briefs may improve my decision quality." placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>Confidence from 0 to 1</Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisConfidence} onChangeText={setHypothesisConfidence} keyboardType="decimal-pad" placeholder="0.5" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                  <Text style={styles.fieldLabel}>Observed evidence</Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisEvidence} onChangeText={setHypothesisEvidence} multiline placeholder="What happened, without interpretation?" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>Evidence source</Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisEvidenceSource} onChangeText={setHypothesisEvidenceSource} placeholder="Weekly project log" placeholderTextColor="#9693a3" style={styles.fieldInput} />
+                  <Text style={styles.fieldLabel}>Alternative explanation <Text style={styles.optional}>(one per line)</Text></Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisAlternative} onChangeText={setHypothesisAlternative} multiline placeholder="The projects may simply have been smaller." placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>What would falsify it?</Text>
+                  <TextInput editable={!reflectionBusy} value={hypothesisFalsifier} onChangeText={setHypothesisFalsifier} multiline placeholder="A concrete observation that would count against it" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Pressable disabled={reflectionBusy} onPress={() => setHypothesisConfirmed((current) => !current)} style={[styles.presetButton, hypothesisConfirmed && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{hypothesisConfirmed ? 'User confirmed: true' : 'User confirmed: false'}</Text></Pressable>
+                </View>
+
+                <View style={[styles.card, styles.reflectionCard, compact && styles.compactLearningCard]}>
+                  <View style={styles.cardHeader}><Text style={styles.sectionTitle}>Optional core proposals</Text><Pill>confirmation only</Pill></View>
+                  <Text style={styles.fieldHelp}>Nonblank values are prepared only after the Archive record is verified. Each proposal is bound to the exact current Agent, Block ID, and base value.</Text>
+                  {['PROFILE', 'GOALS_AND_DECISIONS', 'LEARNING_MODEL', 'CURRENT_CONTEXT'].map((label) => (
+                    <View key={label}>
+                      <Text style={styles.fieldLabel}>{label.replaceAll('_', ' ')}</Text>
+                      <TextInput
+                        editable={!reflectionBusy}
+                        value={reflectionProposalValues[label] ?? ''}
+                        onChangeText={(value) => setReflectionProposalValues((current) => ({ ...current, [label]: value }))}
+                        multiline
+                        placeholder={label === 'LEARNING_MODEL' ? 'Leave blank when using the connection above.' : 'Leave blank for no proposal.'}
+                        placeholderTextColor="#9693a3"
+                        style={styles.compactTextArea}
+                      />
+                    </View>
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.reflectionActions}>
+                <Pressable disabled={reflectionBusy || memoryControlsDisabled} onPress={() => void requestReflectionCoaching()} style={[styles.secondaryOutlineButton, (reflectionBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>Request read-only coaching</Text></Pressable>
+                <Pressable disabled={reflectionBusy || memoryControlsDisabled} onPress={() => void completeWeeklyReview()} style={[styles.primaryButton, (reflectionBusy || memoryControlsDisabled) && styles.buttonDisabled]}>{reflectionBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Archive this weekly review</Text>}</Pressable>
+              </View>
+              <Text style={styles.fieldHelp}>Nothing runs on a timer. Only the explicit button above creates a weekly-review episode, and completion performs no Block write.</Text>
+              <View style={styles.learningCoachPanel}>
+                <View style={styles.cardHeader}><Text style={styles.sectionTitle}>Assistant coaching</Text><Pill>not evidence</Pill></View>
+                <Text style={styles.learningCoachText}>{reflectionCoachOutput || 'Request coaching only after filling the review you want the assistant to discuss.'}</Text>
+              </View>
+              {reflectionFeedback ? (
+                <View style={reflectionFeedbackTone === 'warn' ? styles.errorBox : styles.noticeBox}>
+                  <Text style={reflectionFeedbackTone === 'warn' ? styles.errorText : styles.noticeText}>{reflectionFeedback}</Text>
+                </View>
+              ) : null}
+            </View>
+          )}
+
           {surface === 'Core Memory' && (
             <View style={styles.surface}>
               <SurfaceTitle eyebrow="CORE MEMORY" title="A small, deliberate memory." copy="Four user-owned blocks can change. Two policy blocks stay read-only so the rules remain stable." />
@@ -1487,7 +1867,7 @@ export default function App() {
                       {change.status === 'pending' && (
                         <View style={styles.cardActions}>
                           <Pressable onPress={() => cancelPendingChange(change)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Cancel proposal</Text></Pressable>
-                          <Pressable disabled={memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '')} onPress={() => void applyPendingChange(change)} style={[styles.primaryButton, (memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '')) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Apply to Letta</Text></Pressable>
+                          <Pressable disabled={memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '', blocks.find((item) => item.label === change.block) ?? null)} onPress={() => void applyPendingChange(change)} style={[styles.primaryButton, (memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '', blocks.find((item) => item.label === change.block) ?? null)) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>Apply to Letta</Text></Pressable>
                         </View>
                       )}
                     </View>
@@ -1662,6 +2042,9 @@ const styles = StyleSheet.create({
   learningCompleteButton: { marginTop: 8 },
   learningCoachPanel: { marginTop: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
   learningCoachText: { color: ink, fontSize: 13, lineHeight: 20, marginTop: 12, padding: 13, backgroundColor: '#faf8f5', borderRadius: 10, borderWidth: 1, borderColor: '#e4dfd9' },
+  reflectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
+  reflectionCard: { gap: 8, alignSelf: 'flex-start' },
+  reflectionActions: { marginTop: 16, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center' },
   memoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   card: { flexGrow: 1, flexBasis: 430, minWidth: 280, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
   policyCard: { backgroundColor: '#f0ede7' },

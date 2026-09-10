@@ -10,6 +10,7 @@ import {
   CONNECTION_CHANGE_CANCELLATION_REASON,
   createForgetPreview,
   createMemoryChange,
+  executePendingMemoryChange,
   hasConnectedMemoryContext,
   removeExactTerm,
   stageBlockChange,
@@ -48,6 +49,7 @@ test('stable changes remain pending until applied or cancelled and policy blocks
     before: 'Old',
     after: 'New',
     agentId: 'agent-1',
+    baseBlockId: 'profile-id',
     timestamp: '2026-09-04T00:00:00.000Z',
   });
   assert.equal(pending.status, 'pending');
@@ -63,6 +65,38 @@ test('stable changes remain pending until applied or cancelled and policy blocks
   assert.equal(metadata.personal_co.operation, 'correct');
 });
 
+test('metadata sanitizer normalizes secret-key variants and preserves safe nested structure', () => {
+  const direct = stageBlockChange({ block: 'CURRENT_CONTEXT', before: 'a', after: 'b' });
+  const metadata = buildPersonalCoMetadata({
+    'ＡＰＩ＿ＫＥＹ': 'synthetic-value',
+    kept: true,
+    nested: {
+      access_token: 'synthetic-value',
+      authorizationHeader: 'synthetic-value',
+      'password-hash': 'synthetic-value',
+      cookieJar: 'synthetic-value',
+      credential_id: 'synthetic-value',
+      secretValue: 'synthetic-value',
+      tokenizerMode: 'keep',
+      safeList: [
+        { label: 'keep', 'ＴＯＫＥＮ': 'synthetic-value' },
+        ['unchanged'],
+      ],
+    },
+  }, direct);
+
+  assert.deepEqual(metadata.nested, {
+    tokenizerMode: 'keep',
+    safeList: [
+      { label: 'keep' },
+      ['unchanged'],
+    ],
+  });
+  assert.equal(metadata.kept, true);
+  assert.equal(metadata['ＡＰＩ＿ＫＥＹ'], undefined);
+  assert.equal(metadata.personal_co.operation, 'correct');
+});
+
 test('connection changes cancel every pending proposal and preserve settled audit records', () => {
   const firstPending = stageBlockChange({
     id: 'pending-profile',
@@ -70,6 +104,7 @@ test('connection changes cancel every pending proposal and preserve settled audi
     before: 'old profile',
     after: 'new profile',
     agentId: 'agent-1',
+    baseBlockId: 'profile-id',
   });
   const secondPending = stageBlockChange({
     id: 'pending-goals',
@@ -77,6 +112,7 @@ test('connection changes cancel every pending proposal and preserve settled audi
     before: 'old goals',
     after: 'new goals',
     agentId: 'agent-1',
+    baseBlockId: 'goals-id',
   });
   const applied = transitionMemoryChange(firstPending, 'applied');
   const alreadyCancelled = transitionMemoryChange(secondPending, 'cancelled', 'user cancelled');
@@ -115,10 +151,14 @@ test('stable proposals fail closed across the asynchronous connection boundary',
     before: 'old',
     after: 'new',
     agentId: 'agent-a',
+    baseBlockId: 'profile-id',
   });
-  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connected', 'agent-a'), true);
-  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connecting', 'agent-a'), false);
-  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connected', 'agent-b'), false);
+  const profileBlock = { id: 'profile-id', label: 'PROFILE', value: 'old', limit: 8000, readOnly: false, read_only: false };
+  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connected', 'agent-a', profileBlock), true);
+  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connecting', 'agent-a', profileBlock), false);
+  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connected', 'agent-b', profileBlock), false);
+  assert.equal(authorizePendingMemoryChange(boundToAgentA, 'connected', 'agent-a', { ...profileBlock, value: 'newer' }), false);
+  assert.equal(authorizePendingMemoryChange({ ...boundToAgentA }, 'connected', 'agent-a', profileBlock), false);
 
   // Simulates a proposal somehow created after connect() starts but before agent B commits.
   const createdDuringTransition = stageBlockChange({
@@ -127,10 +167,136 @@ test('stable proposals fail closed across the asynchronous connection boundary',
     before: 'agent-a goals',
     after: 'stale proposed goals',
     agentId: 'agent-a',
+    baseBlockId: 'goals-id',
   });
   const afterAgentBCommit = cancelPendingChangesForConnectionChange([createdDuringTransition]);
   assert.equal(afterAgentBCommit[0].status, 'cancelled');
-  assert.equal(authorizePendingMemoryChange(afterAgentBCommit[0], 'connected', 'agent-b'), false);
+  assert.equal(authorizePendingMemoryChange(afterAgentBCommit[0], 'connected', 'agent-b', { id: 'goals-id', label: 'GOALS_AND_DECISIONS', value: 'agent-a goals' }), false);
+});
+
+test('pending proposal Apply refreshes its exact base, updates once, and verifies exact read-back', async () => {
+  const change = stageBlockChange({
+    id: 'apply-me',
+    block: 'PROFILE',
+    before: 'old',
+    after: 'new',
+    agentId: 'agent-a',
+    baseBlockId: 'profile-id',
+  });
+  const calls = [];
+  let captures = 0;
+  const result = await executePendingMemoryChange({
+    change,
+    expectedAgentId: 'agent-a',
+    currentAgentId: () => 'agent-a',
+    workflow: {
+      async captureAgentMemory(agentId) {
+        calls.push(`capture:${agentId}`);
+        captures += 1;
+        return {
+          blocks: [{ id: 'profile-id', label: 'PROFILE', value: captures === 1 ? 'old' : 'new', limit: 8000, readOnly: false, read_only: false }],
+          archive: [],
+        };
+      },
+      async updateBlock(block, value) {
+        calls.push(`update:${block.id}:${value}`);
+      },
+    },
+  });
+  assert.equal(result.outcome, 'applied');
+  assert.deepEqual(calls, ['capture:agent-a', 'update:profile-id:new', 'capture:agent-a']);
+});
+
+test('pending proposal Apply cancels stale or forged bases without writes and fails false read-back', async () => {
+  const change = stageBlockChange({
+    id: 'stale',
+    block: 'PROFILE',
+    before: 'old',
+    after: 'new',
+    agentId: 'agent-a',
+    baseBlockId: 'profile-id',
+  });
+  for (const candidate of [change, { ...change }]) {
+    const calls = [];
+    const result = await executePendingMemoryChange({
+      change: candidate,
+      expectedAgentId: 'agent-a',
+      currentAgentId: () => 'agent-a',
+      workflow: {
+        async captureAgentMemory() {
+          calls.push('capture');
+          return { blocks: [{ id: 'profile-id', label: 'PROFILE', value: candidate === change ? 'newer' : 'old', limit: 8000, readOnly: false, read_only: false }], archive: [] };
+        },
+        async updateBlock() { calls.push('update'); },
+      },
+    });
+    assert.equal(result.outcome, 'cancelled');
+    assert.deepEqual(calls, ['capture']);
+  }
+
+  const wrongExpectedAgent = await executePendingMemoryChange({
+    change,
+    expectedAgentId: 'agent-b',
+    currentAgentId: () => 'agent-a',
+    workflow: {
+      async captureAgentMemory() { return { blocks: [{ id: 'profile-id', label: 'PROFILE', value: 'old', limit: 8000, readOnly: false, read_only: false }], archive: [] }; },
+      async updateBlock() { throw new Error('must not write'); },
+    },
+  });
+  assert.equal(wrongExpectedAgent.outcome, 'cancelled');
+
+  let captures = 0;
+  let updates = 0;
+  const unverified = await executePendingMemoryChange({
+    change,
+    expectedAgentId: 'agent-a',
+    currentAgentId: () => 'agent-a',
+    workflow: {
+      async captureAgentMemory() {
+        captures += 1;
+        return { blocks: [{ id: 'profile-id', label: 'PROFILE', value: 'old', limit: 8000, readOnly: false, read_only: false }], archive: [] };
+      },
+      async updateBlock() { updates += 1; },
+    },
+  });
+  assert.equal(unverified.outcome, 'failed');
+  assert.equal(captures, 2);
+  assert.equal(updates, 1);
+  assert.match(unverified.error, /read-back/);
+});
+
+test('pending proposal Apply rejects missing, invalid, over-limit, or read-only destinations before writing', async () => {
+  const change = stageBlockChange({
+    id: 'bounded',
+    block: 'PROFILE',
+    before: 'old',
+    after: 'four',
+    agentId: 'agent-a',
+    baseBlockId: 'profile-id',
+  });
+  const valid = { id: 'profile-id', label: 'PROFILE', value: 'old', limit: 4, readOnly: false, read_only: false };
+  const cases = [
+    [],
+    [{ ...valid, limit: undefined }],
+    [{ ...valid, limit: 3 }],
+    [{ ...valid, readOnly: true }],
+    [{ ...valid, read_only: true }],
+    [valid, { ...valid, id: 'duplicate-profile' }],
+  ];
+  for (const destinationBlocks of cases) {
+    let updates = 0;
+    const result = await executePendingMemoryChange({
+      change,
+      expectedAgentId: 'agent-a',
+      currentAgentId: () => 'agent-a',
+      workflow: {
+        async captureAgentMemory() { return { blocks: destinationBlocks, archive: [] }; },
+        async updateBlock() { updates += 1; },
+      },
+    });
+    assert.equal(result.outcome, 'cancelled');
+    assert.equal(updates, 0);
+  }
 });
 
 test('forget is literal, scoped to writable blocks, and tied to an exact confirmation phrase', () => {
@@ -300,7 +466,7 @@ test('change records expose summaries and all required audit fields', () => {
   });
   assert.deepEqual(
     Object.keys(change),
-    ['id', 'block', 'operation', 'source', 'epistemicState', 'timestamp', 'before', 'after', 'beforeSummary', 'afterSummary', 'status', 'error', 'agentId'],
+    ['id', 'block', 'operation', 'source', 'epistemicState', 'timestamp', 'before', 'after', 'beforeSummary', 'afterSummary', 'status', 'error', 'agentId', 'baseBlockId', 'baseBlockValue'],
   );
   assert.equal(change.agentId, null);
 });

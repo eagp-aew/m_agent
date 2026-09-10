@@ -1,5 +1,5 @@
 version: 1
-updated_at: 2026-09-07
+updated_at: 2026-09-09
 
 active_milestone:
   id: M-0002
@@ -8,12 +8,12 @@ active_milestone:
   status: YELLOW
 
 current_work_package:
-  task_id: WP-0030-guided-learning-episodes
-  title: "Add evidence-gated guided learning episodes"
+  task_id: WP-0031-reflection-weekly-review
+  title: "Add transparent reflection and weekly review"
   status: ACCEPTED
   scope_type: implementation
-  assigned_agent: wp0028_verifier_retry
-  work_package_path: ".ai/WORK_PACKAGES/WP-0030-guided-learning-episodes.yaml"
+  assigned_agent: wp0031_verifier_post_security
+  work_package_path: ".ai/WORK_PACKAGES/WP-0031-reflection-weekly-review.yaml"
 
 current_state_machine_state: DONE
 
@@ -46,8 +46,20 @@ recursive_delegation:
   recursive_delegation_violations: 0
 
 open_decisions:
+  - id: OD-0032
+    question: "May Codex perform one further minimal WP-0031 repair limited to recognizing fully parenthesized (N) coaching headings in personal-co/src/domain/reflection.mjs and adding the corresponding regression in personal-co/tests/reflection-workflow.test.mjs, followed by fresh independent verification and commit only after PASS?"
+    source: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-5.md"
+    owner: human
+    status: CLOSED
+    resolution: "On 2026-09-09 the human replied `授权` to the immediately preceding request for one fourth minimal repair limited to fully parenthesized `(N)` coaching headings and the corresponding regression, followed by fresh independent verification and commit only after PASS."
+  - id: OD-0031
+    question: "May Codex exceed WP-0031's two-fix limit for one third bounded repair limited to rejecting Markdown and parenthetical extra coaching headings in personal-co/src/domain/reflection.mjs and adding regressions in personal-co/tests/reflection-workflow.test.mjs, followed by fresh independent verification and acceptance/commit only after PASS?"
+    source: ".ai/AGENT_REPORTS/WP-0031-verifier.md"
+    owner: human
+    status: CLOSED
+    resolution: "On 2026-09-09 the human explicitly authorized one third repair limited to coaching-heading parsing and corresponding regression tests, followed by fresh independent verification and commit only after PASS."
   - id: OD-0028
-    question: "After the accepted WP-0030 milestone commit is created, may Codex push that exact commit, including Personal Co source and internal .ai project records, to https://github.com/eagp-aew/m_agent.git on branch codex/personal-co-v1?"
+    question: "After the accepted WP-0031 milestone commit is created, may Codex push that exact commit, including Personal Co source and internal .ai project records, to https://github.com/eagp-aew/m_agent.git on branch codex/personal-co-v1?"
     source: "Runtime escalation rejected the generic GitHub authorization as insufficiently destination-specific."
     owner: human
     status: OPEN
@@ -78,6 +90,9 @@ open_decisions:
     resolution: "Human explicitly authorized one third fix limited to the connection-state/agent-binding race, followed by independent verification and push only after PASS."
 
 failure_counts_by_task:
+  WP-0031-reflection-weekly-review:
+    verify: 6
+    fix: 4
   WP-0030-guided-learning-episodes:
     verify: 2
     fix: 1
@@ -157,6 +172,90 @@ failure_counts_by_task:
 failure_signatures:
   repeat_stop_threshold: 2
   entries:
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: SECURITY_REGRESSION
+      signature: SECURITY_REGRESSION:compound-credential-identifier-normalization-bypass
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: SECURITY_REGRESSION
+      signature: SECURITY_REGRESSION:reserved-marker-case-spacing-normalization-bypass
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: SECURITY_REGRESSION
+      signature: SECURITY_REGRESSION:unicode-metadata-secret-key-bypass
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:directional-connection-reversal-deduped
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:extra-coaching-headings-accepted
+      seen_count: 3
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-09
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-5.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:block-contract-drift-reported-complete
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:over-limit-core-proposal-written-and-applied
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:proposal-and-unrelated-block-whitespace-corrupted
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:blank-confidence-and-invalid-evidence-date-accepted
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: SECURITY_REGRESSION
+      signature: SECURITY_REGRESSION:credential-shaped-provenance-persisted
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: IMPLEMENTATION_BUG
+      signature: IMPLEMENTATION_BUG:reflection-ui-supports-only-one-connection
+      seen_count: 1
+      first_seen_at: 2026-09-08
+      last_seen_at: 2026-09-08
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+    - work_package_id: WP-0031-reflection-weekly-review
+      classification: VALIDATION_FAILURE
+      signature: VALIDATION_FAILURE:context-packet-missing-agent-role
+      seen_count: 1
+      first_seen_at: 2026-09-07
+      last_seen_at: 2026-09-07
+      evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-1.md"
     - work_package_id: WP-0030-guided-learning-episodes
       classification: IMPLEMENTATION_BUG
       signature: IMPLEMENTATION_BUG:mutable-learning-episode-evidence-and-state-forge-usable
@@ -285,7 +384,7 @@ quality_metrics:
     accepted_tasks_with_memory_update: "100%"
     repeated_failure_escalation: "100%"
   per_work_package_checks:
-    work_package_id: WP-0030-guided-learning-episodes
+    work_package_id: WP-0031-reflection-weekly-review
     work_package_existed_before_implementation: true
     implementer_stayed_within_allowed_files: true
     verifier_report_exists: true
@@ -303,57 +402,79 @@ quality_metrics:
     child_reports_missing: 0
     child_scope_violations: 0
     recursive_delegation_violations: 0
-    fix_attempts: 1
-    repeated_failure_detected: false
-    human_approval_required: false
+    fix_attempts: 4
+    repeated_failure_detected: true
+    human_approval_required: true
     human_approval_obtained: true
-    human_fix_limit_override_obtained: false
+    human_fix_limit_override_obtained: true
     diff_size:
-      files: 4
-      insertions: 1506
-      deletions: 18
-      measurement_scope: "Four WP-0030 product files versus baseline 1384f8d79f1eaec0008018c8647550bb28aa23e5; the 442-line new test file is included."
+      files: 25
+      insertions: 3784
+      deletions: 82
+      measurement_scope: "Final counts are recorded after the accepted memory update and before the local commit against baseline e221e555808d9e8b220bd28590d3debc2cee0f00."
     files_changed:
       - "personal-co/App.tsx"
-      - "personal-co/src/domain/learning.mjs"
-      - "personal-co/tests/learning-workflow.test.mjs"
+      - "personal-co/src/domain/reflection.mjs"
+      - "personal-co/src/domain/changes.mjs"
+      - "personal-co/tests/reflection-workflow.test.mjs"
+      - "personal-co/tests/governance.test.mjs"
       - "personal-co/README.md"
+      - ".ai/WORK_PACKAGES/WP-0031-reflection-weekly-review.yaml"
+      - ".ai/AGENT_REPORTS/WP-0031-explorer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-implementer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-fixer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-security-fixer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-heading-fixer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-parenthesized-heading-fixer.md"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-1.md"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier.md"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-5.md"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-final.md"
+      - ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md"
+      - ".ai/TASK_QUEUE.yaml"
+      - ".ai/MASTER_LEDGER.yaml"
+      - ".ai/PROJECT_STATE.md"
+      - ".ai/DECISIONS.md"
+      - ".ai/RISK_REGISTER.md"
+      - ".ai/INTEGRATION_LOG.md"
   scope_check:
     status: PASS
-    evidence: "Master diff inspection confirms exactly the four WP-0030 product paths changed; no service, dependency, configuration, sensitive, deletion, or tracked generated-output path changed."
+    evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-final.md confirms the fourth repair changed only `(N)` heading recognition and its regression; the complete WP-0031 diff remains inside six product paths and listed project artifacts."
   validation:
     status: PASS
     commands:
-      - "Read-only DOCX extraction and rendered page 11–12 inspection identified exact §§8.1–8.2 requirements."
-      - "python3 -B scripts/protocol_gate.py pre-implement WP-0030-guided-learning-episodes (PASS before implementation)"
-      - ".ai/AGENT_REPORTS/WP-0030-explorer.md (read-only explorer PASS; four product paths sufficient)"
-      - "node --test tests/learning-workflow.test.mjs (PASS 13/13)"
-      - "npm test (PASS 53/53)"
-      - "npm run typecheck (PASS)"
-      - "EXPO_NO_TELEMETRY=1 npm run export:web (PASS; ignored output only)"
-      - "Browser QA at 1280x720 and 390x844 (PASS; no overflow, interaction preview correct, console clean)"
-      - ".ai/AGENT_REPORTS/WP-0030-verifier-attempt-1.md (FAIL; forged mutable episode promotion and text-only Archive false completion)"
-      - "Fix attempt 1: factory-bound immutable episodes plus new exact Archive record verification"
-      - "node --test tests/learning-workflow.test.mjs (post-fix PASS 15/15)"
-      - "npm test (post-fix PASS 55/55)"
-      - "npm run typecheck (post-fix PASS)"
-      - "EXPO_NO_TELEMETRY=1 npm run export:web (post-fix PASS; ignored output only)"
-      - "python3 -B scripts/validate_protocol.py and protocol_gate.py audit (post-fix PASS)"
-      - ".ai/AGENT_REPORTS/WP-0030-verifier.md (independent PASS for 10/10 criteria and adversarial replay)"
-      - "python3 -B scripts/protocol_gate.py check-report .ai/AGENT_REPORTS/WP-0030-verifier.md (PASS)"
-      - "python3 -B scripts/protocol_gate.py pre-accept WP-0030-guided-learning-episodes (PASS)"
+      - "Read-only DOCX extraction and rendered pages 11–12 inspection identified exact §§8.3–8.5 requirements."
+      - "python3 -B scripts/protocol_gate.py pre-implement WP-0031-reflection-weekly-review (PASS before exploration)"
+      - ".ai/AGENT_REPORTS/WP-0031-explorer.md (read-only explorer PASS; six product paths are the minimum sufficient set)"
+      - ".ai/AGENT_REPORTS/WP-0031-implementer.md (implementer PASS; targeted 24/24, full 67/67, typecheck and scoped diff check PASS)"
+      - "Master replay: targeted 24/24, full 67/67, typecheck, Web export, desktop/390px browser QA, protocol validation/audit, and diff check PASS"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-1.md (packet validation BLOCKED before repository access)"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md (independent FAIL with eight reproducible signatures)"
+      - ".ai/AGENT_REPORTS/WP-0031-fixer.md (bounded fix PASS; all eight signatures addressed)"
+      - "Master post-fix replay: targeted 28/28, full 71/71, typecheck, Web export, adversarial probes, desktop/390px three-connection browser QA, protocol validation/audit, and diff check PASS"
+      - ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md (independent FAIL; one high and two medium normalization bypasses reproduced)"
+      - ".ai/AGENT_REPORTS/WP-0031-security-fixer.md (fix attempt 2 addressed all three normalization signatures; product tests passed; its report-only protocol blocker was repaired by the master)"
+      - "Master post-security-fix replay: targeted 30/30, full 73/73, typecheck, Web export, original adversarial probes, protocol validation/audit, and diff check PASS"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier.md (independent FAIL; repeated extra-coaching-headings-accepted signature reproduced for Markdown and parenthetical headings)"
+      - ".ai/AGENT_REPORTS/WP-0031-heading-fixer.md (authorized fix attempt 3 PASS; only heading parser and regression tests changed)"
+      - "Master post-heading-fix replay: targeted 30/30, full 73/73, typecheck, Web export, protocol validation 29/29, protocol audit, and diff check PASS"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-5.md (independent FAIL; fully parenthesized (6) heading still bypasses exact-five validation)"
+      - ".ai/AGENT_REPORTS/WP-0031-parenthesized-heading-fixer.md (human-authorized fix attempt 4 PASS; only `(N)` recognition and one regression changed)"
+      - "Master post-attempt-4 replay: reflection 14/14, targeted 30/30, full 73/73, typecheck, Web export, protocol validation 29/29, protocol audit, and diff check PASS"
+      - ".ai/AGENT_REPORTS/WP-0031-verifier-final.md (fresh independent attempt 6 PASS for all 11 criteria; authorized ASCII heading grammar and prior `(N)` failure close)"
   verifier_status:
     status: PASS
-    evidence: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+    evidence: ".ai/AGENT_REPORTS/WP-0031-verifier-final.md"
 
 execution_budget:
-  max_steps: 28
-  max_tool_calls: 150
+  max_steps: 34
+  max_tool_calls: 180
   deadline: null
-  trace_path: ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  trace_path: ".ai/AGENT_REPORTS/WP-0031-verifier-final.md"
   cancellation:
     owner: master
-    condition: "Stop on dependency, public API, auth, permission, secret, migration, production configuration, database, Agent lifecycle, model/embedding, external integration, file upload/extraction, deletion, broad refactor, or scope beyond documented §§8.1–8.2."
+    condition: "Stop on dependency, public API, auth, permission, secret, migration, production configuration, database, Agent lifecycle, model/embedding, external integration, deletion, background scheduling, broad refactor, or scope beyond documented §§8.3–8.5."
 
 max_fix_attempts: 2
 max_parallel_write_agents: 3

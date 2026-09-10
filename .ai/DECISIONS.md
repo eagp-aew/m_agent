@@ -474,6 +474,25 @@
   - Stale or malformed Archive records cannot produce a false completion result.
   - Live Letta round-trip behavior and design §§8.3–8.5 remain separate validation and implementation work.
 
+## DEC-0029: Keep reflection explicit, Archive-first, and confirmation-gated
+
+- Date: 2026-09-09
+- Status: accepted
+- Context:
+  - Design §§8.3–8.5 require transparent cross-domain connections, falsifiable growth hypotheses, and a weekly review that the user starts deliberately.
+  - Assistant coaching is useful drafting evidence but must not become a hidden writer or silently promote inferred patterns into stable core memory.
+  - A malformed coaching response with extra headings could obscure the exact five-section review contract.
+- Decision:
+  - Create weekly reviews only from an explicit user action and require the five ordered sections with exactly one next-week focus.
+  - Keep cross-domain connections explanatory and bounded to one through three; keep hypotheses inspectable, falsifiable, confidence-scored, evidence-linked, and explicitly confirmed.
+  - Treat assistant drafting as same-Agent, no-write, reconciled coaching separate from reviewed evidence; accept only the authorized ASCII ATX `#` through `######`, `N.`, `N)`, and `(N)` heading grammar when enforcing the exact five headings.
+  - Persist the reviewed episode to Archive and verify a new exact record before exposing any exact-Agent-bound proposal for the four writable core Blocks.
+  - Apply each proposal only through the existing Memory Changes confirmation surface with fresh Agent, Block identity, base-value, permission, and size checks.
+- Consequences:
+  - Reflection can preserve uncertain evidence without turning it into automatic personality labels.
+  - Extra recognized coaching headings fail closed and have deterministic regression coverage.
+  - Live Letta round-trip behavior and cross-process proposal coordination remain deployment-level validation boundaries.
+
 ## Decision log
 
 | ID | Date | Status | Title |
@@ -506,3 +525,4 @@
 | DEC-0026 | 2026-09-07 | accepted | Require exact registered model handles before Agent operations |
 | DEC-0027 | 2026-09-07 | accepted | Make model switching an application transaction |
 | DEC-0028 | 2026-09-07 | accepted | Make guided learning evidence-gated and Archive-first |
+| DEC-0029 | 2026-09-09 | accepted | Keep reflection explicit, Archive-first, and confirmation-gated |

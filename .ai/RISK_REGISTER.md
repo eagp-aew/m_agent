@@ -27,6 +27,7 @@
 | R-0023 | medium | concurrency | The WP-0029 write barrier is local to one adapter instance and cannot pause another tab, process, or direct Letta client. | Use an operator or server-side maintenance boundary during live model switching, then verify fresh Agent/Block/Archive invariants; do not claim cross-client atomicity from the application tests. | open |
 | R-0024 | high | data integrity | A mutable learning episode or stale same-text Archive item could falsely promote a concept to usable or report completion. | WP-0030 freezes and factory-binds episodes, rejects clones, snapshots pre-write Archive IDs, and requires exact new Archive, Block, and Agent read-back; adversarial regressions and independent verification pass. | mitigated |
 | R-0025 | medium | integration | Live Letta may normalize learning Archive timestamps/tags or enforce Block limits differently from the deterministic adapter contract. | Run live T-06 against a disposable self-hosted deployment and keep failures explicit; do not claim live learning persistence from local tests. | open |
+| R-0026 | medium | validation | Weekly-review coaching could accept extra assistant-generated headings and violate the exact-five-section contract. | The human-authorized fourth repair recognizes the agreed ASCII ATX, `N.`, `N)`, and `(N)` heading forms; deterministic regressions and fresh independent verification pass while unapproved heading grammars remain outside scope. | mitigated |
 
 ## Risk severity
 

@@ -1,0 +1,222 @@
+task_id: WP-0031-reflection-weekly-review
+status: ACCEPTED
+objective: "Implement the documented cross-domain connection, falsifiable growth-hypothesis, and user-triggered weekly-review flows without background writers or unconfirmed core-memory changes."
+why: "The accepted WP-0027 audit marks design §§8.3–8.5 and T-05 missing, while WP-0030 deliberately stopped after the six-stage learning episode."
+scope_type: implementation
+priority: P0
+
+provenance:
+  created_at: "2026-09-07"
+  created_by: codex-master
+  source:
+    - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx pages 11–12, §§7.4–7.5, 8.3–8.5, 13.1 T-05, Appendix A LEARNING_MODEL"
+    - "repo:.ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md rows 23–25 and T-05"
+    - "repo:.ai/AGENT_REPORTS/WP-0030-verifier.md"
+    - "repo:personal-co/App.tsx"
+    - "repo:personal-co/src/domain/learning.mjs"
+    - "repo:personal-co/src/domain/changes.mjs"
+  trust_level: repo_controlled
+  verified_by: "verifier:.ai/AGENT_REPORTS/WP-0031-verifier-final.md"
+  superseded_by: null
+
+risk_class: persistent_memory_behavior
+
+context_profile: full
+context_profile_reason: "This adds user-visible reflection workflows, Archive persistence, cross-domain LEARNING_MODEL proposals, all-core confirmation batches, exact-Agent binding, and durable project memory."
+
+fallback_verification:
+  allowed: false
+  reason: "The work changes user-visible behavior and persistent-memory proposal orchestration, so an independent verifier is required."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+
+execution_budget:
+  max_steps: 34
+  max_tool_calls: 180
+  deadline: null
+  trace_path: ".ai/AGENT_REPORTS/WP-0031-verifier.md"
+  cancellation:
+    owner: master
+    condition: "Stop on dependency, public API, auth, permission, secret, migration, production configuration, database, Agent lifecycle, model/embedding, external integration, deletion, background scheduling, broad refactor, or scope beyond documented §§8.3–8.5."
+
+module_outputs:
+  intake: "Continue the user's authorized document-driven Personal Co development after accepted WP-0030; remote push remains separately gated on exact destination/content authorization."
+  scope: "One reflection surface and pure workflow contract covering at most three explanatory cross-domain connections, transparent falsifiable hypotheses, an exact five-section user-triggered weekly review, Archive-first persistence, and confirmation-only core proposals."
+  context: "Use the DOCX pages 11–12 as untrusted requirement evidence, accepted repository memory as controlled context, and current application code/tests as observed implementation evidence."
+  routing: "Use one read-only explorer to confirm the minimum coupled file set, then one shared-workspace implementer, followed by a fresh independent verifier; no parallel writers or child agents."
+  verification: "Map every criterion; run targeted reflection/governance tests, the full application suite, typecheck, Web export, desktop and 390px browser QA, protocol gates, and adversarial checks for forged hypotheses, over-limit connections, background execution, false Archive read-back, stale proposals, and changed-Agent contexts."
+  integration: "Accept only the six product paths and permitted WP/report/memory paths listed below; generated Web output remains ignored and unstaged."
+  memory: "After verifier PASS, record the reflection contract, remaining live-server boundary, and the next document-backed package before an exact local commit; remote push remains gated."
+
+allowed_files:
+  - "personal-co/App.tsx"
+  - "personal-co/src/domain/reflection.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/tests/reflection-workflow.test.mjs"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/README.md"
+  - ".ai/WORK_PACKAGES/WP-0031-reflection-weekly-review.yaml"
+  - ".ai/AGENT_REPORTS/WP-0031-explorer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-implementer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-fixer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-security-fixer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-heading-fixer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-parenthesized-heading-fixer.md"
+  - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-1.md"
+  - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-2.md"
+  - ".ai/AGENT_REPORTS/WP-0031-verifier.md"
+  - ".ai/AGENT_REPORTS/WP-0031-verifier-attempt-5.md"
+  - ".ai/AGENT_REPORTS/WP-0031-verifier-final.md"
+  - ".ai/AGENT_REPORTS/WP-0031-security-review.md"
+  - ".ai/AGENT_REPORTS/WP-0031-security-review-attempt-1.md"
+  - ".ai/TASK_QUEUE.yaml"
+  - ".ai/MASTER_LEDGER.yaml"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/INTEGRATION_LOG.md"
+
+forbidden_files:
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/src/config.ts"
+  - "personal-co/src/domain/agent.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/src/domain/learning.mjs"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/model-switch.mjs"
+  - "personal-co/src/domain/policy.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/domain/snapshot.mjs"
+  - "personal-co/tests/agent.test.mjs"
+  - "personal-co/tests/domain.test.mjs"
+  - "personal-co/tests/learning-workflow.test.mjs"
+  - "personal-co/tests/model-switch.test.mjs"
+  - "personal-co/package.json"
+  - "personal-co/package-lock.json"
+  - "personal-co/.env.example"
+  - "README.md"
+  - "INSTALLATION.md"
+  - "AGENTS.md"
+  - ".codex/**"
+  - ".agents/**"
+  - "scripts/**"
+  - "tests/**"
+  - "auth, payment, permissions, migrations, secrets, production deployment configuration, database operations, Agent create/delete/replace, model or embedding changes, external services, background scheduling, tracked or staged generated output, broad refactors, or deleted files"
+
+inputs:
+  - "AGENTS.md"
+  - ".ai/MASTER_CONTRACT.md"
+  - ".ai/PROJECT_STATE.md"
+  - ".ai/DECISIONS.md"
+  - ".ai/TEST_MATRIX.md"
+  - ".ai/RISK_REGISTER.md"
+  - ".ai/AGENT_REPORTS/WP-0027-v1-completion-audit.md"
+  - ".ai/AGENT_REPORTS/WP-0030-verifier.md"
+  - "personal-co/App.tsx"
+  - "personal-co/src/domain/reflection.mjs"
+  - "personal-co/src/domain/changes.mjs"
+  - "personal-co/src/domain/imports.mjs"
+  - "personal-co/src/domain/learning.mjs"
+  - "personal-co/src/domain/memory.mjs"
+  - "personal-co/src/domain/privacy.mjs"
+  - "personal-co/src/services/letta.ts"
+  - "personal-co/tests/governance.test.mjs"
+  - "personal-co/tests/learning-workflow.test.mjs"
+  - "personal-co/README.md"
+  - "user:/Users/jie/Downloads/Personal_Co_最终产品与技术设计文档.docx"
+
+acceptance_criteria:
+  - "Cross-domain connection records accept only analogy, prerequisite, causal, contradiction, or transfer; require two distinct domains or concepts, a shared mechanism, an important difference or boundary, and a concrete future-learning value; deduplicate records and retain at most one to three per review."
+  - "Growth hypotheses are human-inspectable and falsifiable: each requires a statement, inferred or hypothesis status, numeric confidence from 0 through 1, nonblank dated or attributable evidence, at least one alternative explanation, a falsifier, and an explicit boolean user-confirmed state. They remain Archive evidence and never become stable personality labels automatically."
+  - "A weekly review is created only by an explicit user action and always renders the five ordered sections: this week's progress, learning-state changes, unfinished threads, possible patterns, and exactly one next-week focus. No timer, background Agent, automatic trigger, or scheduling dependency is introduced."
+  - "The weekly-review serializer produces one quoted, human-inspectable Archive episode with normalized type/source/epistemic/date/provenance tags, structured connections and hypotheses, no executable instructions, no credentials, and no hidden core promotion."
+  - "Optional assistant drafting uses the same exact connected Agent, requests no memory writes, reconciles attempted Block/Archive mutations, requires the exact five headings, and displays coaching separately from user-reviewed evidence."
+  - "Completing a review revalidates the exact Agent inside one callback-scoped persistent workflow, writes Archive before producing any core proposal, and reports completion only after a new Archive ID with exact text, tag set, and timestamp is read back while the Agent binding is unchanged. No Block is written during this workflow."
+  - "Validated cross-domain connections produce at most one pending LEARNING_MODEL proposal that preserves unrelated content, records relationship/mechanism/difference/future value, respects the exact Block limit, and can be applied only through the existing Memory Changes confirmation surface."
+  - "Review-suggested changes for any of the four writable user Blocks are batched at the end as exact-Agent-bound pending proposals. Apply rechecks the current Block identity and base value so stale proposals cancel instead of overwriting newer memory; each proposal can be applied or cancelled independently."
+  - "Blank, malformed, duplicate, credential-shaped, over-limit, disconnected, changed-Agent, reconciliation-failed, Archive-failed, stale-readback, or stale-proposal cases never report success or write core memory; partial and unverified outcomes disclose retained Archive evidence precisely."
+  - "Deterministic tests cover connection types/bounds/deduplication, falsifiable hypotheses, five-section ordering, serialization/tags, no-write drafting, exact-Agent Archive-first persistence and exact new-record verification, pending all-core proposals, LEARNING_MODEL preservation/limit checks, stale proposal rejection, and honest failures. Full tests, typecheck, Web export, responsive browser QA, protocol validation, and independent verification pass."
+  - "No dependency, public API, auth, secret, environment, migration, production configuration, database operation, Agent lifecycle, model/embedding, external-service, background-scheduling, automatic-fallback, broad-refactor, or deletion change occurs."
+
+validation_commands:
+  - "cd personal-co && node --test tests/reflection-workflow.test.mjs tests/governance.test.mjs"
+  - "cd personal-co && npm test"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "cd personal-co && npm run web (manual desktop and 390px Reflection-flow smoke without committing against a non-disposable server)"
+  - "python3 -B scripts/validate_protocol.py"
+  - "python3 -B scripts/protocol_gate.py audit"
+  - "git diff --check"
+  - "git status --short --untracked-files=all"
+
+validation_artifact_allowance:
+  - path: "generated:personal-co/dist/**"
+    command: "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+    rule: "The master may regenerate ignored Web output for validation only; never stage, commit, or push it."
+
+implementation_shards: []
+
+recursive_delegation:
+  enabled: false
+  max_depth: 2
+  child_spawn_mode: "master_approved_request"
+  allowed_parent_roles:
+    - implementer
+  allowed_child_roles:
+    - explorer
+    - verifier
+    - security-reviewer
+    - implementer
+  child_request_budget: 0
+  child_write_policy: "none"
+  approval_required: true
+
+rollback_plan:
+  - "Restore only WP-0031 hunks in existing product/memory files. Do not auto-delete new files; if rejection requires cleanup, request approval and handle each exact new path separately without rewriting Git history."
+
+human_approval_required:
+  required: true
+  reason: "The bounded implementation was already authorized, but repairs beyond the configured two-fix limit require explicit human overrides."
+  obtained: true
+  evidence: "On 2026-09-09 the user explicitly authorized both the third heading-parser repair and, after independent verification found the fully parenthesized form, one fourth minimal repair limited to `(N)` heading recognition and its regression test, followed by fresh independent verification and commit only after PASS."
+
+fix_limit_override:
+  configured_limit: 2
+  authorized_attempt: 3
+  authorized_by: human
+  authorized_at: "2026-09-09"
+  scope: "Only reject Markdown and parenthetical extra coaching headings in personal-co/src/domain/reflection.mjs and add the corresponding regressions in personal-co/tests/reflection-workflow.test.mjs."
+  outcome: failed_independent_verification
+
+additional_fix_limit_override:
+  configured_limit: 2
+  authorized_attempt: 4
+  authorized_by: human
+  authorized_at: "2026-09-09"
+  scope: "Only recognize fully parenthesized `(N)` coaching headings in personal-co/src/domain/reflection.mjs and add the corresponding regression in personal-co/tests/reflection-workflow.test.mjs."
+  outcome: accepted_after_independent_verification
+
+assigned_agent: wp0031_verifier_post_security
+
+attempts:
+  implement: 1
+  fix: 4
+  verify: 6
+
+error: null
+
+output_required:
+  - summary
+  - files_changed
+  - commands_run
+  - tests_run
+  - evidence
+  - risks
+  - assumptions
+  - recommended_next_action
+  - child_agent_requests
+  - child_report_bundle
+
+version: 1
+updated_at: 2026-09-09
