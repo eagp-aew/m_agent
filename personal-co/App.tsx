@@ -58,6 +58,14 @@ import {
 } from './src/domain/memory.mjs';
 import { MEMORY_POLICY_TEXT, PERSONA_TEXT } from './src/domain/policy.mjs';
 import {
+  PRIMARY_SECTIONS,
+  SECONDARY_SECTIONS,
+  PROMPT_STARTERS,
+  primaryForSurface,
+  preparePromptDraft,
+  completeChatDraft,
+} from './src/domain/navigation.mjs';
+import {
   createPrivacySettings,
   diffAgentMemory,
   parseDoNotRememberTerms,
@@ -78,7 +86,7 @@ import {
   type PersistentWorkflow,
 } from './src/services/letta';
 
-type Surface = 'Chat' | 'Learning' | 'Reflection' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
+type Surface = 'Chat' | 'Today' | 'Learning' | 'Reflection' | 'Core Memory' | 'Memory Changes' | 'Archive' | 'Import' | 'Settings';
 type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
 type ModelSwitchState = 'idle' | 'switching' | 'rollback_locked';
 type LearningCoachPhase = 'diagnosis' | 'explanation' | 'verification';
@@ -110,25 +118,6 @@ type MemoryChangeRecord = {
   baseBlockId: string | null;
   baseBlockValue: string | null;
 };
-
-const NAV_ITEMS: { label: Surface; symbol: string; hint: string }[] = [
-  { label: 'Chat', symbol: '✦', hint: 'Think together' },
-  { label: 'Learning', symbol: '◎', hint: 'Evidence-gated practice' },
-  { label: 'Reflection', symbol: '◇', hint: 'Weekly review' },
-  { label: 'Core Memory', symbol: '◫', hint: 'Six fixed blocks' },
-  { label: 'Memory Changes', symbol: '↺', hint: 'Review every change' },
-  { label: 'Archive', symbol: '⌁', hint: 'Evidence first' },
-  { label: 'Import', symbol: '↗', hint: 'Review before writing' },
-  { label: 'Settings', symbol: '⚙', hint: 'Local connection' },
-];
-
-const STARTER_MESSAGES: ChatMessage[] = [
-  {
-    id: 'welcome',
-    role: 'assistant',
-    content: 'I’m ready when you are. Connect a Letta server in Settings, or explore how memory and evidence are handled first.',
-  },
-];
 
 function emptyReflectionConnection(id: string): ReflectionConnectionDraft {
   return {
@@ -185,9 +174,10 @@ export default function App() {
   const [connectionError, setConnectionError] = useState('');
   const [client, setClient] = useState<PersonalCoLettaClient | null>(null);
   const [agent, setAgent] = useState<AgentSummary | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>(STARTER_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
+  const [sendFeedback, setSendFeedback] = useState('');
   const [blocks, setBlocks] = useState<AgentBlock[]>(
     createMemoryBlocks(PERSONA_TEXT, MEMORY_POLICY_TEXT),
   );
@@ -272,7 +262,7 @@ export default function App() {
   }
 
   async function connect() {
-    if (connectionSwitchGuard.current !== 'idle') {
+    if (sending || connectionSwitchGuard.current !== 'idle') {
       setConnectionError('Connection changes are unavailable while a persistent workflow, model switch, or rollback lock is active.');
       return;
     }
@@ -306,7 +296,7 @@ export default function App() {
       setClient(nextClient);
       setAgent(nextAgent);
       if (nextBlocks.length) setBlocks(nextBlocks);
-      if (nextMessages.length) setMessages(nextMessages);
+      setMessages(nextMessages);
       setArchive(nextArchive);
       setConnection('connected');
       setSurface('Chat');
@@ -384,42 +374,46 @@ export default function App() {
   }
 
   async function sendMessage() {
+    const submittedDraft = draft;
     const content = draft.trim();
     if (!content || sending) return;
     if (connectionSwitchGuard.current !== 'idle') {
-      setConnectionError('Persistent writes are paused while the connection or model switch is active.');
+      setSendFeedback('正在处理另一项操作，请稍后发送。你的草稿已保留。');
       return;
     }
-    if (!client || !agent) {
-      setConnectionError('Connect your Letta server in Settings before sending a message.');
-      setSurface('Settings');
+    if (!client || !agent || connection !== 'connected') {
+      setSendFeedback('尚未发送。请先打开连接设置接通助手，你的草稿会保留。');
       return;
     }
     const userMessage: ChatMessage = { id: `local-${Date.now()}`, role: 'user', content };
     setMessages((current) => [...current, userMessage]);
-    setDraft('');
     setSending(true);
+    setSendFeedback('');
+    let delivery: 'not_sent' | 'unknown' | 'received' = 'not_sent';
+    let workflowSucceeded = true;
     try {
       const decision = privacyDecisionForMessage(content, privacy);
       await client.runPersistentWorkflow('message and memory reconciliation', async (workflow) => {
         const before = await workflow.captureAgentMemory(agent.id);
         let sendError: unknown = null;
         try {
+          delivery = 'unknown';
           const replies = await workflow.sendMessage(agent.id, content, {
             requestNoMemoryWrites: decision.requestNoMemoryWrites,
             language: privacy.language,
           });
+          delivery = 'received';
           setMessages((current) => [
             ...current,
-            ...(replies.length
-              ? replies
-              : [{ id: `empty-${Date.now()}`, role: 'assistant' as const, content: 'The run completed without an assistant message.' }]),
+            ...replies,
           ]);
+          if (!replies.length) setSendFeedback('服务已完成本次请求，但没有返回助手回复。请查看对话，避免重复发送。');
         } catch (error) {
           sendError = error;
         }
         if (decision.requestNoMemoryWrites) {
           const reconciled = await workflow.reconcileTemporaryMemory(agent.id, before);
+          workflowSucceeded = reconciled.success;
           setBlocks(reconciled.state.blocks);
           setArchive(reconciled.state.archive);
           const reconciliationChange = createMemoryChange({
@@ -439,15 +433,16 @@ export default function App() {
               : `Privacy reconciliation reported failures: ${reconciled.failures.join(' ')}`,
           );
         } else {
-          await recordAgentMemoryWrites(before, workflow);
+          workflowSucceeded = await recordAgentMemoryWrites(before, workflow);
         }
         if (sendError) throw sendError;
       });
+      setDraft((current) => completeChatDraft(current, submittedDraft, workflowSucceeded));
+      if (!workflowSucceeded) setSendFeedback('消息已返回，但记忆检查未通过。草稿已保留；请先查看变更记录中的失败结果，不要重复发送。');
     } catch (error) {
-      setMessages((current) => [
-        ...current,
-        { id: `error-${Date.now()}`, role: 'assistant', content: `I couldn’t complete that request: ${error instanceof Error ? error.message : 'unknown error'}` },
-      ]);
+      const stage = String(delivery);
+      if (stage === 'not_sent') setMessages((current) => current.filter((message) => message.id !== userMessage.id));
+      setSendFeedback(`${stage === 'not_sent' ? '尚未发送。草稿已保留，可检查连接后重试。' : stage === 'received' ? '消息已返回，但后续记忆检查失败。草稿已保留，请先核对结果，不要重复发送。' : '发送结果待核实，服务可能已经收到消息。草稿已保留；请在连接设置中重新连接并核对历史，再决定是否重发。'} ${error instanceof Error ? error.message : '连接异常。'}`);
     } finally {
       setSending(false);
     }
@@ -826,7 +821,7 @@ export default function App() {
     before: { blocks: AgentBlock[]; archive: ArchiveItem[] },
     workflow: PersistentWorkflow,
   ) {
-    if (!client || !agent) return;
+    if (!client || !agent) return false;
     const after = await workflow.captureAgentMemory(agent.id);
     const diff = diffAgentMemory(before, after);
     const logged: MemoryChangeRecord[] = [];
@@ -914,6 +909,7 @@ export default function App() {
     setBlocks(effectiveBlocks);
     setArchive(after.archive);
     if (logged.length) appendChanges(...logged);
+    return logged.every((change) => change.status !== 'failed');
   }
 
   function startEditing(block: AgentBlock) {
@@ -1485,21 +1481,21 @@ export default function App() {
   }
 
   const statusLabel = reflectionBusy
-    ? 'Reflection workflow'
+    ? '正在复盘'
     : learningBusy
-    ? 'Learning workflow'
+    ? '正在学习'
     : modelSwitchState === 'switching'
-    ? 'Switching model'
+    ? '正在切换模型'
     : modelSwitchState === 'rollback_locked'
-      ? 'Writes locked'
+      ? '写入已锁定'
       : connection === 'connected'
-        ? 'Connected'
+        ? '已连接'
         : connection === 'connecting'
-          ? 'Connecting'
+          ? '连接中'
           : connection === 'error'
-            ? 'Needs attention'
-            : 'Local setup';
-  const persistentWritesPaused = learningBusy
+            ? '连接需检查'
+            : '尚未连接';
+  const persistentWritesPaused = sending || learningBusy
     || reflectionBusy
     || modelSwitchState !== 'idle'
     || connectionSwitchGuard.current !== 'idle';
@@ -1507,6 +1503,31 @@ export default function App() {
     || !client
     || !agent
     || !hasConnectedMemoryContext(connection, agent.id);
+  const primarySurface = primaryForSurface(surface);
+  const surfaceLabel = surface === 'Settings' ? '连接与设置' : surface === 'Today' ? '今天' : SECONDARY_SECTIONS.find((item) => item.surface === surface)?.label;
+  const pendingChanges = changes.filter((change) => change.status === 'pending' && change.agentId === agent?.id);
+  const failedDecision = changes.find((change) => change.status === 'failed' && change.agentId === agent?.id);
+
+  function pendingDecisionCards() {
+    return pendingChanges.map((change) => {
+      const disabled = memoryControlsDisabled || !authorizePendingMemoryChange(change, connection, agent?.id ?? '', blocks.find((item) => item.label === change.block) ?? null);
+      return (
+        <View key={change.id} style={styles.changeItem}>
+          <View style={styles.cardHeader}><Text style={styles.sectionTitle}>要记住这项变化吗？</Text><Pill tone="warn">待确认</Pill></View>
+          <Text style={styles.changeMeta}>{change.block.replaceAll('_', ' ')} · {change.source} · {new Date(change.timestamp).toLocaleString()}</Text>
+          <View style={styles.changeSummaryRow}>
+            <View style={styles.changeSummary}><Text style={styles.changeSummaryLabel}>原来的内容</Text><Text style={styles.changeSummaryText}>{change.before || '（空）'}</Text></View>
+            <View style={styles.changeSummary}><Text style={styles.changeSummaryLabel}>准备保存</Text><Text style={styles.changeSummaryText}>{change.after || '（清空）'}</Text></View>
+          </View>
+          <View style={styles.cardActions}>
+            <Pressable accessibilityRole="button" onPress={() => cancelPendingChange(change)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>不保存</Text></Pressable>
+            <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void applyPendingChange(change)} style={[styles.primaryButton, disabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>确认保存</Text></Pressable>
+          </View>
+          {disabled && <Text style={styles.fieldHelp}>当前暂不能保存，请等待操作完成；连接或原内容变化后需重新准备变更。</Text>}
+        </View>
+      );
+    });
+  }
 
   return (
     <View style={styles.app}>
@@ -1515,13 +1536,13 @@ export default function App() {
           <View>
             <View style={styles.brandMark}><Text style={styles.brandMarkText}>PC</Text></View>
             <Text style={styles.brand}>Personal Co</Text>
-            <Text style={styles.brandTagline}>One memory. One agent. Yours.</Text>
+            <Text style={styles.brandTagline}>陪你理清思路，记住重要的事。</Text>
           </View>
           <View style={styles.nav}>
-            {NAV_ITEMS.map((item) => (
-              <Pressable key={item.label} onPress={() => setSurface(item.label)} style={[styles.navItem, surface === item.label && styles.navItemActive]}>
-                <Text style={[styles.navSymbol, surface === item.label && styles.navTextActive]}>{item.symbol}</Text>
-                <View><Text style={[styles.navLabel, surface === item.label && styles.navTextActive]}>{item.label}</Text><Text style={styles.navHint}>{item.hint}</Text></View>
+            {PRIMARY_SECTIONS.map((item) => (
+              <Pressable accessibilityRole="button" accessibilityState={{ selected: primarySurface === item.surface }} key={item.surface} onPress={() => setSurface(item.surface as Surface)} style={[styles.navItem, primarySurface === item.surface && styles.navItemActive]}>
+                <Text style={[styles.navSymbol, primarySurface === item.surface && styles.navTextActive]}>{item.symbol}</Text>
+                <View style={styles.flexible}><Text style={[styles.navLabel, primarySurface === item.surface && styles.navTextActive]}>{item.label}</Text><Text style={styles.navHint}>{item.hint}</Text></View>
               </Pressable>
             ))}
           </View>
@@ -1533,23 +1554,34 @@ export default function App() {
       )}
 
       <View style={styles.main}>
-        {compact && (
           <View style={styles.mobileHeader}>
-            <View><Text style={styles.mobileBrand}>Personal Co</Text><Text style={styles.mobileSurface}>{surface}</Text></View>
+            <View style={styles.flexible}><Text style={styles.mobileBrand}>{compact ? 'Personal Co' : surfaceLabel}</Text><Text style={styles.mobileSurface}>{compact ? surfaceLabel : '你的随身思考伙伴'}</Text></View>
             <Pill tone={connection === 'connected' && modelSwitchState === 'idle' && !learningBusy && !reflectionBusy ? 'good' : connection === 'error' || modelSwitchState === 'rollback_locked' ? 'warn' : 'neutral'}>{statusLabel}</Pill>
+            <Pressable accessibilityRole="button" accessibilityState={{ selected: surface === 'Settings' }} onPress={() => setSurface('Settings')} style={[styles.presetButton, surface === 'Settings' && styles.presetButtonActive]}><Text style={styles.presetButtonText}>设置</Text></Pressable>
           </View>
-        )}
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.content, compact && styles.compactContent]} keyboardShouldPersistTaps="handled">
+          {primarySurface !== 'Today' && surface !== 'Settings' && (
+            <View style={[styles.surface, styles.secondaryNav]}>
+              {SECONDARY_SECTIONS.filter((item) => item.primary === primarySurface).map((item) => (
+                <Pressable key={item.surface} accessibilityRole="button" accessibilityState={{ selected: surface === item.surface }} onPress={() => setSurface(item.surface as Surface)} style={[styles.presetButton, surface === item.surface && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{item.label}</Text></Pressable>
+              ))}
+            </View>
+          )}
           {surface === 'Chat' && (
             <View style={styles.surface}>
-              <SurfaceTitle eyebrow="THINKING SPACE" title="What are we working through?" copy="Personal Co keeps evidence and confidence visible, so useful context can grow without turning guesses into facts." />
+              <SurfaceTitle eyebrow="对话" title="今天，想从哪件事开始？" copy="把问题、想法或最近的进展告诉我。我们可以一起理清下一步。" />
+              {connection !== 'connected' && <View style={styles.connectionCard}><Text style={styles.sectionTitle}>{connection === 'connecting' ? '正在接通你的助手…' : '先接通你的助手'}</Text><Text style={styles.subtitle}>连接后才会发送消息和读取真实记忆。现在也可以先写草稿。</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>打开连接设置</Text></Pressable></View>}
+              <View style={styles.secondaryNav}>{PROMPT_STARTERS.map((prompt) => <Pressable key={prompt} accessibilityRole="button" disabled={sending || Boolean(draft.trim())} onPress={() => setDraft((current) => preparePromptDraft(current, prompt))} style={[styles.presetButton, (sending || Boolean(draft.trim())) && styles.buttonDisabled]}><Text style={styles.presetButtonText}>{prompt}</Text></Pressable>)}</View>
+              {sendFeedback ? <View style={styles.errorBox}><Text style={styles.errorText}>{sendFeedback}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>查看连接设置</Text></Pressable></View> : null}
+              {connectionError ? <View style={styles.errorBox}><Text style={styles.errorText}>连接未完成：{connectionError}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>检查配置并重试</Text></Pressable></View> : null}
               <View style={styles.chatPanel}>
                 <ScrollView style={styles.messageList} contentContainerStyle={styles.messageListContent}>
+                  {messages.length === 0 && <Text style={styles.emptyCopy}>{connection === 'connected' ? '这里还没有对话。说说你正在想的事吧。' : '接通后会在这里显示真实对话。'}</Text>}
                   {messages.map((message) => (
                     <View key={message.id} style={[styles.messageRow, message.role === 'user' && styles.messageRowUser]}>
                       <View style={[styles.avatar, message.role === 'user' && styles.avatarUser]}><Text style={styles.avatarText}>{message.role === 'user' ? 'YOU' : 'CO'}</Text></View>
                       <View style={[styles.messageBubble, message.role === 'user' && styles.messageBubbleUser]}>
-                        <Text style={styles.messageRole}>{message.role === 'user' ? 'You' : 'Personal Co'}</Text>
+                        <Text style={styles.messageRole}>{message.role === 'user' ? '你' : 'Personal Co'}</Text>
                         <Text style={styles.messageText}>{message.content}</Text>
                       </View>
                     </View>
@@ -1557,11 +1589,32 @@ export default function App() {
                   {sending && <ActivityIndicator color="#684df4" style={{ alignSelf: 'flex-start' }} />}
                 </ScrollView>
                 <View style={styles.composer}>
-                  <TextInput value={draft} onChangeText={setDraft} placeholder="Ask, reflect, or make a decision…" placeholderTextColor="#8d8a9b" multiline style={styles.composerInput} onSubmitEditing={() => void sendMessage()} />
-                  <Pressable onPress={() => void sendMessage()} style={[styles.sendButton, (!draft.trim() || sending || persistentWritesPaused) && styles.buttonDisabled]} disabled={!draft.trim() || sending || persistentWritesPaused}><Text style={styles.sendButtonText}>Send ↑</Text></Pressable>
+                  <TextInput accessibilityLabel="对话草稿" editable={!sending} value={draft} onChangeText={setDraft} placeholder="说说你想做的事…" placeholderTextColor="#8d8a9b" multiline style={styles.composerInput} onSubmitEditing={() => void sendMessage()} />
+                  <Pressable accessibilityRole="button" onPress={() => void sendMessage()} style={[styles.sendButton, (!draft.trim() || sending || persistentWritesPaused) && styles.buttonDisabled]} disabled={!draft.trim() || sending || persistentWritesPaused}><Text style={styles.sendButtonText}>{sending ? '处理中' : '发送 ↑'}</Text></Pressable>
                 </View>
               </View>
-              <View style={styles.policyStrip}><Text style={styles.policyStripTitle}>Archive-first by design</Text><Text style={styles.policyStripCopy}>Uncertain ideas stay outside stable memory until evidence or your confirmation supports them.</Text></View>
+              <View style={styles.policyStrip}><Text style={styles.policyStripTitle}>{privacy.temporarySession ? '临时对话已开启' : '重要变化由你确认'}</Text><Text style={styles.policyStripCopy}>你可以在设置中管理隐私；长期画像和目标的变化会先请你确认。</Text></View>
+              {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
+              {pendingChanges.length > 0 && <View style={styles.pendingList}><Text style={styles.sectionTitle}>需要你决定 · {pendingChanges.length}</Text>{pendingDecisionCards()}</View>}
+              {failedDecision && <View style={styles.errorBox}><Text style={styles.errorText}>有一项记忆操作未完成：{failedDecision.error}</Text></View>}
+              {changes.length > 0 && <Pressable accessibilityRole="button" onPress={() => setSurface('Memory Changes')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>查看全部变更与处理结果</Text></Pressable>}
+            </View>
+          )}
+
+          {surface === 'Today' && (
+            <View style={styles.surface}>
+              <SurfaceTitle eyebrow="今天" title="把重要的事放在眼前。" copy="这里先汇集本次打开期间需要你确认的记忆变化。" />
+              {connection !== 'connected' && <View style={styles.connectionCard}><Text style={styles.subtitle}>尚未连接，无法核对助手的最新内容。</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>打开连接设置</Text></Pressable></View>}
+              {pendingChanges.length ? <View style={styles.changeList}><Text style={styles.sectionTitle}>需要你决定 · {pendingChanges.length}</Text>{pendingDecisionCards()}</View> : <EmptyState symbol="◎" title={connection === 'connected' ? '本次打开还没有待确认变化' : '连接后再查看待确认变化'} copy="待确认变化只保留在本次页面会话中；这里还不是持久待办清单，也不会发送后台提醒。" />}
+              {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
+              {failedDecision && <View style={styles.errorBox}><Text style={styles.errorText}>有一项记忆操作未完成：{failedDecision.error}</Text></View>}
+              {changes.length > 0 && <Pressable accessibilityRole="button" onPress={() => setSurface('Memory Changes')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>查看全部变更与处理结果</Text></Pressable>}
+              <View style={styles.policyStrip}><Text style={styles.policyStripCopy}>持久待办、改期和关闭应用后的提醒尚未接通。当前可查看已有目标、回顾进展或继续聊天。</Text></View>
+              <View style={styles.secondaryNav}>
+                <Pressable accessibilityRole="button" onPress={() => setSurface('Chat')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>继续对话</Text></Pressable>
+                <Pressable accessibilityRole="button" onPress={() => setSurface('Core Memory')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>查看目标与近况</Text></Pressable>
+                <Pressable accessibilityRole="button" onPress={() => setSurface('Reflection')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>回顾本周</Text></Pressable>
+              </View>
             </View>
           )}
 
@@ -1782,7 +1835,7 @@ export default function App() {
 
           {surface === 'Core Memory' && (
             <View style={styles.surface}>
-              <SurfaceTitle eyebrow="CORE MEMORY" title="A small, deliberate memory." copy="Four user-owned blocks can change. Two policy blocks stay read-only so the rules remain stable." />
+              <SurfaceTitle eyebrow="记忆" title="记住重要的，也允许改变。" copy="查看关于你的资料、正在关注的事和学习进展。发现不准确的内容，可以纠正或提出忘记请求。" />
               <View style={styles.memoryGrid}>
                 {ALL_MEMORY_LABELS.map((label) => {
                   const block = blocks.find((item) => item.label === label) ?? { label, value: 'Not returned by server.' };
@@ -1831,7 +1884,7 @@ export default function App() {
             <View style={styles.surface}>
               <SurfaceTitle eyebrow="MEMORY CHANGES" title="Review, apply, cancel, or forget." copy="Stable memory waits for your Apply action. Every session change records its source, epistemic state, timestamp, and before/after summary." />
               <View style={styles.governanceGrid}>
-                <View style={[styles.card, styles.governanceCard]}>
+                <View style={[styles.card, styles.governanceCard, compact && styles.compactLearningCard]}>
                   <Text style={styles.sectionTitle}>Forget an exact term</Text>
                   <Text style={styles.fieldHelp}>Literal matching only. Policy blocks are never searched or edited.</Text>
                   <TextInput value={forgetTerm} onChangeText={(value) => { setForgetTerm(value); setForgetPreview(null); setForgetConfirmation(''); }} placeholder="Exact term" placeholderTextColor="#9693a3" style={styles.fieldInput} />
@@ -1845,7 +1898,7 @@ export default function App() {
                     </View>
                   )}
                 </View>
-                <View style={[styles.card, styles.governanceCard]}>
+                <View style={[styles.card, styles.governanceCard, compact && styles.compactLearningCard]}>
                   <Text style={styles.sectionTitle}>Session audit</Text>
                   <Text style={styles.fieldHelp}>{changes.length} change record{changes.length === 1 ? '' : 's'} in this browser session.</Text>
                   {governanceNotice ? <View style={styles.noticeBox}><Text style={styles.noticeText}>{governanceNotice}</Text></View> : null}
@@ -1895,13 +1948,13 @@ export default function App() {
                 <View style={styles.importEditor}><Text style={styles.fieldLabel}>Selected source</Text><TextInput value={importSource} onChangeText={setImportSource} placeholder="pasted text" placeholderTextColor="#918fa0" style={styles.fieldInput} /><Text style={styles.fieldLabel}>Paste notes or exported text</Text><TextInput value={importText} onChangeText={setImportText} multiline placeholder={'One observation per line\nProjects feel clearer after a written brief\nConsidering a move next spring'} placeholderTextColor="#918fa0" style={styles.importInput} /><Text style={styles.fieldHelp}>Local preview only until you choose “Archive candidates.”</Text></View>
                 <View style={styles.importPreview}><View style={styles.cardHeader}><Text style={styles.previewTitle}>Review queue</Text><Pill tone="warn">{importCandidates.length} candidate{importCandidates.length === 1 ? '' : 's'}</Pill></View>{importCandidates.length === 0 ? <EmptyState symbol="↗" title="Nothing staged." copy="Paste text to see exactly what would be archived." /> : importCandidates.slice(0, 8).map((candidate: { id: string; content: string; sourceName: string }) => <View key={candidate.id} style={styles.candidate}><Text style={styles.candidateText}>{candidate.content}</Text><View style={styles.candidateMeta}><Text style={styles.candidateTag}>external_import · {candidate.sourceName}</Text><Text style={styles.candidateDestination}>→ archive · observed</Text></View></View>)}{importCandidates.length > 0 && <Pressable disabled={importBusy || memoryControlsDisabled} onPress={() => void archiveImports()} style={[styles.primaryButton, styles.importButton, (importBusy || memoryControlsDisabled) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{importBusy ? 'Archiving…' : 'Archive candidates'}</Text></Pressable>}</View>
               </View>
-              <View style={styles.guardrail}><Text style={styles.guardrailIcon}>◇</Text><View><Text style={styles.guardrailTitle}>Stable memory safeguard</Text><Text style={styles.guardrailCopy}>PROFILE and GOALS AND DECISIONS require a separate, explicit confirmation step after import.</Text></View></View>
+              <View style={styles.guardrail}><Text style={styles.guardrailIcon}>◇</Text><View style={styles.flexible}><Text style={styles.guardrailTitle}>Stable memory safeguard</Text><Text style={styles.guardrailCopy}>PROFILE and GOALS AND DECISIONS require a separate, explicit confirmation step after import.</Text></View></View>
             </View>
           )}
 
           {surface === 'Settings' && (
             <View style={styles.surface}>
-              <SurfaceTitle eyebrow="CONNECTION" title="Your Letta, your model choices." copy="Personal Co uses only the handles you provide. It never switches providers automatically." />
+              <SurfaceTitle eyebrow="设置" title="接通你的助手。" copy="首次使用请填写服务地址和已开通的模型。连接成功后回到对话；输入的草稿会保留。下方提供详细连接与隐私设置。" />
               <View style={styles.settingsGrid}>
                 <View style={[styles.card, styles.settingsCard, compact && styles.compactSettingsCard]}>
                   <Text style={styles.sectionTitle}>Letta server</Text>
@@ -1965,7 +2018,7 @@ export default function App() {
 
         {compact && (
           <View style={styles.bottomNav}>
-            {NAV_ITEMS.map((item) => <Pressable key={item.label} onPress={() => setSurface(item.label)} style={styles.bottomNavItem}><Text style={[styles.bottomNavSymbol, surface === item.label && styles.bottomNavActive]}>{item.symbol}</Text><Text numberOfLines={1} style={[styles.bottomNavLabel, surface === item.label && styles.bottomNavActive]}>{item.label === 'Core Memory' ? 'Memory' : item.label === 'Memory Changes' ? 'Changes' : item.label}</Text></Pressable>)}
+            {PRIMARY_SECTIONS.map((item) => <Pressable accessibilityRole="button" accessibilityState={{ selected: primarySurface === item.surface }} key={item.surface} onPress={() => setSurface(item.surface as Surface)} style={styles.bottomNavItem}><Text style={[styles.bottomNavSymbol, primarySurface === item.surface && styles.bottomNavActive]}>{item.symbol}</Text><Text style={[styles.bottomNavLabel, primarySurface === item.surface && styles.bottomNavActive]}>{item.label}</Text></Pressable>)}
           </View>
         )}
       </View>
@@ -1998,8 +2051,13 @@ const styles = StyleSheet.create({
   statusDotError: { backgroundColor: '#ff917f' },
   statusLabel: { color: '#e8e4eb', fontSize: 12, fontWeight: '700' },
   statusMeta: { color: '#817b89', fontSize: 10, marginTop: 2 },
-  main: { flex: 1 },
+  main: { flex: 1, minWidth: 0 },
+  flexible: { flex: 1, minWidth: 0 },
   content: { flexGrow: 1, paddingHorizontal: 34, paddingVertical: 34, alignItems: 'center' },
+  compactContent: { paddingHorizontal: 16, paddingVertical: 20 },
+  secondaryNav: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18, marginTop: 8 },
+  connectionCard: { backgroundColor: '#ece8ff', padding: 18, borderRadius: 14, marginBottom: 14 },
+  pendingList: { marginTop: 22, gap: 10 },
   surface: { width: '100%', maxWidth: 1120 },
   surfaceTitle: { marginBottom: 25, maxWidth: 760 },
   eyebrow: { color: violet, fontSize: 11, fontWeight: '900', letterSpacing: 1.6, marginBottom: 9 },
@@ -2048,11 +2106,11 @@ const styles = StyleSheet.create({
   memoryGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   card: { flexGrow: 1, flexBasis: 430, minWidth: 280, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
   policyCard: { backgroundColor: '#f0ede7' },
-  cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 13 },
+  cardHeader: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 13 },
   cardLabel: { color: ink, fontSize: 12, fontWeight: '900', letterSpacing: 0.5 },
   cardBody: { color: '#55515f', fontSize: 14, lineHeight: 21, minHeight: 54 },
   metadataLine: { color: '#918c98', fontSize: 9, lineHeight: 14, marginTop: 10 },
-  cardActions: { marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
+  cardActions: { marginTop: 16, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
   memoryInput: { color: ink, fontSize: 14, lineHeight: 21, minHeight: 105, padding: 12, backgroundColor: '#faf8f5', borderWidth: 1, borderColor: '#d8d2cb', borderRadius: 10, textAlignVertical: 'top' },
   textButton: { paddingVertical: 7 },
   textButtonText: { color: violet, fontSize: 12, fontWeight: '800' },
@@ -2085,8 +2143,8 @@ const styles = StyleSheet.create({
   archiveFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 10 },
   archiveSource: { color: '#8a8591', fontSize: 10, flexShrink: 1 },
   importLayout: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
-  importEditor: { flex: 1, minWidth: 290 },
-  importPreview: { flex: 1, minWidth: 290, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: line, padding: 18 },
+  importEditor: { flexGrow: 1, flexBasis: 290, minWidth: 0 },
+  importPreview: { flexGrow: 1, flexBasis: 290, minWidth: 0, backgroundColor: '#fff', borderRadius: 17, borderWidth: 1, borderColor: line, padding: 18 },
   importInput: { minHeight: 320, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 15, padding: 16, color: ink, fontSize: 14, lineHeight: 22, textAlignVertical: 'top' },
   previewTitle: { color: ink, fontSize: 16, fontWeight: '800' },
   candidate: { borderTopWidth: 1, borderTopColor: '#eeeae5', paddingVertical: 12 },
@@ -2122,7 +2180,7 @@ const styles = StyleSheet.create({
   confirmationBox: { marginTop: 14, padding: 13, backgroundColor: '#fff5f2', borderRadius: 10, borderWidth: 1, borderColor: '#efc3ba', gap: 8 },
   confirmationTitle: { color: '#8f362f', fontSize: 12, fontWeight: '900' },
   confirmationCopy: { color: '#6f5552', fontSize: 11, lineHeight: 17 },
-  confirmationActions: { flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
+  confirmationActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 10 },
   destructiveConfirmButton: { minHeight: 38, backgroundColor: '#bb493f', borderRadius: 9, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   noticeBox: { marginTop: 12, padding: 12, borderRadius: 10, backgroundColor: '#ece8ff', borderWidth: 1, borderColor: '#d6ceff' },
   noticeText: { color: '#514489', fontSize: 11, lineHeight: 17 },
@@ -2130,7 +2188,7 @@ const styles = StyleSheet.create({
   changeItem: { backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 14, padding: 17 },
   changeMeta: { color: '#8b8692', fontSize: 9, marginTop: 4 },
   changeSummaryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  changeSummary: { flex: 1, minWidth: 230, backgroundColor: '#f8f6f3', borderRadius: 9, padding: 11 },
+  changeSummary: { flexGrow: 1, flexBasis: 230, minWidth: 0, backgroundColor: '#f8f6f3', borderRadius: 9, padding: 11 },
   changeSummaryLabel: { color: '#88838e', fontSize: 9, fontWeight: '900', textTransform: 'uppercase', marginBottom: 5 },
   changeSummaryText: { color: ink, fontSize: 12, lineHeight: 18 },
   changeError: { color: '#9e3f34', fontSize: 11, lineHeight: 17, marginTop: 9 },

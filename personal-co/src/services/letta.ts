@@ -407,12 +407,13 @@ export class PersonalCoLettaClient {
       role: 'user' | 'system';
       content: string;
     }>;
+    // Delivery may have succeeded even when the response fails; do not replay messages.
     const response = await this.client.agents.messages.create(agentId, {
       messages,
       use_assistant_message: true,
       stream_tokens: false,
       streaming: false,
-    });
+    }, { maxRetries: 0 });
     return (response.messages ?? [])
       .map((message, index): ChatMessage | null => {
         const raw = message as unknown as Record<string, unknown>;

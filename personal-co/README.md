@@ -4,11 +4,17 @@ Personal Co is an original Expo Web foundation for a single, durable thinking pa
 
 ## Product surfaces
 
+The primary navigation is **对话 / 今天 / 记忆** on desktop and narrow screens; **设置** is a secondary header action. Chat contains the Learning and Reflection detail links. Memory contains Core Memory, Memory Changes, Archive, and Import. Existing detailed forms remain available, including English technical labels.
+
+Chat starters only fill an empty editable draft and never send it. The draft survives navigation and failed sends during this page session; it is cleared only after a successful complete message workflow. Delivery errors distinguish an unattempted send, an unknown delivery, and a returned message with failed memory follow-up. No automatic resend occurs: an unknown result requires checking refreshed history before the user chooses to resend. Drafts are not persisted across page reloads.
+
+Chat and Today show this session's current Agent-bound pending memory decisions with their full before/after values, invoking the same existing Apply/Cancel handlers and exact-base checks. Today currently provides links to goals, review, and chat; it does **not** provide persistent tasks, scheduled notifications, or background reminders. Offline and empty states make this limitation explicit. The first empty chat is onboarding guidance, not synthetic conversation history.
+
 - **Chat** — converse with the one agent tagged `personal-co-v1`.
 - **Learning** — run the six-stage diagnose, explain, verify, archive, and review flow while keeping assistant coaching separate from user-verified evidence.
 - **Reflection** — explicitly create a five-section weekly review with explanatory cross-domain connections, falsifiable hypotheses, and confirmation-only core proposals.
 - **Core Memory** — correct or clear the four writable blocks, inspect persisted Personal Co metadata, and keep `PERSONA` and `MEMORY_POLICY` read-only.
-- **Memory Changes** — review session changes, apply or cancel stable proposals, and preview exact-term forget operations before confirmation.
+- **Memory Changes** — review session changes, apply or cancel stable proposals (also available in Chat and Today), and preview exact-term forget operations before confirmation.
 - **Archive** — search structured durable passages and confirm deletion of one exact passage.
 - **Import** — preview pasted lines with normalized type, source, date, and epistemic provenance.
 - **Settings** — configure the Letta connection, privacy scopes, language, and portable snapshot export/restore.
