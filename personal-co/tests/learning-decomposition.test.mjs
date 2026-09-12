@@ -1,9 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import ts from 'typescript';
 import {
   LEARNING_OUTLINE_SCHEMA,
   prepareLearningDecomposition,
   parseLearningDecomposition,
+  executeLearningDecomposition,
+  learningDecompositionShortcut,
+  learningNodePrompt,
 } from '../src/domain/learning-decomposition.mjs';
 
 const INPUT = { goal: '理解条件概率', material: '条件概率限制样本空间。\n\n独立事件不改变概率。' };
@@ -224,3 +229,350 @@ test('success and whole-outline rejection never mutate caller data or advance le
   assert.deepEqual(prepared, before);
   assert.deepEqual(Object.keys(result).sort(), ['schema', 'summary', 'nodes', 'firstStepId', 'sourceMode', 'paragraphs'].sort());
 });
+
+function coachingFixture(overrides = {}) {
+  const calls = [];
+  const memory = { blocks: [], archive: [] };
+  return {
+    calls,
+    workflow: {
+      async captureAgentMemory(id) { calls.push(['capture', id]); return memory; },
+      async sendMessage(id, prompt, options) {
+        calls.push(['send', id, prompt, options]);
+        return [{ role: 'assistant', content: JSON.stringify(outline()) }];
+      },
+      async reconcileTemporaryMemory(id, before) {
+        calls.push(['reconcile', id]);
+        return { success: true, state: before, failures: [], restoredBlocks: [], deletedArchiveIds: [] };
+      },
+      ...overrides,
+    },
+  };
+}
+
+test('explicit leading natural-language shortcuts only prepare goals, with no catch-all question routing', () => {
+  for (const prefix of ['请拆解', '帮我拆解', '请帮我拆解']) {
+    assert.deepEqual(learningDecompositionShortcut(` ${prefix}：条件概率`), { goal: '条件概率' });
+  }
+  assert.deepEqual(learningDecompositionShortcut('请拆解'), { goal: '' });
+  for (const text of ['条件概率是什么？', '你能帮我拆解吗？', '解释为什么要拆解', '拆解', null, 3]) {
+    assert.equal(learningDecompositionShortcut(text), null);
+  }
+});
+
+test('decomposition captures raw input before waiting and delivers exact quoted Unicode/whitespace once', async () => {
+  const input = { goal: '  Ａ  条件概率 ', material: ' Ａ  第一行\r\n第二行\t值\n\n另一段 ' };
+  const captured = { ...input };
+  const expected = prepareLearningDecomposition(captured);
+  let release;
+  const wait = new Promise((resolve) => { release = resolve; });
+  const fixture = coachingFixture({
+    async captureAgentMemory(id) { fixture.calls.push(['capture', id]); await wait; return { blocks: [], archive: [] }; },
+  });
+  const pending = executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', input });
+  input.goal = 'changed';
+  input.material = 'changed';
+  release();
+  const result = await pending;
+  assert.equal(result.outcome, 'coached');
+  assert.equal(Object.isFrozen(result.input), true);
+  assert.deepEqual(result.input, captured);
+  assert.deepEqual(result.outline.paragraphs, expected.paragraphs);
+  assert.deepEqual(fixture.calls.map((call) => call.slice(0, 2)), [['capture', 'agent-1'], ['send', 'agent-1'], ['reconcile', 'agent-1']]);
+  assert.equal(fixture.calls[1][2], expected.prompt);
+  assert.deepEqual(fixture.calls[1][3], { requestNoMemoryWrites: true, language: '简体中文' });
+  assert.deepEqual(result.replies, []);
+});
+
+test('decomposition rejects bad raw input before memory capture or send', async () => {
+  for (const input of [{ goal: '' }, { goal: 'x'.repeat(1001) }, { goal: 'x', material: ' '.repeat(8001) }]) {
+    const fixture = coachingFixture();
+    await assert.rejects(() => executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', input }));
+    assert.deepEqual(fixture.calls, []);
+  }
+});
+
+test('only one assistant result is parsed; invalid outputs never expose a partial outline', async () => {
+  const valid = { role: 'assistant', content: JSON.stringify(outline()) };
+  for (const replies of [[], null, [{ role: 'user', content: valid.content }], [{ role: 'system', content: valid.content }], [{ role: 'assistant', content: null }], [valid, valid], [{ ...valid, content: '' }], [{ ...valid, content: 'model error' }], [{ ...valid, content: valid.content.padEnd(24001) }], [{ ...valid, content: JSON.stringify(outline({ nodes: [node(), node({ id: 'n2', title: 'bad', prerequisites: ['missing'] })] })) }]]) {
+    const fixture = coachingFixture({ async sendMessage() { return replies; } });
+    const result = await executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', input: INPUT });
+    assert.equal(result.outcome, 'invalid_output');
+    assert.equal(result.outline, null);
+    assert.deepEqual(result.replies, []);
+    assert.match(result.error, /校验/);
+    assert.equal(result.reconciliation.success, true);
+  }
+  const fixture = coachingFixture({ async sendMessage() { return [{ role: 'tool', content: 'not JSON' }, valid]; } });
+  assert.equal((await executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', input: INPUT })).outcome, 'coached');
+});
+
+test('binding drift before send stops it; late binding or cancelled/edited inputs discard only after reconciliation', async () => {
+  const before = coachingFixture();
+  await assert.rejects(() => executeLearningDecomposition({ workflow: before.workflow, expectedAgentId: 'agent-1', currentAgentId: () => 'agent-2', input: INPUT }), /Agent changed/);
+  assert.deepEqual(before.calls, [['capture', 'agent-1']]);
+  for (const reason of ['binding', 'cancel', 'edit']) {
+    let current = true;
+    let id = 'agent-1';
+    const fixture = coachingFixture({
+      async sendMessage(agentId) {
+        fixture.calls.push(['send', agentId]);
+        if (reason === 'binding') id = 'agent-2';
+        else current = false;
+        return [{ role: 'assistant', content: JSON.stringify(outline()) }];
+      },
+    });
+    const result = await executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', currentAgentId: () => id, isCurrent: () => current, input: INPUT });
+    assert.equal(result.outcome, 'discarded');
+    assert.equal(result.outline, null);
+    assert.deepEqual(fixture.calls, [['capture', 'agent-1'], ['send', 'agent-1'], ['reconcile', 'agent-1']]);
+    assert.equal(result.reconciliation.success, true);
+  }
+});
+
+test('send/model errors and reconciliation failures retain audit but never parse or retry', async () => {
+  for (const failure of ['send', 'reconciliation', 'reconciliation-throw']) {
+    let sends = 0;
+    let reconciles = 0;
+    const fixture = coachingFixture({
+      async sendMessage() {
+        sends += 1;
+        if (failure === 'send') throw new Error('model unavailable');
+        return [{ role: 'assistant', get content() { throw new Error('must not parse'); } }];
+      },
+      async reconcileTemporaryMemory(id, state) {
+        reconciles += 1;
+        if (failure === 'reconciliation-throw') throw new Error('restore unavailable');
+        return { success: failure === 'send', state, failures: ['restore incomplete'], restoredBlocks: [], deletedArchiveIds: [] };
+      },
+    });
+    const result = await executeLearningDecomposition({ workflow: fixture.workflow, expectedAgentId: 'agent-1', input: INPUT });
+    assert.equal(result.outcome, failure === 'send' ? 'send_failed' : 'reconciliation_failed');
+    assert.equal(result.outline, null);
+    assert.equal(sends, 1);
+    assert.equal(reconciles, 1);
+    assert.deepEqual(result.replies, []);
+  }
+});
+
+test('node selection prepares quoted editable teaching text with only actual selected citations', () => {
+  const parsed = parse(outline({ nodes: [node({ basis: 'material', sourceParagraphIds: ['p1'] })] }), INPUT);
+  const prompt = learningNodePrompt(parsed, 'n1', INPUT.goal);
+  assert.match(prompt, /先问一个问题/);
+  assert.match(prompt, /不要自动记录学习完成/);
+  const data = JSON.parse(prompt.split('\n')[1]);
+  assert.deepEqual(data.paragraphs, [parsed.paragraphs[0]]);
+  assert.equal(data.goal, INPUT.goal);
+  assert.equal(data.title, '条件概率');
+  assert.throws(() => learningNodePrompt(parsed, 'unknown', INPUT.goal), /请选择/);
+});
+
+// Execute the real App closures with a small hook host. Only the final JSX return
+// is replaced: guards, state setters, confirmations and domain calls stay intact.
+const appSource = ts.createSourceFile('App.tsx', readFileSync(new URL('../App.tsx', import.meta.url), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+const appFunction = appSource.statements.find((statement) => ts.isFunctionDeclaration(statement) && statement.name?.text === 'App');
+const appReturn = appFunction.body.statements.find(ts.isReturnStatement);
+const appBindings = appFunction.body.statements.flatMap((statement) => {
+  if (ts.isFunctionDeclaration(statement)) return [statement.name.text];
+  if (!ts.isVariableStatement(statement)) return [];
+  return statement.declarationList.declarations.flatMap(({ name }) => ts.isIdentifier(name)
+    ? [name.text] : name.elements.map((element) => element.name.text));
+});
+const appHelpers = appSource.statements.filter((statement) => ts.isFunctionDeclaration(statement)
+  && ['emptyReflectionConnection', 'splitLearningLines'].includes(statement.name?.text)).map((statement) => statement.getText(appSource)).join('\n');
+const appCode = ts.transpileModule(`${appHelpers}\nfunction App() {${appSource.text.slice(appFunction.body.getStart(appSource) + 1, appReturn.getStart(appSource))}\nreturn {${appBindings.join(',')}};}`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React },
+}).outputText;
+const appDomains = Object.assign({}, ...await Promise.all(appSource.statements
+  .filter((statement) => ts.isImportDeclaration(statement) && statement.moduleSpecifier.text.endsWith('.mjs'))
+  .map((statement) => import(new URL(`../${statement.moduleSpecifier.text}`, import.meta.url)))));
+
+function mountApp(client, memory) {
+  const hooks = [];
+  let cursor = 0;
+  let dirty = true;
+  const dependencies = {
+    ...appDomains, DEFAULT_SETTINGS: {}, useWindowDimensions: () => ({ width: 1000 }),
+    useMemo: (compute) => compute(),
+    useRef(initial) {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = { current: initial };
+      return hooks[index];
+    },
+    useState(initial) {
+      const index = cursor++;
+      if (!(index in hooks)) hooks[index] = typeof initial === 'function' ? initial() : initial;
+      return [hooks[index], (next) => {
+        const value = typeof next === 'function' ? next(hooks[index]) : next;
+        if (!Object.is(value, hooks[index])) dirty = true;
+        hooks[index] = value;
+      }];
+    },
+  };
+  const renderApp = new Function(...Object.keys(dependencies), `${appCode}\nreturn App;`)(...Object.values(dependencies));
+  let view;
+  function render() {
+    if (dirty) { cursor = 0; dirty = false; view = renderApp(); }
+    return view;
+  }
+  const initial = render();
+  initial.setClient(client);
+  initial.setAgent({ id: 'agent-1' });
+  initial.setConnection('connected');
+  initial.setBlocks(structuredClone(memory.blocks));
+  initial.setArchive(structuredClone(memory.archive));
+  initial.setDecompositionGoal(INPUT.goal);
+  initial.agentBindingRef.current = { client, agentId: 'agent-1' };
+  return { render };
+}
+
+function deferred() {
+  let resolve, reject;
+  const promise = new Promise((yes, no) => { resolve = yes; reject = no; });
+  return { promise, resolve, reject };
+}
+
+function appMemoryFixture() {
+  const memory = {
+    blocks: appDomains.createMemoryBlocks('synthetic persona', 'synthetic policy')
+      .map((block) => ({ ...block, id: `block-${block.label}`, value: block.label === 'CURRENT_CONTEXT' ? 'original' : block.value, metadata: null }))
+      .sort((a, b) => Number(b.label === 'CURRENT_CONTEXT') - Number(a.label === 'CURRENT_CONTEXT')),
+    archive: [{ id: 'passage-1', text: 'original note', tags: [], epistemicState: 'observed' }],
+  };
+  const calls = [];
+  const gates = {};
+  async function step(name) {
+    calls.push(name);
+    if (gates[name]) await gates[name].promise;
+  }
+  const client = {
+    async runPersistentWorkflow(_label, callback) { await step('workflow'); return callback(client); },
+    async captureAgentMemory() { await step('capture'); return structuredClone(memory); },
+    async updateBlock(block, value, metadata) {
+      await step('update');
+      const updated = { ...block, value, metadata };
+      memory.blocks = memory.blocks.map((item) => item.id === block.id ? updated : item);
+      return updated;
+    },
+    async deleteArchiveItem(_agentId, id) { await step('delete'); memory.archive = memory.archive.filter((item) => item.id !== id); },
+    async archiveText(_agentId, text, tags) { await step('archive'); memory.archive.push({ id: 'imported', text, tags }); },
+    async listArchive() { await step('list'); return structuredClone(memory.archive); },
+    async sendMessage() { await step('send'); return [{ role: 'assistant', content: JSON.stringify(outline()) }]; },
+    async reconcileTemporaryMemory(_agentId, before) {
+      await step('reconcile');
+      const restoredBlocks = [];
+      for (const block of before.blocks) {
+        if (memory.blocks.find((item) => item.id === block.id)?.value !== block.value) {
+          await client.updateBlock(block, block.value, block.metadata);
+          restoredBlocks.push(block.label);
+        }
+      }
+      return { success: true, state: structuredClone(memory), failures: [], restoredBlocks, deletedArchiveIds: [] };
+    },
+  };
+  return { memory, calls, gates, client, app: mountApp(client, memory) };
+}
+
+async function waitForCall(fixture, name) {
+  for (let i = 0; i < 30 && !fixture.calls.includes(name); i += 1) await Promise.resolve();
+  assert.ok(fixture.calls.includes(name), `${name} reached`);
+}
+
+function startMutation(fixture, kind) {
+  let app = fixture.app.render();
+  const block = fixture.memory.blocks.find((item) => item.label === (kind === 'pending' ? 'PROFILE' : 'CURRENT_CONTEXT'));
+  if (kind === 'direct') return app.applyDirectBlockChange(block, 'USER APPROVED EDIT', 'correct');
+  if (kind === 'delete') return app.deleteArchiveItem(fixture.memory.archive[0], 'DELETE passage-1');
+  if (kind === 'forget') {
+    const preview = appDomains.createForgetPreview('original', fixture.memory.blocks, fixture.memory.archive, 'agent-1');
+    app.setForgetPreview(preview);
+    app.setForgetConfirmation(preview.confirmationPhrase);
+  } else if (kind === 'import') {
+    app.setImportText('approved imported note');
+  } else if (kind === 'restore') {
+    const snapshot = appDomains.createPortableSnapshot({ agentId: 'agent-1', settings: {}, ...fixture.memory });
+    snapshot.blocks[0].value = 'USER APPROVED EDIT';
+    const preview = appDomains.createRestorePreview(snapshot, { agentId: 'agent-1', ...fixture.memory });
+    app.setSnapshotText(JSON.stringify(snapshot));
+    app.setRestorePreview(preview);
+    app.setRestoreConfirmation(preview.confirmationPhrase);
+  } else if (kind === 'pending') {
+    const change = appDomains.stageBlockChange({ block: block.label, before: block.value, after: 'USER APPROVED EDIT', agentId: 'agent-1', baseBlockId: block.id, source: 'user', epistemicState: 'confirmed', operation: 'correct' });
+    app.setChanges([change]);
+    return fixture.app.render().applyPendingChange(change);
+  }
+  app = fixture.app.render();
+  return ({ forget: app.executeForget, import: app.archiveImports, restore: app.applySnapshotRestore })[kind]();
+}
+
+test('actual App: an earlier held direct update blocks decomposition before capture/send and preserves the approved edit', async () => {
+  const fixture = appMemoryFixture();
+  fixture.gates.update = deferred();
+  fixture.gates.send = deferred();
+  const mutation = startMutation(fixture, 'direct');
+  const decomposition = fixture.app.render().requestDecomposition();
+  await Promise.resolve();
+  fixture.gates.update.resolve();
+  await mutation;
+  fixture.gates.send.resolve();
+  await decomposition;
+  assert.equal(fixture.memory.blocks[0].value, 'USER APPROVED EDIT');
+  assert.equal(fixture.calls.includes('capture'), false);
+  assert.equal(fixture.calls.includes('send'), false);
+  assert.equal(fixture.app.render().decompositionResult, null);
+  await fixture.app.render().requestDecomposition();
+  assert.ok(fixture.app.render().decompositionResult);
+  assert.equal(fixture.memory.blocks[0].value, 'USER APPROVED EDIT');
+});
+
+for (const kind of ['direct', 'delete', 'forget', 'import', 'restore', 'pending']) {
+  test(`actual App: ${kind} holds the visible guard, rejects duplicate/competing initiation, and releases on failure for retry`, async () => {
+    const fixture = appMemoryFixture();
+    const boundary = kind === 'direct' ? 'update' : kind === 'delete' ? 'delete' : 'workflow';
+    fixture.gates[boundary] = deferred();
+    const pending = startMutation(fixture, kind);
+    await waitForCall(fixture, boundary);
+    assert.equal(fixture.app.render().memoryControlsDisabled, true);
+    assert.notEqual(fixture.app.render().connectionSwitchGuard.current, 'idle');
+    const callsBefore = [...fixture.calls];
+    await startMutation(fixture, kind);
+    await fixture.app.render().requestDecomposition();
+    assert.deepEqual(fixture.calls, callsBefore);
+    fixture.gates[boundary].reject(new Error('synthetic request rejected before write'));
+    await pending;
+    assert.equal(fixture.app.render().connectionSwitchGuard.current, 'idle');
+    assert.equal(fixture.app.render().memoryControlsDisabled, false);
+    delete fixture.gates[boundary];
+    await startMutation(fixture, kind);
+    assert.equal(fixture.app.render().memoryControlsDisabled, false);
+    assert.equal(fixture.app.render().connectionSwitchGuard.current, 'idle');
+    assert.ok(fixture.app.render().changes.some((change) => change.status === 'applied'));
+  });
+
+  test(`actual App: decomposition first blocks ${kind}, including cancellation until reconciliation completes`, async () => {
+    const fixture = appMemoryFixture();
+    fixture.gates.send = deferred();
+    fixture.gates.reconcile = deferred();
+    const pending = fixture.app.render().requestDecomposition();
+    await waitForCall(fixture, 'send');
+    const before = structuredClone(fixture.memory);
+    const callsBefore = [...fixture.calls];
+    await startMutation(fixture, kind);
+    await fixture.app.render().requestDecomposition();
+    assert.deepEqual(fixture.calls, callsBefore);
+    fixture.app.render().invalidateDecomposition('cancel waiting');
+    await startMutation(fixture, kind);
+    assert.equal(fixture.app.render().memoryControlsDisabled, true);
+    fixture.gates.send.resolve();
+    await waitForCall(fixture, 'reconcile');
+    await startMutation(fixture, kind);
+    assert.equal(fixture.app.render().connectionSwitchGuard.current, 'learning');
+    assert.deepEqual(fixture.memory, before);
+    fixture.gates.reconcile.resolve();
+    await pending;
+    assert.equal(fixture.app.render().decompositionResult, null);
+    assert.equal(fixture.app.render().memoryControlsDisabled, false);
+    await startMutation(fixture, kind);
+    assert.ok(fixture.app.render().changes.some((change) => change.operation !== 'learning_coaching_reconcile' && change.status === 'applied'));
+  });
+}

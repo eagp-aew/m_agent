@@ -503,7 +503,9 @@ export async function executeLearningCoaching({
   requiredPort(workflow, 'sendMessage');
   requiredPort(workflow, 'reconcileTemporaryMemory');
   const agentId = exactAgentId(expectedAgentId, 'Expected Agent ID');
-  const coachingPrompt = text(prompt, 'Learning coaching prompt');
+  // Validate the normalized view as before, but do not alter quoted learner data.
+  text(prompt, 'Learning coaching prompt');
+  const coachingPrompt = String(prompt);
   const before = await workflow.captureAgentMemory(agentId);
   if (exactAgentId(currentAgentId(), 'Current Agent ID') !== agentId) {
     throw new Error('The connected Agent changed before learning coaching could run.');

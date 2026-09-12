@@ -44,6 +44,12 @@ import {
   executeLearningEpisodePersistence,
 } from './src/domain/learning.mjs';
 import {
+  executeLearningDecomposition,
+  learningDecompositionShortcut,
+  learningNodePrompt,
+  parseLearningDecomposition,
+} from './src/domain/learning-decomposition.mjs';
+import {
   CONNECTION_TYPES,
   WEEKLY_REVIEW_SECTIONS,
   buildWeeklyReviewCoachRequest,
@@ -91,6 +97,10 @@ type ConnectionState = 'offline' | 'connecting' | 'connected' | 'error';
 type ModelSwitchState = 'idle' | 'switching' | 'rollback_locked';
 type LearningCoachPhase = 'diagnosis' | 'explanation' | 'verification';
 type LearningFeedbackTone = 'neutral' | 'good' | 'warn';
+type LearningOutlineNode = {
+  id: string; title: string; objective: string; prerequisites: string[];
+  basis: 'material' | 'general'; sourceParagraphIds: string[];
+};
 type ReflectionConnectionDraft = {
   id: string;
   from: string;
@@ -206,6 +216,16 @@ export default function App() {
   const [learningMisconceptions, setLearningMisconceptions] = useState('');
   const [learningRetrievalQuestions, setLearningRetrievalQuestions] = useState('');
   const [learningBusy, setLearningBusy] = useState(false);
+  const [decompositionOpen, setDecompositionOpen] = useState(false);
+  const [decompositionGoal, setDecompositionGoal] = useState('');
+  const [decompositionMaterial, setDecompositionMaterial] = useState('');
+  const [decompositionBusy, setDecompositionBusy] = useState(false);
+  const [decompositionFeedback, setDecompositionFeedback] = useState('');
+  const [decompositionResult, setDecompositionResult] = useState<{
+    outline: ReturnType<typeof parseLearningDecomposition>; goal: string;
+  } | null>(null);
+  const [visibleCitations, setVisibleCitations] = useState<string[]>([]);
+  const decompositionRevision = useRef(0);
   const [learningCoachOutput, setLearningCoachOutput] = useState('');
   const [learningFeedback, setLearningFeedback] = useState('');
   const [learningFeedbackTone, setLearningFeedbackTone] = useState<LearningFeedbackTone>('neutral');
@@ -239,6 +259,7 @@ export default function App() {
   const [restorePreview, setRestorePreview] = useState<ReturnType<typeof createRestorePreview> | null>(null);
   const [restoreConfirmation, setRestoreConfirmation] = useState('');
   const [snapshotBusy, setSnapshotBusy] = useState(false);
+  const [memoryMutationBusy, setMemoryMutationBusy] = useState(false);
   const [modelSwitchState, setModelSwitchState] = useState<ModelSwitchState>('idle');
   const [modelSwitchOutcome, setModelSwitchOutcome] = useState('');
   const connectionSwitchGuard = useRef<'idle' | 'connecting' | 'switching' | 'learning' | 'reflection' | 'memory_change' | 'rollback_locked'>('idle');
@@ -293,6 +314,7 @@ export default function App() {
       setActiveSettings(normalized);
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
       agentBindingRef.current = { client: nextClient, agentId: nextAgent.id };
+      invalidateDecomposition('连接已更新；旧拆解已清除，输入草稿仍保留。');
       setClient(nextClient);
       setAgent(nextAgent);
       if (nextBlocks.length) setBlocks(nextBlocks);
@@ -379,6 +401,18 @@ export default function App() {
     if (!content || sending) return;
     if (connectionSwitchGuard.current !== 'idle') {
       setSendFeedback('正在处理另一项操作，请稍后发送。你的草稿已保留。');
+      return;
+    }
+    const shortcut = learningDecompositionShortcut(submittedDraft);
+    if (shortcut) {
+      setDecompositionOpen(true);
+      if (!decompositionGoal.trim()) {
+        setDecompositionGoal(shortcut.goal);
+        invalidateDecomposition('已准备拆解目标。请检查后点击“生成拆解”；对话草稿保留，尚未发送。');
+      } else {
+        setDecompositionFeedback('已打开拆解。已有目标和对话草稿均已保留；请检查目标后再生成。');
+      }
+      setSendFeedback('拆解入口已打开，本次没有发送消息。');
       return;
     }
     if (!client || !agent || connection !== 'connected') {
@@ -469,6 +503,93 @@ export default function App() {
   function currentLearningAgentId(expectedClient: PersonalCoLettaClient): string {
     const binding = agentBindingRef.current;
     return binding?.client === expectedClient ? binding.agentId : '__changed_agent__';
+  }
+
+  function invalidateDecomposition(feedback = '输入已修改；旧拆解已清除，请重新生成。') {
+    decompositionRevision.current += 1;
+    setDecompositionResult(null);
+    setVisibleCitations([]);
+    setDecompositionFeedback(feedback);
+  }
+
+  async function requestDecomposition() {
+    if (connectionSwitchGuard.current !== 'idle' || sending || importBusy || snapshotBusy) {
+      setDecompositionFeedback('另一项操作仍在处理中，请等待完成。输入草稿已保留。');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected') {
+      setDecompositionFeedback('尚未发送：请先在设置中连接助手。输入草稿已保留。');
+      return;
+    }
+    if (privacy.temporarySession) {
+      setDecompositionFeedback('临时对话模式暂不支持学习拆解；请勿提交敏感材料。可关闭临时模式后再决定是否生成。');
+      return;
+    }
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    const input = Object.freeze({ goal: decompositionGoal, material: decompositionMaterial });
+    invalidateDecomposition('正在生成并核对记忆；请等待。');
+    const revision = decompositionRevision.current;
+    connectionSwitchGuard.current = 'learning';
+    setLearningBusy(true);
+    setDecompositionBusy(true);
+    try {
+      await expectedClient.runPersistentWorkflow('learning decomposition coaching', async (workflow) => {
+        const result = await executeLearningDecomposition({
+          workflow, expectedAgentId,
+          currentAgentId: () => currentLearningAgentId(expectedClient),
+          isCurrent: () => decompositionRevision.current === revision,
+          input,
+        });
+        if (currentLearningAgentId(expectedClient) === expectedAgentId) {
+          setBlocks(result.memory.blocks);
+          setArchive(result.memory.archive);
+        }
+        const reconciliation = result.reconciliation;
+        appendChanges(createMemoryChange({
+          block: 'SESSION', operation: 'learning_coaching_reconcile', source: 'learning_decomposition',
+          epistemicState: 'confirmed', agentId: expectedAgentId,
+          before: reconciliation
+            ? `${reconciliation.restoredBlocks.length} block and ${reconciliation.deletedArchiveIds.length} archive write(s) detected`
+            : 'Memory state captured before coaching',
+          after: result.outcome === 'reconciliation_failed'
+            ? 'Memory reconciliation incomplete; coaching discarded'
+            : 'Pre-coaching memory state restored and verified',
+          status: result.outcome === 'reconciliation_failed' ? 'failed' : 'applied',
+          error: result.outcome === 'reconciliation_failed' ? result.error : null,
+        }) as MemoryChangeRecord);
+        if (result.outcome === 'reconciliation_failed') {
+          setGovernanceNotice(`学习拆解记忆核对失败，请查看变更记录：${result.error}`);
+        }
+        if (decompositionRevision.current !== revision) return;
+        if (result.outcome === 'coached' && result.outline && currentLearningAgentId(expectedClient) === expectedAgentId) {
+          setDecompositionResult({ outline: result.outline, goal: input.goal });
+          setDecompositionFeedback('拆解已通过格式和引用位置检查，不代表教学内容正确或你已掌握。');
+        } else {
+          setDecompositionFeedback(`未显示拆解：${result.error ?? '助手连接已变化。'} 输入仍保留；不会自动重试。`);
+        }
+      });
+    } catch (error) {
+      if (decompositionRevision.current === revision) {
+        setDecompositionFeedback(`拆解未完成：${error instanceof Error ? error.message : '请求异常。'} 输入已保留；不会自动重试。`);
+      }
+    } finally {
+      if (connectionSwitchGuard.current === 'learning') connectionSwitchGuard.current = 'idle';
+      setLearningBusy(false);
+      setDecompositionBusy(false);
+    }
+  }
+
+  function chooseDecompositionNode(nodeId: string) {
+    if (!decompositionResult || decompositionBusy) return;
+    if (draft.trim()) {
+      setDecompositionFeedback('对话框已有草稿，未覆盖。请先处理或清空草稿，再选择知识点。');
+      return;
+    }
+    setDraft((current) => preparePromptDraft(current, learningNodePrompt(
+      decompositionResult.outline, nodeId, decompositionResult.goal,
+    )));
+    setDecompositionFeedback('已在下方对话框准备辅导草稿，可编辑后自行发送；尚未开始或完成课程。');
   }
 
   async function requestLearningCoaching(phase: LearningCoachPhase) {
@@ -972,6 +1093,8 @@ export default function App() {
       after: value,
       status: 'applied',
     }) as MemoryChangeRecord;
+    connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     try {
       const updated = await client.updateBlock(
         block,
@@ -986,6 +1109,9 @@ export default function App() {
       appendChanges(failed);
       setGovernanceNotice(`Memory update failed: ${failed.error ?? 'Unknown error'}`);
       setSurface('Memory Changes');
+    } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
     }
   }
 
@@ -1007,6 +1133,7 @@ export default function App() {
     const expectedClient = client;
     const expectedAgentId = agent.id;
     connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     try {
       await expectedClient.runPersistentWorkflow('pending memory proposal apply', async (workflow) => {
         const result = await executePendingMemoryChange({
@@ -1035,6 +1162,7 @@ export default function App() {
         : item));
     } finally {
       if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
     }
   }
 
@@ -1133,6 +1261,8 @@ export default function App() {
     const exactTerm = forgetPreview.exactTerm;
     const failures: string[] = [];
     const logged: MemoryChangeRecord[] = [];
+    connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     try {
       await client.runPersistentWorkflow('forget workflow', async (workflow) => {
     let freshPreview: ReturnType<typeof createForgetPreview>;
@@ -1217,6 +1347,9 @@ export default function App() {
       });
     } catch (error) {
       setGovernanceNotice(error instanceof Error ? error.message : 'Forget workflow could not start.');
+    } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
     }
   }
 
@@ -1249,6 +1382,8 @@ export default function App() {
       after: '',
       status: 'applied',
     }) as MemoryChangeRecord;
+    connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     try {
       await client.deleteArchiveItem(agent.id, item.id);
       setArchive((current) => current.filter((candidate) => candidate.id !== item.id));
@@ -1264,6 +1399,9 @@ export default function App() {
         error: message,
       });
       setGovernanceNotice(`Archive deletion failed for ${item.id}: ${message}`);
+    } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
     }
   }
 
@@ -1277,6 +1415,8 @@ export default function App() {
       setSurface('Settings');
       return;
     }
+    connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     setImportBusy(true);
     const logged: MemoryChangeRecord[] = [];
     const failures: string[] = [];
@@ -1320,6 +1460,8 @@ export default function App() {
     } catch (error) {
       setConnectionError(error instanceof Error ? error.message : 'Import failed.');
     } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
       setImportBusy(false);
     }
   }
@@ -1385,6 +1527,8 @@ export default function App() {
       return;
     }
     const connectedAgentId = agent.id;
+    connectionSwitchGuard.current = 'memory_change';
+    setMemoryMutationBusy(true);
     setSnapshotBusy(true);
     const failures: string[] = [];
     const logged: MemoryChangeRecord[] = [];
@@ -1476,6 +1620,8 @@ export default function App() {
     } catch (error) {
       setGovernanceNotice(error instanceof Error ? error.message : 'Restore workflow could not start.');
     } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
+      setMemoryMutationBusy(false);
       setSnapshotBusy(false);
     }
   }
@@ -1484,6 +1630,8 @@ export default function App() {
     ? '正在复盘'
     : learningBusy
     ? '正在学习'
+    : memoryMutationBusy
+    ? '正在更新记忆'
     : modelSwitchState === 'switching'
     ? '正在切换模型'
     : modelSwitchState === 'rollback_locked'
@@ -1497,6 +1645,7 @@ export default function App() {
             : '尚未连接';
   const persistentWritesPaused = sending || learningBusy
     || reflectionBusy
+    || memoryMutationBusy
     || modelSwitchState !== 'idle'
     || connectionSwitchGuard.current !== 'idle';
   const memoryControlsDisabled = persistentWritesPaused
@@ -1572,6 +1721,45 @@ export default function App() {
               <SurfaceTitle eyebrow="对话" title="今天，想从哪件事开始？" copy="把问题、想法或最近的进展告诉我。我们可以一起理清下一步。" />
               {connection !== 'connected' && <View style={styles.connectionCard}><Text style={styles.sectionTitle}>{connection === 'connecting' ? '正在接通你的助手…' : '先接通你的助手'}</Text><Text style={styles.subtitle}>连接后才会发送消息和读取真实记忆。现在也可以先写草稿。</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>打开连接设置</Text></Pressable></View>}
               <View style={styles.secondaryNav}>{PROMPT_STARTERS.map((prompt) => <Pressable key={prompt} accessibilityRole="button" disabled={sending || Boolean(draft.trim())} onPress={() => setDraft((current) => preparePromptDraft(current, prompt))} style={[styles.presetButton, (sending || Boolean(draft.trim())) && styles.buttonDisabled]}><Text style={styles.presetButtonText}>{prompt}</Text></Pressable>)}</View>
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: decompositionOpen }} onPress={() => setDecompositionOpen((current) => !current)} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>{decompositionOpen ? '收起拆解' : '帮我拆解'}</Text></Pressable>
+              {decompositionOpen && (
+                <View style={styles.decompositionPanel}>
+                  <Text style={styles.sectionTitle}>把学习目标拆成可开始的小步</Text>
+                  <Text style={styles.fieldHelp}>也可以在对话里写“请拆解…”或“帮我拆解…”，点击发送只会准备此入口。请先用非敏感材料试用。</Text>
+                  <Text style={styles.fieldLabel}>拆解目标 · {decompositionGoal.length}/1000</Text>
+                  <TextInput accessibilityLabel="拆解目标" value={decompositionGoal} onChangeText={(value) => { setDecompositionGoal(value); invalidateDecomposition(); }} multiline placeholder="例如：理解条件概率并能解释生活中的例子" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>学习材料（可选）· {decompositionMaterial.length}/8000</Text>
+                  <TextInput accessibilityLabel="学习材料" value={decompositionMaterial} onChangeText={(value) => { setDecompositionMaterial(value); invalidateDecomposition(); }} multiline placeholder="粘贴短材料；空行分段。不填时按一般知识拆解。" placeholderTextColor="#9693a3" style={styles.learningTextArea} />
+                  <Text style={styles.fieldHelp}>按原始 UTF-16 码元计数（部分 emoji 占 2 个），包含空白；超出上限会拒绝，不会自动截断。仅本次页面会话保留，刷新会丢失；不是已保存课程或学习完成记录。</Text>
+                  {connection !== 'connected' && <Text style={styles.errorText}>尚未连接，不能生成；请先打开连接设置，草稿会保留。</Text>}
+                  {privacy.temporarySession && <Text style={styles.errorText}>临时对话模式暂不支持学习拆解。请勿提交敏感材料。</Text>}
+                  <View style={styles.secondaryNav}>
+                    <Pressable accessibilityRole="button" disabled={memoryControlsDisabled || privacy.temporarySession || importBusy || snapshotBusy} onPress={() => void requestDecomposition()} style={[styles.primaryButton, (memoryControlsDisabled || privacy.temporarySession || importBusy || snapshotBusy) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{decompositionBusy ? '生成与核对中…' : '生成拆解'}</Text></Pressable>
+                    {decompositionBusy && <Pressable accessibilityRole="button" onPress={() => invalidateDecomposition('已取消等待，后续拆解不会显示。远端请求没有被撤销，记忆核对仍会继续；完成前不能再次发送。')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>取消等待</Text></Pressable>}
+                  </View>
+                  {decompositionFeedback ? <View accessibilityLiveRegion="polite" style={styles.noticeBox}><Text style={styles.noticeText}>{decompositionFeedback}</Text></View> : null}
+                  {decompositionResult && (
+                    <View style={styles.decompositionOutline}>
+                      <Text style={styles.sectionTitle}>学习顺序建议</Text>
+                      <Text style={styles.cardBody}>{decompositionResult.outline.summary}</Text>
+                      <Text style={styles.fieldHelp}>“材料引用”只证明段落位置存在，不证明结论受材料支持或内容正确；“一般讲解”没有材料证据。选择知识点只准备对话草稿。</Text>
+                      {draft.trim() ? <Text style={styles.fieldHelp}>对话框已有草稿，请先处理或清空，再选择知识点；不会覆盖。</Text> : null}
+                      {decompositionResult.outline.nodes.map((node: LearningOutlineNode, index: number) => (
+                        <View key={node.id} style={styles.decompositionNode}>
+                          <Text style={styles.sectionTitle}>{index + 1} · {node.title}</Text>
+                          {node.id === decompositionResult.outline.firstStepId && <Pill tone="good">建议第一步</Pill>}
+                          <Text style={styles.cardBody}>{node.objective}</Text>
+                          <Text style={styles.fieldHelp}>前置知识：{node.prerequisites.length ? node.prerequisites.map((id) => decompositionResult.outline.nodes.find((item: LearningOutlineNode) => item.id === id)?.title).join('、') : '无前置依赖'}</Text>
+                          <Pill>{node.basis === 'material' ? '材料引用' : '一般讲解'}</Pill>
+                          {node.basis === 'material' && <Pressable accessibilityRole="button" accessibilityState={{ expanded: visibleCitations.includes(node.id) }} onPress={() => setVisibleCitations((current) => current.includes(node.id) ? current.filter((id) => id !== node.id) : [...current, node.id])} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>{visibleCitations.includes(node.id) ? '收起' : '查看'}引用原文 · {node.sourceParagraphIds.join('、')}</Text></Pressable>}
+                          {visibleCitations.includes(node.id) && decompositionResult.outline.paragraphs.filter((paragraph) => node.sourceParagraphIds.includes(paragraph.id)).map((paragraph) => <View key={paragraph.id} style={styles.previewBox}><Text style={styles.fieldLabel}>{paragraph.id}</Text><Text selectable style={styles.learningCoachText}>{paragraph.text}</Text></View>)}
+                          <Pressable accessibilityRole="button" disabled={Boolean(draft.trim()) || persistentWritesPaused} onPress={() => chooseDecompositionNode(node.id)} style={[styles.secondaryOutlineButton, (Boolean(draft.trim()) || persistentWritesPaused) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>从“{node.title}”开始</Text></Pressable>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              )}
               {sendFeedback ? <View style={styles.errorBox}><Text style={styles.errorText}>{sendFeedback}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>查看连接设置</Text></Pressable></View> : null}
               {connectionError ? <View style={styles.errorBox}><Text style={styles.errorText}>连接未完成：{connectionError}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>检查配置并重试</Text></Pressable></View> : null}
               <View style={styles.chatPanel}>
@@ -2099,6 +2287,9 @@ const styles = StyleSheet.create({
   statePreviewValue: { color: '#514489', fontSize: 18, fontWeight: '900' },
   learningCompleteButton: { marginTop: 8 },
   learningCoachPanel: { marginTop: 15, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17, padding: 20 },
+  decompositionPanel: { marginVertical: 15, padding: 16, gap: 9, minWidth: 0, backgroundColor: '#fff', borderWidth: 1, borderColor: line, borderRadius: 17 },
+  decompositionOutline: { gap: 12, minWidth: 0 },
+  decompositionNode: { padding: 13, gap: 8, minWidth: 0, backgroundColor: '#faf8f5', borderWidth: 1, borderColor: line, borderRadius: 12 },
   learningCoachText: { color: ink, fontSize: 13, lineHeight: 20, marginTop: 12, padding: 13, backgroundColor: '#faf8f5', borderRadius: 10, borderWidth: 1, borderColor: '#e4dfd9' },
   reflectionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   reflectionCard: { gap: 8, alignSelf: 'flex-start' },

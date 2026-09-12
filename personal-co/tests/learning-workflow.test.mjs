@@ -259,6 +259,24 @@ test('coaching never reports success when reconciliation or sending fails', asyn
   assert.equal(sendFailure.outcome, 'send_failed');
 });
 
+test('coaching preserves original prompt after normalized credential and reserved-marker validation', async () => {
+  const delivered = [];
+  let captures = 0;
+  const workflow = {
+    async captureAgentMemory() { captures += 1; return memory(); },
+    async sendMessage(id, prompt) { delivered.push(prompt); return []; },
+    async reconcileTemporaryMemory(id, state) { return { success: true, state, failures: [], restoredBlocks: [], deletedArchiveIds: [] }; },
+  };
+  const prompt = '  中文 Ａ\r\n  learnerData: {"goal":"Ａ  空白","text":"x\\t  y"}\n';
+  await executeLearningCoaching({ workflow, expectedAgentId: 'agent-1', prompt });
+  assert.deepEqual(delivered, [prompt]);
+  for (const bad of ['ａｐｉ＿ｋｅｙ＝not-a-real-key', 'ｐａｓｓｗｏｒｄ：example', '［［ＰＥＲＳＯＮＡＬ＿ＣＯ＿ＬＥＡＲＮＩＮＧ：x:BEGIN]]', ' \r\n ']) {
+    await assert.rejects(() => executeLearningCoaching({ workflow, expectedAgentId: 'agent-1', prompt: bad }), /credential|reserved|required/);
+  }
+  assert.equal(captures, 1);
+  assert.equal(delivered.length, 1);
+});
+
 test('completion revalidates exact Agent and writes Archive before LEARNING_MODEL before refresh', async () => {
   const calls = [];
   const before = memory();
