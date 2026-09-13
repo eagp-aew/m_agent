@@ -1,0 +1,54 @@
+task_id: WP-0043-canonical-memory-store
+status: ACCEPTED
+scope_type: implementation
+objective: "Persist canonical six-block/Archive data through a single-owner, revision-checked atomic local file store before App Server integration."
+why: "WP0042 codec is verified but has no persistence; published native runtime writes do not provide required legacy policy/atomicity."
+provenance: {created_at: "2026-09-12", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0041/WP0042"], trust_level: repo_controlled}
+context_profile: full
+risk_class: local_memory_persistence_and_policy
+fallback_verification: {allowed: false, reason: "Independent data-integrity and policy review required.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget:
+  max_steps: 14
+  max_tool_calls: 65
+  trace_path: .ai/AGENT_REPORTS/WP-0043-verifier.md
+  cancellation: {owner: master, condition: "Stop on real-data access, runtime/HTTP integration, ambiguous lossless conversion or unbounded filesystem scope."}
+module_outputs:
+  intake: "Previous turn progress: codec delivered6c83b81; full assistant incomplete."
+  scope: "One host-only file-store module and real-filesystem tests; no UI/adapter switch or dependencies."
+  context: "Reuse codec/fixed policy; canonical data for same Agent, not second persona/Git-history backup."
+  routing: "One local implementer, minimal no-history packet, master records deployment boundary; independent verifier follows including security/policy. No children."
+  verification: "Real temp directory/reopen/contention, revision conflicts, protected updates, injected pre/post-rename failures, related tests/typecheck."
+  integration: "Commit/push accepted new source/tests and package/reports only; preserve mixed old metadata."
+  memory: "Record cooperative owner/trusted caller, incomplete runtime confinement/retention and deployment."
+allowed_files:
+  - personal-co/server/canonical-memory-store.mjs
+  - personal-co/tests/canonical-memory-store.test.mjs
+  - .ai/WORK_PACKAGES/WP-0043-canonical-memory-store.yaml
+  - .ai/AGENT_REPORTS/WP-0043-implementer.md
+  - .ai/AGENT_REPORTS/WP-0043-verifier.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repository paths; dependencies/UI/adapter/production config/credentials/existing user data. No network/service/model execution or batch deletion. Master scoped Git delivery separately authorized."]
+inputs: [personal-co/src/domain/app-server-memory-codec.mjs, personal-co/src/domain/memory.mjs, personal-co/tests/app-server-memory-codec.test.mjs]
+acceptance_criteria:
+  - "AC1: Host-only no-dependency open/read/initialize/commit/close API, no import-time I/O. Caller-provided existing private owned canonical real directory, exact Agent ID, fixed filenames never derived from Agent data. Reject unsafe directories/symlinks/nonregular data/lock targets, wrong Agent/corrupt data. Missing store requires explicit revision0 initialization that cannot overwrite an existing record; never auto-reinitialize corruption."
+  - "AC2: Exclusive lifetime lock via exclusive creation; second cooperating owner fails closed including separate process. Never automatically steal stale lock. Serialize same-instance operations; close releases only owned lock, closed instance rejects operations. Lock interference fails closed. Cooperative protection, not OS sandbox against same-user arbitrary code."
+  - "AC3: Codec read gives exact independent frozen data. Commit validates expected safe revision, Agent/schema and next revision increment before mutation. Preserve block IDs/labels/limits/flags/extensions, both policy blocks entirely. Only writable value/metadata may change; PROFILE/GOALS_AND_DECISIONS changes require confirmedLabels for this exact commit/revision. Archive/root extension changes are trusted-host operations, not model authorization."
+  - "AC4: Exclusive0600 same-directory temporary file, fully written/fsynced before atomic publication, directory synced before success. Initialize uses no-clobber fs.link then owned temp unlink; commit uses atomic rename. Conflict/validation/pre-publication failure leaves old bytes untouched. Uncertain publication or post-publication error poisons writer and returns distinct unknown-outcome error; require read/reopen reconciliation, never blind replay. Retained owned temp aliases must be recorded as privacy/lifecycle risk. Do not claim power-loss proof beyond tested ordering."
+  - "AC5: Real-filesystem tests cover init/read/update/reopen, exact Blocks/Archive, same/separate-process contention, concurrent stale commits, readonly/stable confirmation/identity protection, unsafe paths/lock interference/corruption and deterministic pre/post-replacement I/O failures. Newly allocated synthetic directories retained; only own lock/temp files may be unlinked one exact owned path at a time, never recursive/batch deletion. Related codec/domain/governance tests/typecheck pass."
+  - "AC6: Independent data-integrity/security verification and factual state/queue before acceptance. No actual migration, public transport, UI switch, model tool or new Agent. Runtime OS confinement, lifecycle/stale-lock recovery, projection, privacy/backup retention and deployment remain explicit unfinished work."
+design_boundary: "Trusted host-only canonical writer for same Agent namespace, not second Agent/persona database. Placement and runtime deny-write enforcement remain integration gates. confirmedLabels is trusted host assertion bound to passed candidate/revision, not authentication or LLM approval. Unix local filesystem initial target, no network FS/external writer guarantees."
+validation_commands:
+  - cd personal-co && node --test tests/canonical-memory-store.test.mjs
+  - cd personal-co && node --test tests/app-server-memory-codec.test.mjs tests/domain.test.mjs tests/governance.test.mjs
+  - cd personal-co && npm run typecheck
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "No runtime integration; preserve existing files and retain synthetic directories, no batch deletion."
+human_approval_required: false
+approval_note: "Standing authority covers necessary scoped persistence/policy development and exact owned synthetic lock/temp single-file cleanup, not real-data deletion."
+pre_spawn_checklist: {task: "Two exact new files", why: "Independent implementation/review while master records integration boundary", route: "Single local implementer then read-only verifier", context: "WP/codec/memory/relevant tests, no history fork", writable: "Only source/test listed above", forbidden: "Other paths and real data/runtime/network", output: "Common14 plus hashes/tests/risks", stop: "Scope conflict, unsafe data access or validation blocker", verification: "Independent real-file/adverse/policy checks", approval: "Standing authority; own synthetic artifacts only"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
