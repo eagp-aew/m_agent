@@ -222,6 +222,26 @@ test('upstream capability echo including escaped JSON is rejected without exposu
   const host = await factory(transport); await assert.rejects(host.connect(url), code('INVALID_RESPONSE')); await host.dispose();
 });
 
+test('passive client.closed settles on idle socket loss and deliberate close without reconnect', async () => {
+  const transport = mockTransport(); const host = await factory(transport); const client = await host.connect(url);
+  assert.ok(client.closed instanceof Promise);
+  transport.sockets[0].terminate(); assert.equal(await client.closed, true);
+  await host.dispose(); assert.equal(transport.sockets.length, 1);
+  const deliberate = await factory(); const ready = await deliberate.connect(url);
+  await ready.close(); assert.equal(await ready.closed, true); await deliberate.dispose();
+});
+
+test('passive client.closed reports bounded unconfirmed cleanup and stays false after a late close', async () => {
+  const transport = mockTransport(); const host = await factory(transport); const client = await host.connect(url);
+  const socket = transport.sockets[0]; socket.terminate = () => {};
+  const started = performance.now();
+  await assert.rejects(client.close(), code('CLEANUP_FAILED'));
+  assert.equal(await client.closed, false);
+  assert.ok(performance.now() - started >= 900); assert.ok(performance.now() - started < 3000);
+  socket.emit('close', 1006, Buffer.from('PRIVATE_LATE_CLOSE'));
+  assert.equal(await client.closed, false); await host.dispose();
+});
+
 test('unsolicited and late messages never resolve a request or trigger instructions; event flood is bounded', async () => {
   const transport = mockTransport(); const host = await factory(transport); const client = await host.connect(url); const socket = transport.sockets[0];
   socket.message(response(socket.sent[0])); // Completed request, now late.
@@ -345,7 +365,8 @@ test('real ws enforces the configured fragmented-message bound', async t => {
 // Default tests never launch the upstream runtime. This opt-in attests reviewed
 // frozen bytes; the digest is NOT authentication or proof a review took place.
 const reviewFiles = ['../server/authenticated-app-server.mjs', './authenticated-app-server.test.mjs',
-  '../server/package.json', '../server/package-lock.json', '../server/runtime-sandbox.mjs', '../../scripts/probe_runtime_confinement.mjs'];
+  '../server/package.json', '../server/package-lock.json', '../server/runtime-sandbox.mjs', '../../scripts/probe_runtime_confinement.mjs',
+  '../server/runtime-process.mjs'];
 async function reviewedDigest() {
   const hash = createHash('sha256');
   for (const file of reviewFiles) hash.update(await fs.readFile(new URL(file, import.meta.url)));

@@ -1,0 +1,55 @@
+task_id: WP-0047-managed-read-session
+status: ACCEPTED
+scope_type: implementation
+objective: "Compose owned runtime startup, native authentication and same-Agent history reader into a managed host read session with reliable terminal cleanup."
+why: "The upcoming runnable browser broker needs a single owner of process/connection/reader lifecycle. Existing modules cannot currently start or shut down the complete session and the old process helper belongs to probe code."
+provenance: {created_at: "2026-09-13", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0046 accepteddeef3f2"], trust_level: repo_controlled}
+context_profile: full
+risk_class: owned_process_lifecycle_auth_composition
+fallback_verification: {allowed: false, reason: "Independent security-aware verification before native execution and final acceptance.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 18, max_tool_calls: 90, trace_path: .ai/AGENT_REPORTS/WP-0047-verifier.md, cancellation: {owner: master, condition: "Unreviewed upstream execution, secrets/data/provider use, unowned process signals, scope expansion or budget exhaustion."}}
+module_outputs:
+  intake: "Prior goal turn progress: WP0046 delivered. Full assistant, S0/S2-S6 and live learning incomplete, not blocked."
+  scope: "Six product/helper/test paths; preserve sandbox/reader/store/dependencies/UI. Managed existing-Agent read lifecycle, no Agent creation/migration/provider turns/HTTP gateway."
+  context: "Reuse startOwned/validateEndpoint/listenerGone from probe via extracted product helper with backward-compatible exports; compose current authenticated client/reader. Existing root restrictions remain disposable macOS only."
+  routing: "One implementer local exact files; master reviews lifecycle/privacy/source integration concurrently. Independent verifier security review before opt-in actual native run, then independent final corroboration. No children/parallel writers."
+  verification: "Controlled process/socket tests, existing helper and reader/transport tests, typecheck. One reviewed fresh native missing-Agent startup must reject and completely clean own process/socket/group/listener; no successful auth/confinement probe replay."
+  integration: "Only accepted six product files plus scoped WP/three reports committed/pushed; mixed historical memory preserved."
+  memory: "Record managed existing-Agent host session and true native missing-Agent cleanup proof; no runnable full assistant/browser/provider/bootstrap claim."
+allowed_files:
+  - personal-co/server/runtime-process.mjs
+  - personal-co/server/managed-read-session.mjs
+  - personal-co/tests/managed-read-session.test.mjs
+  - personal-co/server/authenticated-app-server.mjs
+  - personal-co/tests/authenticated-app-server.test.mjs
+  - scripts/probe_runtime_confinement.mjs
+  - .ai/WORK_PACKAGES/WP-0047-managed-read-session.yaml
+  - .ai/AGENT_REPORTS/WP-0047-implementer.md
+  - .ai/AGENT_REPORTS/WP-0047-verifier.md
+  - .ai/AGENT_REPORTS/WP-0047-runtime.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo writes, dependencies/manifests, sandbox/reader/store/codec/UI/REST adapter changes, old runtime installation or state, real credentials/data/providers, production paths/config, deleting files or batch cleanup."]
+inputs: [personal-co/server/runtime-sandbox.mjs, personal-co/server/authenticated-app-server.mjs, personal-co/server/conversation-reader.mjs, scripts/probe_runtime_confinement.mjs, tests/test_runtime_confinement_probe.mjs]
+human_approval_required: false
+approval_note: "Standing authorization covers necessary process ownership and passive connection lifecycle API/extraction. No privileges, runtime commands, dependency or sandbox grants expanded. Only owned synthetic process groups may be stopped; no unrelated scans/kills, native execution only after independent frozen-source review."
+acceptance_criteria:
+  - "AC1: Extract startOwned/validateEndpoint/listenerGone into import-safe runtime-process.mjs; old probe imports/reexports remain compatible and no product module imports scripts. Preserve bounded exact native startup parsing, clean spec spawn/no shell, log ceiling, PID guard, TERM/KILL/confirmed group cleanup and listener check. Add passive settled failure notification for child error/log overflow and post-ready invalid/multiple endpoint lines; raw output stays internal to probe/helper, never managed-session errors/results. Keep reviewed-source digests covering newly imported helper."
+  - "AC2: Authenticated client exposes a passive closure promise without polling/reconnect or exposing capability; existing token/header/command/endpoint policies unchanged. New managed factory composes unchanged sandbox validation/auth factory, owned process, exact endpoint authentication, bounded unique visible-tagged expected Agent preflight and reader. Trusted host config supplies exact roots/Agent ID; capture config before awaits. Return only bounded reader methods, terminal/status/close handles, never raw client/child/spec/token/logs or arbitrary RPC. No Agent creation or writes."
+  - "AC3: Validate before spawning; one active session per exact stateRoot within this host module, rejected duplicates, lease retained on uncertain cleanup. Document no cross-process exclusivity claim: host controls directories; no disk lock/recovery/migration invented. Readiness means authenticated pinned info and exact expected visible personal-co-v1 Agent, not model/provider availability. Every public read refuses when not ready/closing/closed and preserves reader per-operation cancellation semantics."
+  - "AC4: Startup timeout/error/bad endpoint/auth failure/missing or wrong Agent/abort, spontaneous child exit, idle socket closure and log overflow lead to terminal cleanup. Invalidate reader synchronously on terminal transition; close auth sockets/capability then stop only owned group, confirm reaping/group absence and observed listener refusal when endpoint known. close idempotent, bounded, no auto retry/restart; cleanup failures reported explicitly rather than successful closure. No raw upstream error causes. Lifetime cancellation distinct from a read's delivery cancellation."
+  - "AC5: Controlled tests cover all lifecycle branches, duplicate lease, late startup/auth completion, pending reads, repeat close, post-ready child/socket/log failures, errors without usable PID, cleanup failure, and no browser credential/object leakage. Integrate real loopback ws with actual authenticated client and reader plus controlled process seam for ready/read/close. Existing confinement-helper and reader/auth tests pass; defaults never launch upstream."
+  - "AC6: After independent pre-execution security PASS for frozen sources only, opt-in test uses fresh private /private/tmp roots, reused pinned install and default actual manager. Expected missing synthetic Agent must fail closed after real authenticated startup and complete owned cleanup. No Agent create, native file write, provider/turn calls or old-state access. Capture only public hashes/pins/root/PID/endpoint/cleanup observations through trusted test seam, no token. Retain fixture, final verifier corroborates evidence and absence without rerunning passed test."
+  - "AC7: Targeted/related/typecheck/whitespace and independent AC/security evidence pass; memory records experimental macOS existing-Agent session only. Agent bootstrap, real canonical integration, HTTP/browser authentication, creation/sending/classification, privacy retention and provider deployment remain unfinished. No production/root/ownership guarantee extrapolation."
+validation_commands:
+  - "WP0045_RUN_NATIVE=0 WP0047_RUN_NATIVE=0 node --test personal-co/tests/managed-read-session.test.mjs personal-co/tests/authenticated-app-server.test.mjs personal-co/tests/conversation-reader.test.mjs tests/test_runtime_confinement_probe.mjs"
+  - "cd personal-co && npm run typecheck"
+  - "Opt-in native missing-Agent test only after independent frozen-source review; invocation/hashes in runtime report."
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "No production switch/data migration; stop only test-owned sockets/processes and retain synthetic directories. Preserve all unrelated changes."
+pre_spawn_checklist: {task: "Six exact files", why: "Bounded lifecycle implementation while main independently reviews ownership/source/digest boundaries", route: "Single implementer then security-aware independent verifier", context: "WP/current modules/probe process helper/tests only", writable: "Six named product paths", forbidden: "All other writes and live native before review", output: "Common14/freeze/opt-in invocation", stop: "Scope/credential/cleanup/unreviewed execution pressure", verification: "Controlled lifecycle tests, reviewed one native failure/cleanup then final verifier", approval: "Standing authorization; no children or parallel writes"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]

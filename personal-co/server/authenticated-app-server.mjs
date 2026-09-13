@@ -179,6 +179,9 @@ function createConnection(url, token, onClosed, { WebSocketImpl, handshakeMs, re
   if (lifetimeSignal?.aborted) abort();
 
   const client = Object.freeze({
+    // Passive, never-rejecting notification. False means cleanup could not be
+    // confirmed before its deadline; a later close cannot rewrite that result.
+    closed: didClose,
     request(type, input = {}, options = {}) {
       try {
         const signal = signalOption(options);
@@ -251,7 +254,8 @@ export async function createAuthenticatedAppServer(roots, {
         await connection.opened;
         const info = await connection.client.request('app_server_info');
         check(!disposed, 'DISPOSED'); check(!signal?.aborted, 'ABORTED');
-        return Object.freeze({ info, request: connection.client.request, close: connection.client.close });
+        return Object.freeze({ info, request: connection.client.request, close: connection.client.close,
+          closed: connection.client.closed });
       } catch (failure) {
         try { await connection.client.close(); } catch { throw error('CLEANUP_FAILED'); }
         throw failure;
