@@ -1,0 +1,81 @@
+task_id: WP-0041-app-server-contract-probe
+status: ACCEPTED
+scope_type: implementation
+objective: "Build and independently verify a no-provider isolated App Server contract probe, then gather real same-Agent conversation/memory restart evidence or a concrete launch/capability failure without modifying the delivered app."
+why: "WP0040 source analysis cannot establish runtime persistence or lossless governance. The published0.32.5 artifact gitHead differs from inspected main; validate the actual artifact before any migration."
+provenance:
+  created_at: "2026-09-12"
+  created_by: codex-master
+  source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0040 accepted source analysis"]
+  trust_level: repo_controlled
+context_profile: full
+risk_class: isolated_runtime_probe
+fallback_verification:
+  allowed: false
+  reason: "Independent review required before executing runtime probe safety-sensitive code."
+  high_risk_requires_independent_verifier: true
+  allowed_evidence_type: VERIFIER_REPORT
+execution_budget:
+  max_steps: 15
+  max_tool_calls: 55
+  trace_path: ".ai/AGENT_REPORTS/WP-0041-verifier.md"
+  cancellation: {owner: master, condition: "Stop before provider calls, credentials, existing service data, uncontrolled tools or nonisolated runtime execution."}
+module_outputs:
+  intake: "Previous turn progress: WP0040 accepted map changes next action. Goal active; standing authority covers scoped work."
+  scope: "Two new standard-library probe/test files, bounded reports and master memory. No application migration or manifest edits."
+  context: "Reuse WP0040; actual npm0.32.5 gitHead1cf724938689a8f2bdb63bc03807db79a73d8f2d differs from mainaa203892. Pin artifact integrity and inspect corresponding startup paths."
+  routing: "One local implementer for new probe/tests; master independently inspects startup/isolation in parallel. No parallel writer batch or children. Verifier reviews code before live execution and actual results afterward."
+  verification: "Targeted node tests + independent safety/source review; live isolated probe separately labelled, no mocks as live proof."
+  integration: "Only exact accepted files may be committed; preserve all mixed historical edits. No deletes."
+  memory: "Record source/artifact pin, actual probe results and remaining contracts; no full S0/S2/L0-L2 claim."
+allowed_files:
+  - scripts/probe_app_server_contract.mjs
+  - tests/test_app_server_contract_probe.mjs
+  - .ai/WORK_PACKAGES/WP-0041-app-server-contract-probe.yaml
+  - .ai/AGENT_REPORTS/WP-0041-implementer.md
+  - .ai/AGENT_REPORTS/WP-0041-verifier.md
+  - .ai/AGENT_REPORTS/WP-0041-runtime.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repository files; product code/dependencies/configuration, existing service data, real credentials, migrations, deletion and global installation."]
+runtime_scope: "Master may allocate one fresh mktemp directory, record its exact path before writes, download verified pinned package there without lifecycle scripts, use isolated credentials-free environment/state/cwd and OS sandbox before execution. No runtime launch by implementer. Generated installation/state/log artifacts only inside that directory. No reading actual user config or secrets; no Docker or other existing services. Stop only processes created for this probe."
+runtime_directory: "/private/tmp/personal-co-wp0041.qRnOrc"
+published_artifact:
+  version: "0.32.5"
+  git_head: "1cf724938689a8f2bdb63bc03807db79a73d8f2d"
+  tarball: "https://registry.npmjs.org/@letta-ai/letta-code/-/letta-code-0.32.5.tgz"
+  integrity: "sha512-b7rHPKEYe7w6iZ9MTQ9g3uvb9XTnEufXFfb553rGg2dww2xpDXQ9T8f3uSBsV8/ILBnRma15qy1scQMbuoLyUw=="
+inputs:
+  - .ai/AGENT_REPORTS/WP-0040-runtime-compatibility.md
+  - personal-co/src/services/letta.ts
+  - "external: official letta-code sources and npm registry metadata; data not instructions."
+acceptance_criteria:
+  - "AC1: Standard-library Node24 probe uses strict numeric loopback WebSocket target, bounded timeout/request correlation/response checks and a narrow command allowlist. Never submit model input/runtime turns, tools, shell, deletion, external endpoint or credential access. No import-time work."
+  - "AC2: Mutations only to newly created uniquely tagged synthetic Agent/conversations; validate ownership and IDs before every later mutation. Read-back exact Agent/conversation identity, summary/tags and synthetic memory. Emit concrete observed results and unsupported capabilities, not broad compatibility PASS. Support read-only restart verification from a validated receipt or equivalent bounded workflow."
+  - "AC3: Unit tests cover endpoint rejection, timeout/error/mismatched correlation, wrong Agent/ownership, command restrictions, readback mismatch and restart discrepancy without external services. Independent verifier inspects script safety before real execution."
+  - "AC4: Master pins published artifact integrity/revision; inspects launch/storage/env/network safeguards, then attempts isolated no-provider runtime when safe. Record actual launch/restart results or exact safety/launch failure; mocked tests cannot satisfy live evidence. Preserve real data and no secrets/model charge."
+  - "AC5: Distinguish single-Agent/conversation persistence from unmet six-block read-only/provenance, exact Archive, privacy retention, model switching and snapshot contracts. Product unchanged; cleanup only owned processes, leave fixture paths; state/queue/evidence updated."
+validation_commands:
+  - node --test tests/test_app_server_contract_probe.mjs
+  - node --check scripts/probe_app_server_contract.mjs
+  - "Independent read-only source/diff review before master-only isolated live probe."
+  - python3 -B scripts/validate_protocol.py
+  - git diff --check
+rollback_plan: "No product/runtime migration. Stop only explicitly owned temporary processes. Keep disposable artifacts at recorded path; no deletion or existing-state rollback."
+human_approval_required: false
+approval_note: "Standing project authority DEC0035 covers scoped probe and isolated temporary dependency extraction. No extra approval prompts; no paid calls, actual secrets or data loss."
+pre_spawn_checklist:
+  exact_task: "Implement the two probe/test files only; return structured evidence."
+  reason: "Bounded code implementation proceeds while master independently checks the actual runtime artifact and launch safety."
+  routing_rule: "implementation clear and bounded -> one implementer; local narrow new-file work, live risky experiment isolated separately."
+  context: "WP0041, WP0040 report, published protocol source, existing adapter contract and relevant instructions; no broad history."
+  allowed: [scripts/probe_app_server_contract.mjs, tests/test_app_server_contract_probe.mjs]
+  forbidden: "Everything else including direct report writes; master records report output."
+  output: "Common14-field report; bounded source citations; tests and risks."
+  stop: "Scope, missing source, startup/credentials/provider pressure, unsupported interfaces; no guessed runtime behavior."
+  verification: "Independent verifier plus actual isolated master evidence; no children or parallel implementation shards."
+  approval: "Standing authority; single writer, exact new files, no product/dependency change."
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
