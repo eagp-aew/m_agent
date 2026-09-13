@@ -50,6 +50,14 @@ import {
   parseLearningDecomposition,
 } from './src/domain/learning-decomposition.mjs';
 import {
+  TUTORING_MAX_TURNS,
+  createTutoringSession,
+  executeTutoringTurn,
+  prepareTutoringRequest,
+  tutoringNodeInput,
+  tutoringShortcut,
+} from './src/domain/learning-tutoring.mjs';
+import {
   CONNECTION_TYPES,
   WEEKLY_REVIEW_SECTIONS,
   buildWeeklyReviewCoachRequest,
@@ -100,6 +108,11 @@ type LearningFeedbackTone = 'neutral' | 'good' | 'warn';
 type LearningOutlineNode = {
   id: string; title: string; objective: string; prerequisites: string[];
   basis: 'material' | 'general'; sourceParagraphIds: string[];
+};
+type TutoringHistoryTurn = {
+  requestId: string; action: string; userText: string; question: { id: string; text: string } | null;
+  result: { explanation: string; question: { id: string; text: string } | null;
+    feedback: { correct: string; misconceptions: string; nextStep: string } | null };
 };
 type ReflectionConnectionDraft = {
   id: string;
@@ -226,6 +239,19 @@ export default function App() {
   } | null>(null);
   const [visibleCitations, setVisibleCitations] = useState<string[]>([]);
   const decompositionRevision = useRef(0);
+  const [tutoringOpen, setTutoringOpen] = useState(false);
+  const [tutoringGoal, setTutoringGoal] = useState('');
+  const [tutoringMaterial, setTutoringMaterial] = useState('');
+  const [tutoringNode, setTutoringNode] = useState<ReturnType<typeof tutoringNodeInput>['node'] | null>(null);
+  const [tutoringMode, setTutoringMode] = useState('practice');
+  const [tutoringDraft, setTutoringDraft] = useState('');
+  const [tutoringSession, setTutoringSession] = useState<ReturnType<typeof createTutoringSession> | null>(null);
+  const tutoringSessionRef = useRef<ReturnType<typeof createTutoringSession> | null>(null);
+  const tutoringRevision = useRef(0);
+  const tutoringSequence = useRef(0);
+  const tutoringNonce = useRef(`tutor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
+  const [tutoringBusy, setTutoringBusy] = useState(false);
+  const [tutoringFeedback, setTutoringFeedback] = useState('');
   const [learningCoachOutput, setLearningCoachOutput] = useState('');
   const [learningFeedback, setLearningFeedback] = useState('');
   const [learningFeedbackTone, setLearningFeedbackTone] = useState<LearningFeedbackTone>('neutral');
@@ -315,6 +341,7 @@ export default function App() {
       setChanges((current) => cancelPendingChangesForConnectionChange(current) as MemoryChangeRecord[]);
       agentBindingRef.current = { client: nextClient, agentId: nextAgent.id };
       invalidateDecomposition('连接已更新；旧拆解已清除，输入草稿仍保留。');
+      resetTutoring('连接已更新；旧辅导会话已结束，输入草稿保留，请重新确认开始。');
       setClient(nextClient);
       setAgent(nextAgent);
       if (nextBlocks.length) setBlocks(nextBlocks);
@@ -403,6 +430,12 @@ export default function App() {
       setSendFeedback('正在处理另一项操作，请稍后发送。你的草稿已保留。');
       return;
     }
+    const tutoringEntry = tutoringShortcut(submittedDraft);
+    if (tutoringEntry) {
+      openTutoring(tutoringEntry.goal);
+      setSendFeedback('辅导入口已打开，本次没有发送消息，对话草稿保留。');
+      return;
+    }
     const shortcut = learningDecompositionShortcut(submittedDraft);
     if (shortcut) {
       setDecompositionOpen(true);
@@ -420,6 +453,7 @@ export default function App() {
       return;
     }
     const userMessage: ChatMessage = { id: `local-${Date.now()}`, role: 'user', content };
+    connectionSwitchGuard.current = 'memory_change';
     setMessages((current) => [...current, userMessage]);
     setSending(true);
     setSendFeedback('');
@@ -478,6 +512,7 @@ export default function App() {
       if (stage === 'not_sent') setMessages((current) => current.filter((message) => message.id !== userMessage.id));
       setSendFeedback(`${stage === 'not_sent' ? '尚未发送。草稿已保留，可检查连接后重试。' : stage === 'received' ? '消息已返回，但后续记忆检查失败。草稿已保留，请先核对结果，不要重复发送。' : '发送结果待核实，服务可能已经收到消息。草稿已保留；请在连接设置中重新连接并核对历史，再决定是否重发。'} ${error instanceof Error ? error.message : '连接异常。'}`);
     } finally {
+      if (connectionSwitchGuard.current === 'memory_change') connectionSwitchGuard.current = 'idle';
       setSending(false);
     }
   }
@@ -590,6 +625,112 @@ export default function App() {
       decompositionResult.outline, nodeId, decompositionResult.goal,
     )));
     setDecompositionFeedback('已在下方对话框准备辅导草稿，可编辑后自行发送；尚未开始或完成课程。');
+  }
+
+  function resetTutoring(feedback = '输入已修改；本次辅导已结束，草稿保留，请重新确认开始。') {
+    tutoringRevision.current += 1;
+    tutoringSessionRef.current = null;
+    setTutoringSession(null);
+    setTutoringFeedback(feedback);
+  }
+
+  function cancelTutoringTurn() {
+    tutoringRevision.current += 1;
+    setTutoringFeedback('已取消本轮等待，已接受的内容和草稿保留。远端请求没有被撤销，记忆核对仍会继续；完成前不能再次发送。');
+  }
+
+  function editTutoringDraft(value: string) {
+    tutoringRevision.current += 1;
+    setTutoringDraft(value);
+    if (tutoringBusy) setTutoringFeedback('回答草稿已修改，本轮回复将丢弃；远端请求与记忆核对仍会继续。');
+  }
+
+  function openTutoring(goal = '', nodeId?: string) {
+    setTutoringOpen(true);
+    setSurface('Chat');
+    if (tutoringSessionRef.current || tutoringGoal || tutoringMaterial || tutoringDraft || tutoringNode || tutoringBusy) {
+      setTutoringFeedback('已打开辅导；已有辅导内容与草稿均保留，未替换目标或发送。');
+      return;
+    }
+    if (nodeId && decompositionResult) {
+      const input = tutoringNodeInput(decompositionResult.outline, nodeId, decompositionResult.goal);
+      setTutoringGoal(input.goal);
+      setTutoringMaterial(input.material);
+      setTutoringNode(input.node);
+    } else {
+      setTutoringGoal(goal);
+    }
+    setTutoringFeedback('已准备辅导。请检查目标、材料和模式，点击“确认开始辅导”才会发送。');
+  }
+
+  async function requestTutoring(action: string) {
+    if (connectionSwitchGuard.current !== 'idle' || sending || importBusy || snapshotBusy) {
+      setTutoringFeedback('另一项操作仍在处理中，请等待完成。辅导草稿已保留。');
+      return;
+    }
+    if (!client || !agent || connection !== 'connected' || privacy.temporarySession) {
+      setTutoringFeedback(privacy.temporarySession ? '临时对话模式暂不支持辅导，请勿提交敏感材料。' : '尚未发送：请先在设置中连接助手。辅导草稿已保留。');
+      return;
+    }
+    const expectedClient = client;
+    const expectedAgentId = agent.id;
+    const baseSession = tutoringSessionRef.current;
+    const revision = tutoringRevision.current;
+    connectionSwitchGuard.current = 'learning';
+    setLearningBusy(true);
+    setTutoringBusy(true);
+    setTutoringFeedback('正在辅导并核对记忆，请等待。');
+    try {
+      if (action === 'start' && baseSession) throw new Error('本次辅导已经开始，请选择当前可用动作。');
+      if (action !== 'start' && !baseSession) throw new Error('请先确认开始辅导。');
+      const sequence = ++tutoringSequence.current;
+      const session = baseSession ?? createTutoringSession({
+        sessionId: `${tutoringNonce.current}-${sequence}`, agentId: expectedAgentId,
+        goal: tutoringGoal, material: tutoringMaterial, mode: tutoringMode, node: tutoringNode,
+      });
+      const submittedDraft = ['answer', 'ask'].includes(action) ? tutoringDraft : '';
+      const request = prepareTutoringRequest(session, action, submittedDraft, `${tutoringNonce.current}-r${sequence}`);
+      const isCurrent = () => tutoringRevision.current === revision && tutoringSessionRef.current === baseSession;
+      await expectedClient.runPersistentWorkflow('learning conversational tutoring', async (workflow) => {
+        const result = await executeTutoringTurn({
+          workflow, expectedAgentId, request,
+          currentAgentId: () => currentLearningAgentId(expectedClient), isCurrent,
+        });
+        if (currentLearningAgentId(expectedClient) === expectedAgentId) {
+          setBlocks(result.memory.blocks);
+          setArchive(result.memory.archive);
+        }
+        const reconciliation = result.reconciliation;
+        appendChanges(createMemoryChange({
+          block: 'SESSION', operation: 'learning_coaching_reconcile', source: 'learning_tutoring',
+          epistemicState: 'confirmed', agentId: expectedAgentId,
+          before: reconciliation
+            ? `${reconciliation.restoredBlocks.length} block and ${reconciliation.deletedArchiveIds.length} archive write(s) detected`
+            : 'Memory state captured before coaching',
+          after: result.outcome === 'reconciliation_failed' ? 'Memory reconciliation incomplete; coaching discarded' : 'Pre-coaching memory state restored and verified',
+          status: result.outcome === 'reconciliation_failed' ? 'failed' : 'applied',
+          error: result.outcome === 'reconciliation_failed' ? result.error : null,
+        }) as MemoryChangeRecord);
+        if (result.outcome === 'reconciliation_failed') setGovernanceNotice(`辅导记忆核对失败，请查看变更记录：${result.error}`);
+        if (!isCurrent()) return;
+        if (result.outcome === 'coached' && result.session && currentLearningAgentId(expectedClient) === expectedAgentId) {
+          tutoringSessionRef.current = result.session;
+          setTutoringSession(result.session);
+          if (['answer', 'ask'].includes(action)) setTutoringDraft((current) => current === submittedDraft ? '' : current);
+          setTutoringFeedback(result.session.history.length === TUTORING_MAX_TURNS
+            ? '已到 8 轮上限，历史完整保留。可结束本次辅导，再明确开始新会话。'
+            : '本轮已显示；教学内容仍需核实，不代表已掌握或学习完成。下一步由你选择。');
+        } else {
+          setTutoringFeedback(`本轮未接受：${result.error ?? '助手连接已变化。'} 已接受内容与草稿保留，不会自动重试；请核对后再明确选择动作。`);
+        }
+      });
+    } catch (error) {
+      if (tutoringRevision.current === revision) setTutoringFeedback(`辅导未完成：${error instanceof Error ? error.message : '请求异常。'} 已接受内容与草稿保留，不会自动重试。`);
+    } finally {
+      if (connectionSwitchGuard.current === 'learning') connectionSwitchGuard.current = 'idle';
+      setLearningBusy(false);
+      setTutoringBusy(false);
+    }
   }
 
   async function requestLearningCoaching(phase: LearningCoachPhase) {
@@ -1754,10 +1895,59 @@ export default function App() {
                           {node.basis === 'material' && <Pressable accessibilityRole="button" accessibilityState={{ expanded: visibleCitations.includes(node.id) }} onPress={() => setVisibleCitations((current) => current.includes(node.id) ? current.filter((id) => id !== node.id) : [...current, node.id])} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>{visibleCitations.includes(node.id) ? '收起' : '查看'}引用原文 · {node.sourceParagraphIds.join('、')}</Text></Pressable>}
                           {visibleCitations.includes(node.id) && decompositionResult.outline.paragraphs.filter((paragraph) => node.sourceParagraphIds.includes(paragraph.id)).map((paragraph) => <View key={paragraph.id} style={styles.previewBox}><Text style={styles.fieldLabel}>{paragraph.id}</Text><Text selectable style={styles.learningCoachText}>{paragraph.text}</Text></View>)}
                           <Pressable accessibilityRole="button" disabled={Boolean(draft.trim()) || persistentWritesPaused} onPress={() => chooseDecompositionNode(node.id)} style={[styles.secondaryOutlineButton, (Boolean(draft.trim()) || persistentWritesPaused) && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>从“{node.title}”开始</Text></Pressable>
+                          <Pressable accessibilityRole="button" onPress={() => openTutoring('', node.id)} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>带我学“{node.title}”</Text></Pressable>
                         </View>
                       ))}
                     </View>
                   )}
+                </View>
+              )}
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: tutoringOpen }} onPress={() => tutoringOpen ? setTutoringOpen(false) : openTutoring()} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>{tutoringOpen ? '收起辅导' : '带我学 / 检查理解'}</Text></Pressable>
+              {tutoringOpen && (
+                <View style={styles.decompositionPanel}>
+                  <Text style={styles.sectionTitle}>一起学清楚，一次一小步</Text>
+                  <Text style={styles.fieldHelp}>对话里以“带我学…”或“检查理解…”开头，点击发送只会准备此入口。先用非敏感材料试用；仅本次页面保留，刷新会丢失。服务端可能保留对话记录；这里不会保存课程、写入学习状态或判断掌握。</Text>
+                  <Text style={styles.fieldLabel}>辅导目标 · {tutoringGoal.length}/1000</Text>
+                  <TextInput accessibilityLabel="辅导目标" value={tutoringGoal} onChangeText={(value) => { setTutoringGoal(value); resetTutoring(); }} multiline placeholder="例如：分数为什么要先确定整体？" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <Text style={styles.fieldLabel}>辅导材料（可选）· {tutoringMaterial.length}/8000</Text>
+                  <TextInput accessibilityLabel="辅导材料" value={tutoringMaterial} onChangeText={(value) => { setTutoringMaterial(value); setTutoringNode(null); resetTutoring(); }} multiline placeholder="粘贴想一起理解的短材料" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  {tutoringNode && <View style={styles.previewBox}><Text style={styles.fieldLabel}>选中知识点：{tutoringNode.title}</Text><Text style={styles.cardBody}>{tutoringNode.objective}</Text><Text style={styles.fieldHelp}>{tutoringNode.basis === 'material' ? '使用该知识点引用的原文；引用存在不保证内容正确。' : '一般讲解，无材料证据。'}</Text></View>}
+                  <Text style={styles.fieldHelp}>上限按原始 UTF-16 码元计数，包含空白（部分 emoji 占 2 个），超限拒绝而不截断。每次辅导最多 {TUTORING_MAX_TURNS} 轮，当前 {tutoringSession?.history.length ?? 0} 轮；发送完整的已接受历史。</Text>
+                  <View style={styles.secondaryNav}>
+                    {[['practice', '解释后检查理解'], ['explain_only', '只解释，不出题']].map(([mode, label]) => <Pressable key={mode} accessibilityRole="button" accessibilityState={{ selected: tutoringMode === mode }} onPress={() => { if (tutoringMode !== mode) { setTutoringMode(mode); resetTutoring('模式已修改；请重新确认开始。草稿保留。'); } }} style={[styles.presetButton, tutoringMode === mode && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{label}</Text></Pressable>)}
+                  </View>
+                  {connection !== 'connected' && <Text style={styles.errorText}>尚未连接，不能发送辅导；草稿可以先写。</Text>}
+                  {privacy.temporarySession && <Text style={styles.errorText}>临时对话模式暂不支持辅导，请勿提交敏感材料。</Text>}
+                  {!tutoringSession && <Pressable accessibilityRole="button" disabled={memoryControlsDisabled || privacy.temporarySession || importBusy || snapshotBusy} onPress={() => void requestTutoring('start')} style={[styles.primaryButton, (memoryControlsDisabled || privacy.temporarySession || importBusy || snapshotBusy) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>{tutoringBusy ? '辅导与核对中…' : '确认开始辅导'}</Text></Pressable>}
+                  {tutoringSession?.history.map((turn: TutoringHistoryTurn) => (
+                    <View key={turn.requestId} style={styles.decompositionNode}>
+                      {turn.action === 'skip' && <Text style={styles.fieldLabel}>已跳过上一题 · 不作答题评价</Text>}
+                      {turn.userText ? <><Text style={styles.fieldLabel}>{turn.action === 'answer' ? '你提交的回答' : '你的提问'}</Text>{turn.action === 'answer' && <Text selectable style={styles.cardBody}>针对：{turn.question?.text}</Text>}<Text selectable style={styles.cardBody}>{turn.userText}</Text></> : null}
+                      <Text style={styles.fieldLabel}>辅导讲解 · 内容待核实</Text>
+                      <Text selectable style={styles.cardBody}>{turn.result.explanation}</Text>
+                      {turn.result.feedback && <View style={styles.previewBox}><Text style={styles.fieldLabel}>针对这次回答的反馈</Text><Text selectable style={styles.cardBody}>正确部分：{turn.result.feedback.correct}</Text><Text selectable style={styles.cardBody}>误解或不足：{turn.result.feedback.misconceptions}</Text><Text selectable style={styles.cardBody}>下一步：{turn.result.feedback.nextStep}</Text></View>}
+                      {turn.result.question && <Text selectable style={styles.cardBody}>当时的问题：{turn.result.question.text}</Text>}
+                    </View>
+                  ))}
+                  {tutoringSession && <>
+                    {tutoringSession.question && <View style={styles.previewBox}><Text style={styles.fieldLabel}>当前问题 · 可以回答、提问或跳过</Text><Text selectable style={styles.cardBody}>{tutoringSession.question.text}</Text></View>}
+                    <Text style={styles.fieldLabel}>我的回答或问题 · {tutoringDraft.length}/2000</Text>
+                    <TextInput accessibilityLabel="我的回答或问题" value={tutoringDraft} onChangeText={editTutoringDraft} multiline placeholder="用自己的话说说；也可以问不明白的地方" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                    <View style={styles.secondaryNav}>
+                      {[
+                        ...(tutoringSession.question ? [['answer', '提交回答'], ['skip', '跳过这题']] : [['next', '继续下一步']]),
+                        ['rephrase', '换个说法'], ['ask', '我来提问'],
+                      ].map(([action, label]) => {
+                        const disabled = memoryControlsDisabled || privacy.temporarySession || importBusy || snapshotBusy || tutoringSession.history.length >= TUTORING_MAX_TURNS || (['answer', 'ask'].includes(action) && !tutoringDraft.trim());
+                        return <Pressable key={action} accessibilityRole="button" disabled={disabled} onPress={() => void requestTutoring(action)} style={[styles.secondaryOutlineButton, disabled && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>{label}</Text></Pressable>;
+                      })}
+                    </View>
+                  </>}
+                  <View style={styles.secondaryNav}>
+                    {tutoringBusy && <Pressable accessibilityRole="button" onPress={cancelTutoringTurn} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>取消本轮等待</Text></Pressable>}
+                    {(tutoringSession || tutoringBusy) && <Pressable accessibilityRole="button" onPress={() => resetTutoring('本次辅导已结束，输入草稿保留；未保存或标记学习完成。若仍有请求，远端与记忆核对继续到完成。')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>结束本次辅导</Text></Pressable>}
+                  </View>
+                  {tutoringFeedback ? <View accessibilityLiveRegion="polite" style={styles.noticeBox}><Text style={styles.noticeText}>{tutoringFeedback}</Text></View> : null}
                 </View>
               )}
               {sendFeedback ? <View style={styles.errorBox}><Text style={styles.errorText}>{sendFeedback}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>查看连接设置</Text></Pressable></View> : null}
