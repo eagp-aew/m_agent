@@ -1,0 +1,52 @@
+task_id: WP-0046-same-agent-conversation-reader
+status: ACCEPTED
+scope_type: implementation
+objective: "Compose the authenticated native client into a same-Agent conversation list/history reader for the upcoming browser broker, including correct projected-message IDs and safe display-only results."
+why: "S2 needs actual named conversations/history, not the legacy default Agent message stream. WP0045 supplies transport but neither identity-scoped reads nor display projection; its generic ID validator also rejects native projected message IDs containing colons."
+provenance: {created_at: "2026-09-13", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0045 accepted3e1826c"], trust_level: repo_controlled}
+context_profile: full
+risk_class: identity_scoping_data_exposure
+fallback_verification: {allowed: false, reason: "Independent verification required for identity and data projection.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 16, max_tool_calls: 75, trace_path: .ai/AGENT_REPORTS/WP-0046-verifier.md, cancellation: {owner: master, condition: "Scope/credential exposure, actual upstream/provider/data access, unbounded pagination or exhausted budget."}}
+module_outputs:
+  intake: "Previous turn progress: WP0045 delivered. Full goal still includes S0/S2-S6 and live learning; not blocked."
+  scope: "One new reader/test plus existing transport/test narrow message-ID fix. No HTTP/UI switch, new storage, dependencies, runtime creation or provider calls."
+  context: "Pinned native projection source137052-137198, list137377-137395, history138328-138344/138768-138850 and page223659 onward; existing auth client and single-Agent policy."
+  routing: "One implementer; main checks pinned paging/identity contract concurrently. Independent verifier with security scope after frozen implementation. No children or parallel writers."
+  verification: "Reproduce projected-message ID incompatibility first, then regression; controlled real WebSocket through actual authenticated client and bounded adversarial tests. Reuse prior native auth/confinement proof without upstream replay."
+  integration: "Exact accepted four product paths plus WP/two reports committed/pushed; preserve mixed historical memory."
+  memory: "Record reader contract and exact limitations. Does not complete browser authorization, persistence UI, classification, temporary privacy or whole S2."
+allowed_files:
+  - personal-co/server/conversation-reader.mjs
+  - personal-co/tests/conversation-reader.test.mjs
+  - personal-co/server/authenticated-app-server.mjs
+  - personal-co/tests/authenticated-app-server.test.mjs
+  - .ai/WORK_PACKAGES/WP-0046-same-agent-conversation-reader.yaml
+  - .ai/AGENT_REPORTS/WP-0046-implementer.md
+  - .ai/AGENT_REPORTS/WP-0046-verifier.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo files; dependencies/manifests, sandbox/probe/store/codec, UI/REST adapter, runtime install/state, secrets/real data, production config, deletions or new services."]
+inputs: [personal-co/server/authenticated-app-server.mjs, personal-co/src/domain/agent.mjs, personal-co/PRODUCT_ROADMAP.md, .ai/AGENT_REPORTS/WP-0045-verifier.md]
+human_approval_required: false
+approval_note: "Standing authorization covers this necessary identity/data-read adapter and narrow transport message-ID compatibility change. Native capability/Agent identity supplied by trusted host, never browser/model input. No auth relaxation or new command privileges."
+acceptance_criteria:
+  - "AC1: Import-safe createConversationReader(client,{agentId}) wraps an existing authenticated client, exact immutable trusted Agent binding, no raw client/capability returned. Public operations listConversations({search?,cursor?},{signal?}), listMessages(conversationId,{cursor?},{signal?}), close(). Strict bounded data inputs and static sanitized failures; no commands beyond current six read RPCs, no implicit Agent creation or writes."
+  - "AC2: Each read validates unique personal-co-v1 tagged Agent using bounded tag-filtered inventory and exact expected ID; zero/duplicate/wrong/missing-tag/malformed Agent fails closed. Every list row, retrieved conversation and message carries exact expected agent_id; messages also exact conversation_id. Before message read validate named conversation ownership/non-hidden status. Revalidate identity and conversation after asynchronous content fetch before returning; no cross-Agent partial results."
+  - "AC3: Return minimal immutable display DTOs only: conversation id/summary/tags/timestamps and message id/role/content/date, with bounded supported fields. Only user_message and assistant_message text content displayed; omit reasoning, tool/system/approval/summary messages and unknown fields, and never return image/base64/tools/secrets/config. Keep text as untrusted text, not HTML/instructions. Unsupported visible attachments are honestly indicated, not silently called a complete transcript. This does not promise temporary-privacy filtering; future trusted broker must apply product privacy gates."
+  - "AC4: Fixed bounded page sizes, native descending order, issued opaque cursors bound to reader/kind/search/conversation, no raw client-supplied native cursors. Detect repeated/duplicate/nonadvancing pages and malformed pagination; preserve continuation even when visible page is empty because native page contains only internal messages. Bound cursor retention and total scanned rows; fail explicitly at bound, no automatic scanning/polling/retries. close invalidates cursors/in-flight result delivery without claiming ownership of borrowed client. Abort honored; caller mutation after async dispatch cannot change request authority."
+  - "AC5: Reproduce current transport rejection of native colon-containing projected message IDs before fixing. Permit bounded native message IDs/cursors separately from strict Agent/conversation IDs; no broad relaxation of entity IDs/endpoints/commands. Regression covers assistant/reasoning/tool projected IDs, hostile IDs and input/query differentiation. Controlled reader tests include real ws server through createAuthenticatedAppServer (synthetic test sandbox seam only), two conversations, Chinese visible content, non-text/internal canaries, pagination and identity races. No actual upstream launch/install/provider calls."
+  - "AC6: Focused reader and transport tests, related domain identity tests/typecheck pass; independent review maps all criteria including security/data scope. Memory accurately records host library only and next browser/lifecycle/creation/classification/live integration work, not a usable deployed S2 or complete assistant."
+validation_commands:
+  - "WP0045_RUN_NATIVE=0 node --test personal-co/tests/conversation-reader.test.mjs personal-co/tests/authenticated-app-server.test.mjs"
+  - "cd personal-co && node --test tests/agent.test.mjs"
+  - "cd personal-co && npm run typecheck"
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "No production switch or stored data changes; close only controlled test sockets, preserve existing files and synthetic artifacts."
+repair_scope: "Independent AC4 FAIL: hidden issued anchor plus21 unseen new rows causes undetected native pagination reset. Fix only reader/tests with one-row overlap verification for both list and history: retain prior page penultimate raw/displayed ID as native boundary and final ID as expected overlap. Resume after/before penultimate with bounded extra row; require first returned raw row exactly prior final ID before dropping overlap and processing continuation. This directly proves continuity despite native missing-cursor fallback, using existing commands/no extra RPC. Preserve lookahead and native next_before semantics, validate overlap ownership, reject stale/hidden/search-removed anchor without consuming opaque cursor. Cover missing anchors and normal continuations for both methods. One product fix after master metadata fix1; no transport/HTTP/runtime changes."
+pre_spawn_checklist: {task: "Four exact product files", why: "Implement scoped reader while master corroborates pinned source paging/IDs", route: "Single implementer then independent security-aware verifier", context: "WP/auth/source excerpts", writable: "Four product paths only", forbidden: "All other writes, live upstream and real data", output: "Common14 with repro and test evidence", stop: "Scope/authority/missing context/validation pressure", verification: "Independent source plus controlled integration tests", approval: "Standing authorization; no children/worktree/parallel writers needed"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]

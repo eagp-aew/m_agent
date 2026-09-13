@@ -111,6 +111,35 @@ test('ready client requires native version/local backend/protocol and capability
   }
 });
 
+test('native projected message IDs and message cursors remain separate from strict entity IDs', async () => {
+  const projected = ['message-1:assistant:2', 'message-1:reasoning:0', 'message-1:tool:call_123:request',
+    'message-1:tool:provider/call:opaque.id:request'];
+  for (const messageId of projected) {
+    const transport = mockTransport({ send: (socket, request) => queueMicrotask(() => socket.message(
+      request.type === 'app_server_info' ? response(request) : response(request,
+        { messages: [{ id: messageId }], next_before: messageId, has_more: false }))) });
+    const host = await factory(transport);
+    try {
+      const client = await host.connect(url);
+      assert.equal((await client.request('conversation_messages_list', { conversation_id: 'conv-1' })).messages[0].id, messageId);
+      await client.request('conversation_messages_list', { conversation_id: 'conv-1', query: { before: messageId } });
+      await client.request('conversation_messages_list', { conversation_id: 'conv-1', query: { after: messageId } });
+      await assert.rejects(client.request('agent_retrieve', { agent_id: messageId }), code('INVALID_REQUEST'));
+      await assert.rejects(client.request('conversation_retrieve', { conversation_id: messageId }), code('INVALID_REQUEST'));
+      await assert.rejects(client.request('agent_list', { query: { after: messageId } }), code('INVALID_REQUEST'));
+      await assert.rejects(client.request('conversation_messages_list', { conversation_id: 'conv-1', query: { agent_id: messageId } }), code('INVALID_REQUEST'));
+    } finally { await host.dispose(); }
+  }
+  const host = await factory(); const client = await host.connect(url);
+  try {
+    for (const value of ['message-1:unknown:2', 'message-1:assistant:-1', 'message-1:assistant:01',
+      'message-1:reasoning:9999999', 'message-1:tool:call\n:request', 'message-1:tool:call:response',
+      'message-1:assistant:2\n', 'message-1:assistant:2\u2028', 'x'.repeat(321)]) {
+      await assert.rejects(client.request('conversation_messages_list', { conversation_id: 'conv-1', query: { before: value } }), code('INVALID_REQUEST'));
+    }
+  } finally { await host.dispose(); }
+});
+
 test('read-only RPC supports bounded pinned shapes and correlates overlapping replies out of order', async () => {
   const waiting = [];
   const transport = mockTransport({ send: (socket, request) => {

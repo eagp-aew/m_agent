@@ -11,6 +11,13 @@ const id = value => {
   const match = typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.exec(value);
   return Boolean(match && match[0] === value && value !== 'default');
 };
+// Native projections append suffixes; provider tool-call IDs are opaque JSON
+// data, never filesystem paths. Entity IDs deliberately keep the strict policy.
+const messageId = value => {
+  const match = typeof value === 'string' && value.length <= 320
+    && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}(?::(?:assistant|reasoning):(?:0|[1-9][0-9]{0,5})|:tool:[^\x00-\x1f\x7f\u2028\u2029]{1,128}:request)?$/.exec(value);
+  return Boolean(match && match[0] === value && value !== 'default');
+};
 const text = value => typeof value === 'string' && value.length <= 256 && !/[\x00-\x1f\x7f]/.test(value);
 const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
@@ -44,7 +51,8 @@ function query(input = {}, kind) {
   const result = { limit: 20 };
   for (const [key, value] of Object.entries(input)) {
     if (key === 'limit') check(Number.isInteger(value) && value >= 1 && value <= 100);
-    else if (['before', 'after', 'agent_id'].includes(key)) check(id(value));
+    else if (['before', 'after', 'agent_id'].includes(key)) check(kind === 'conversation_messages_list'
+      && key !== 'agent_id' ? messageId(value) : id(value));
     else if (key === 'order') check(['asc', 'desc'].includes(value));
     else if (key === 'tags') {
       check(Array.isArray(value) && Object.getPrototypeOf(value) === Array.prototype && value.length <= 10
@@ -91,9 +99,9 @@ function validateResponse(message, pending) {
   } else {
     const key = pending.type === 'agent_list' ? 'agents' : pending.type === 'conversation_list' ? 'conversations' : 'messages';
     check(Array.isArray(message[key]) && message[key].length <= pending.fields.query.limit
-      && message[key].every(item => record(item) && id(item.id)), 'INVALID_RESPONSE');
+      && message[key].every(item => record(item) && (key === 'messages' ? messageId(item.id) : id(item.id))), 'INVALID_RESPONSE');
     if (key === 'messages') check(typeof message.has_more === 'boolean'
-      && (message.next_before === null || id(message.next_before)), 'INVALID_RESPONSE');
+      && (message.next_before === null || messageId(message.next_before)), 'INVALID_RESPONSE');
   }
 }
 
