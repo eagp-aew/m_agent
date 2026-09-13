@@ -1,0 +1,64 @@
+task_id: WP-0042-app-server-memory-codec
+status: ACCEPTED
+scope_type: implementation
+objective: "Implement a lossless, Agent-bound versioned canonical memory codec required by the supported-runtime adapter, without enabling a backend switch or weakening six-block/Archive governance."
+why: "Actual0.32.5 MemFS v2 frontmatter validator accepts replacing legacy read-only content without the old flag. Existing portable snapshot deliberately removes IDs/limits/secret-like metadata, so it is not a lossless runtime persistence format. Preserve existing state before any migration."
+provenance: {created_at: "2026-09-12", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0040/WP0041 evidence"], trust_level: repo_controlled}
+context_profile: full
+risk_class: lossless_memory_data_contract
+fallback_verification: {allowed: false, reason: "Independent implementation verification required; codec is not a runtime authorization layer.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget:
+  max_steps: 12
+  max_tool_calls: 35
+  trace_path: .ai/AGENT_REPORTS/WP-0042-verifier.md
+  cancellation: {owner: master, condition: "Stop at runtime integration, new dependencies, existing data mutation or ambiguous lossless conversion; no blind conversion."}
+module_outputs:
+  intake: "Previous turn progress: WP0041 pushedab4688c; actual synthetic persistence proved, canonical memory compatibility still missing."
+  scope: "Two exact product module/test files; pure codec, no services, UI or adapter switch."
+  context: "Reuse six-block labels/policy from memory.mjs. snapshot.mjs is deliberately lossy/export-oriented; do not change it. Published MemFS v2 policy mismatch is actual compiled-function evidence, not live tool-enforcement proof."
+  routing: "One implementer with minimal no-history packet, master records source/design findings in parallel; independent verifier follows. No child agents or parallel writers."
+  verification: "Exact roundtrip and negative input tests, related memory/snapshot suites and typecheck; no redundant service install/restart or provider calls."
+  integration: "Commit only accepted two product files and scoped package/reports; preserve mixed old metadata."
+  memory: "Record conditional canonical representation and remaining writer/projection/Archive/privacy integration, never call codec runtime enforcement."
+allowed_files:
+  - personal-co/src/domain/app-server-memory-codec.mjs
+  - personal-co/tests/app-server-memory-codec.test.mjs
+  - .ai/WORK_PACKAGES/WP-0042-app-server-memory-codec.yaml
+  - .ai/AGENT_REPORTS/WP-0042-implementer.md
+  - .ai/AGENT_REPORTS/WP-0042-verifier.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["Every other path; existing adapter/UI/domain changes, dependencies/config/auth/migrations/secrets, actual service data, deletion, runtime execution or network writes."]
+inputs: [personal-co/src/domain/memory.mjs, personal-co/src/domain/snapshot.mjs, personal-co/src/domain/agent.mjs, personal-co/src/services/letta.ts, .ai/AGENT_REPORTS/WP-0041-runtime.md]
+acceptance_criteria:
+  - "AC1: Pure no-dependency module exports explicit schema/version and encode/decode API. Envelope contains Agent ID, nonnegative safe-integer revision, exact six blocks and Archive. Decode requires exact expected Agent ID, rejects unknown version/schema and malformed envelope; no import-time I/O."
+  - "AC2: Reuse fixed labels/read-only policy. Require unique nonblank block IDs, exact string values and valid optional limit, correct four-writable/two-read-only flags; accept existing readOnly/read_only representation but reject conflicting aliases. Preserve IDs, values, limits including null, metadata including null and all valid JSON extension fields exactly; no silent coercion/filtering/trimming or policy changes."
+  - "AC3: Archive requires unique nonblank IDs, string text and string-array tags; preserve exact tag ordering/duplicates, timestamps and JSON extension/provenance fields. Optional createdAt/updatedAt timestamps, when present, must be valid strings (do not rewrite offsets/text) or null. Empty Archive valid. No dedupe, synthesis, sorting or delete/write operations."
+  - "AC4: Reject unsupported/lossy JSON values (undefined, non-finite numbers, bigint, functions, symbols, sparse arrays, cycles, nonplain/accessor objects) rather than dropping/coercing. Strict data parser returns an independent deep-frozen representation; errors disclose no source content. No claimed secret stripping: this is internal data format, not share/export format."
+  - "AC5: Tests exercise unicode/newlines/nested metadata, both readonly aliases/conflicts, wrong Agent/schema/version, missing/extra/duplicate labels/IDs, malformed values/limits/tags/timestamps, unsupported JSON, caller mutation and exact Archive ordering. Related memory/snapshot tests and typecheck pass or concrete issues explained."
+  - "AC6: Scope remains codec only; do not claim OS/server read-only enforcement, successful migration, search/delivery/atomic persistence or erasure. Independent verifier evidence and current factual state/queue updates required before acceptance; final accepted-history/DONE after verdict."
+design_boundary: "Canonical format is a candidate single authoritative record inside the same Letta Agent's memory namespace, not a second persona database. No path/write mechanism/projection is enabled here. Protected writer/tool confinement, atomicity/CAS, runtime injection, lossless source-Agent migration and historical-retention policy are separate unresolved integration requirements."
+validation_commands:
+  - cd personal-co && node --test tests/app-server-memory-codec.test.mjs
+  - "Related memory/snapshot node:test files discovered with rg --files, exact names recorded in evidence."
+  - cd personal-co && npm run typecheck
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "No runtime/data conversion or existing behavior enabled; leave unrelated files intact, no deletions."
+human_approval_required: false
+approval_note: "Standing authority covers required scoped development; no runtime permission or real data change in this package."
+pre_spawn_checklist:
+  task: "Implement only new codec/test files; exact ownership and no history fork to minimize redundant context."
+  why: "Bounded implementer writes while master documents actual upstream compatibility findings; verifier independently challenges data-loss behavior."
+  route: "implementation clear and bounded -> one local implementer; no parallel batch, worktree or children needed for new isolated files."
+  context: "WP and listed domain/adapter inputs, relevant instructions; no entire history."
+  writable: [personal-co/src/domain/app-server-memory-codec.mjs, personal-co/tests/app-server-memory-codec.test.mjs]
+  forbidden: "All other paths; return report in message, master records it."
+  output: "Common14 fields, exact tests/evidence/risks, no raw logs."
+  stop: "Scope expansion, missing schema evidence, lossy assumption, I/O/dependency/secrets pressure."
+  verification: "Independent verifier and exact tests; memory closure afterward, no circular acceptance prerequisite."
+  approval: "Standing user authority; no provider/runtime/data side effects."
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
