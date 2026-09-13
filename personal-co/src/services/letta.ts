@@ -493,11 +493,12 @@ export class PersonalCoLettaClient {
     tags: string[],
     createdAt?: string | null,
   ): Promise<void> {
+    // An append may succeed even when its response fails; do not replay it.
     await this.client.agents.passages.create(agentId, {
       text,
       tags,
       created_at: createdAt || undefined,
-    });
+    }, { maxRetries: 0 });
   }
 
   async archiveText(agentId: string, text: string, tags: string[], createdAt?: string | null): Promise<void> {
