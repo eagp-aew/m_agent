@@ -1,0 +1,55 @@
+task_id: WP-0045-authenticated-app-server
+status: ACCEPTED
+scope_type: implementation
+objective: "Add a reusable host-only authenticated App Server connection for the upcoming broker/conversation adapter, and prove actual native capability authentication without exposing credentials to the UI."
+why: "WP0044 proves filesystem confinement but leaves the native loopback service unauthenticated. A real product connection needs header-based capability authentication and bounded transport before personal data or browser integration."
+provenance: {created_at: "2026-09-13", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0044 accepted2740425"], trust_level: repo_controlled}
+context_profile: full
+risk_class: authentication_transport_dependency
+fallback_verification: {allowed: false, reason: "Independent security review before upstream execution and independent final verification required.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 16, max_tool_calls: 75, trace_path: .ai/AGENT_REPORTS/WP-0045-verifier.md, cancellation: {owner: master, condition: "Unreviewed upstream launch, credential exposure, real data/providers, unowned children, scope expansion or exhausted budget."}}
+module_outputs:
+  intake: "Previous goal turn progress: WP0044 accepted/pushed; full assistant incomplete, not blocked."
+  scope: "One host module/test plus isolated server package/lock ws declaration; existing Expo manifests/install untouched. No UI switch, broker HTTP API, provider calls, memory migration or second Agent."
+  context: "Reuse WP0044 sandbox unchanged; pinned native auth source420495-420570/420653-420677/422405-422428 and protocol types1319-1430. Existing installed runtime uses ws8.21.3."
+  routing: "One implementer; main reviews actual upstream contract and integration boundary in parallel. Independent security pre-execution gate then main optional native test/final verifier. No child agents/parallel writers."
+  verification: "Controlled sockets/mocks and typecheck; reviewed opt-in fresh native authentication test; independent final evidence/pins/cleanup review, no repeat confinement/restart test."
+  integration: "Commit/push exact accepted source/test/manifest and scoped reports to existing branch; preserve mixed historical metadata."
+  memory: "Record native authentication truth, safe host-only boundary and pending broker/conversation/UI/provider/lifecycle work."
+allowed_files:
+  - personal-co/server/authenticated-app-server.mjs
+  - personal-co/tests/authenticated-app-server.test.mjs
+  - personal-co/server/package.json
+  - personal-co/server/package-lock.json
+  - .ai/WORK_PACKAGES/WP-0045-authenticated-app-server.yaml
+  - .ai/AGENT_REPORTS/WP-0045-implementer.md
+  - .ai/AGENT_REPORTS/WP-0045-security.md
+  - .ai/AGENT_REPORTS/WP-0045-runtime.md
+  - .ai/AGENT_REPORTS/WP-0045-verifier.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo files, Expo manifests/install, old runtime install/state/profile, UI/adapter/store/codec/sandbox edits, global config, real credentials/data, providers, deletions/batch cleanup, installations beyond exact ws declaration. Generated dependency placement only in fresh personal-co/server/node_modules as required by approved package install; no lifecycle scripts."]
+inputs: [personal-co/server/runtime-sandbox.mjs, scripts/probe_runtime_confinement.mjs, .ai/AGENT_REPORTS/WP-0044-verifier.md]
+approval_note: "Standing user authorization covers this necessary host authentication module and explicit ws8.21.3 direct dependency. Raw new ephemeral capability may be used only for this runtime connection; never expose real account credentials. No new service or paid calls."
+human_approval_required: false
+acceptance_criteria:
+  - "AC1: Server-only import-safe factory composes unchanged validated WP0044 launch spec with native --ws-auth capability-token --ws-token-sha256 flags. Generate cryptographically random >=256-bit ephemeral capability after path validation, keep raw token private to closure; returned enumerable objects/JSON/argv/env/errors never expose it. Fresh factories differ. Dispose prevents new connections and closes owned sockets; no disk/env/browser credential storage or false secure-erasure claim."
+  - "AC2: Connect via explicitly declared exact ws8.21.3, Authorization Bearer header only. Literal ws://127.0.0.1:port/ws endpoint only; no query/userinfo/fragment/aliases/redirects/proxies/custom client-provided headers, no TLS bypass. Fixed handshake timeout/message/fragment limits, compression off. Native HTTP401/403 and other errors sanitized; do not echo upstream bodies, headers, URLs, close reasons or token."
+  - "AC3: Reusable read-only host RPC request surface supports exact app_server_info, agent_list, agent_retrieve, conversation_list, conversation_retrieve, conversation_messages_list shapes from pinned protocol, with bounded limits/cursors/IDs and no files/tools/runtime_start/input/mutations. Correlate own request_id/type, reject malformed responses, cap pending/request bytes and unsolicited events, no automatic retries or reconnect. Return server data as untrusted data, not authorization. Initial info validates pinned version/local backend/protocol before exposing ready client."
+  - "AC4: Controlled tests exercise header-only secrecy, auth errors/redirects, endpoint rejection before socket creation, malformed/mismatched/oversized/late/unsolicited messages, timeout/disconnect/abort/send failure, overlapping requests and disposal cleanup. Defaults cannot launch upstream runtime. Any trusted test seams clearly separate from public/model inputs. Existing sandbox/confinement21 tests and typecheck pass; lock changes limited to exact direct ws and required dependency placement, no unrelated upgrades."
+  - "AC5: After independent frozen-source security PASS only, opt-in test creates fresh private /private/tmp state/protected roots, reuses pinned dependency root, uses existing startOwned test helper for bounded native process. Missing and wrong bearer get actual401; correct private factory connection returns pinned info and empty Agent list. No Agent creation/memory/provider/turn calls. Always close sockets/process group/listener and retain synthetic roots. Report public hashes/pins/observations/owned PIDs only, no token. Final verifier corroborates actual result/cleanup without replaying passed probe."
+  - "AC6: Record actual evidence and current state/queue before acceptance. This is host transport used next by broker, not full UI migration, authentication of browser users, multi-tenant authorization, provider access, erasure/lifecycle recovery or assistant completion. No alternative memory truth/agent introduced."
+validation_commands:
+  - cd personal-co && node --test tests/authenticated-app-server.test.mjs
+  - node --test personal-co/tests/runtime-sandbox.test.mjs tests/test_runtime_confinement_probe.mjs
+  - cd personal-co && npm run typecheck
+  - "After independent security PASS only: opt-in fixed native test; exact invocation/freeze in runtime report."
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+dependency_policy: "Initial Expo install dry-run proposed removal of optional packages; stopped before edits/install. Use new isolated personal-co/server/package.json/private Node host package with exact ws8.21.3 and server/package-lock.json; npm --prefix personal-co/server install --ignore-scripts --no-audit --no-fund --omit=optional into fresh server/node_modules only, with no existing tree to prune. Existing Expo/runtime manifests and node_modules untouched. Test may resolve ws using createRequire anchored to server/package.json. No custom network proxy or lifecycle scripts; stop if actual unrelated removals are proposed."
+rollback_plan: "No production switch; close only test-owned sockets/processes, retain synthetic artifacts. Preserve old runtime install and unrelated files."
+pre_spawn_checklist: {task: "Four exact product paths", why: "Implement host auth while main checks native contract/dependency evidence", route: "Single implementer then security/final verification", context: "WP/pinned source/test helper only", writable: "Exact module/test/package/lock", forbidden: "All other files and actual upstream execution before review", output: "Common14 plus freeze and opt-in command", stop: "Scope/secret/lifecycle/unreviewed execution pressure", verification: "Independent security and native auth observations", approval: "Standing scope-specific authorization, no child agents"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
