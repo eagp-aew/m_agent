@@ -39,6 +39,12 @@ function register(session) {
   return session;
 }
 
+/** A narrow provenance boundary for summaries; copied or empty sessions are not evidence. */
+export function acceptedTutoringSession(session) {
+  if (!sessions.has(session) || !session.history.length) throw new Error('需要本页真实接受过辅导回复的会话。');
+  return session;
+}
+
 export function tutoringShortcut(draft) {
   if (typeof draft !== 'string') return null;
   const match = /^\s*(?:请)?(?:带我学|检查理解)[：:\s]*([\s\S]*)$/u.exec(draft);

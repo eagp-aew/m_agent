@@ -50,7 +50,10 @@ function fixture() {
       return next;
     },
     async deleteArchiveItem() { await step('delete'); },
-    async archiveText() { await step('archive'); },
+    async archiveText(agentId, text, tags, createdAt) {
+      await step('archive');
+      memory.archive.push({ id: `saved-${memory.archive.length}`, text, tags: [...tags], createdAt });
+    },
     async listArchive() { await step('list'); return memory.archive; },
   };
   async function step(name) { calls.push(name); if (gates[name]) await gates[name].promise; }
@@ -375,6 +378,219 @@ test('actual App: chat synchronous guard blocks same-event tutoring; tutoring bl
   await app.render().connect();
   assert.equal(app.render().tutoringSession, null); assert.equal(app.render().tutoringSessionRef.current, null);
   assert.equal(app.render().tutoringDraft, '保留辅导草稿'); assert.equal(app.render().draft, '保留普通草稿');
+});
+
+async function reviewedSummary(app) {
+  app.render().setTutoringMode('explain_only');
+  await app.render().requestTutoring('start');
+  app.render().openSummary();
+  app.render().editSummary({ reviewed: true });
+  await app.render().previewSummary();
+  assert.ok(app.render().summaryCandidate, app.render().summaryFeedback);
+}
+
+test('actual App summary: no-quiz review/preview writes nothing; explicit save/readback retains navigation and receipt', async () => {
+  const { f, app } = appFixture();
+  await reviewedSummary(app);
+  assert.equal(app.render().summaryCandidate.episode.state, 'exposed');
+  assert.equal(f.calls.includes('archive'), false);
+  app.render().setSurface('Today'); app.render().setTutoringOpen(false);
+  assert.ok(app.render().summaryReview); assert.ok(app.render().summaryCandidate);
+  await app.render().saveSummary();
+  assert.equal(app.render().summaryStatus.outcome, 'complete', app.render().summaryFeedback);
+  const calls = [...f.calls]; await app.render().saveSummary(); assert.deepEqual(f.calls, calls);
+  app.render().viewSummaryArchive(app.render().summaryStatus);
+  assert.equal(app.render().surface, 'Archive'); assert.ok(app.render().archiveSearch);
+  assert.equal(app.render().archive.length, 2);
+  assert.ok(app.render().changes.some((change) => change.operation === 'learning_summary_readback' && change.status === 'applied'));
+  assert.equal(app.render().failedDecision, undefined);
+  assert.equal(app.render().changes.filter((change) => change.source === 'learning_summary').every((change) => change.status === 'applied'), true);
+});
+
+for (const reason of ['review-edit', 'history', 'end', 'cancel', 'privacy', 'rebind']) {
+  test(`actual App summary: ${reason} invalidates or blocks unattempted preview and preserves draft`, async () => {
+    const { f, app } = appFixture(); await reviewedSummary(app);
+    const review = app.render().summaryReview;
+    if (reason === 'review-edit') app.render().editSummary({ learned: '修改后的理解' });
+    if (reason === 'history') await app.render().requestTutoring('next');
+    if (reason === 'end') app.render().resetTutoring();
+    if (reason === 'cancel') app.render().invalidateSummary();
+    if (reason === 'privacy') app.render().setPrivacy({ ...app.render().privacy, doNotRememberTerms: ['分数'] });
+    if (reason === 'rebind') app.render().agentBindingRef.current = { client: f.client, agentId: 'agent-2' };
+    await app.render().saveSummary();
+    assert.equal(f.calls.includes('archive'), false);
+    assert.ok(app.render().summaryReview);
+    if (reason !== 'review-edit') assert.deepEqual(app.render().summaryReview, review);
+  });
+}
+
+for (const phase of ['workflow', 'capture', 'archive', 'update']) {
+  test(`actual App summary: shared synchronous guard at ${phase} blocks double save and all competing handlers`, async () => {
+    const { f, app } = appFixture(); await reviewedSummary(app);
+    f.calls.length = 0; f.gates[phase] = deferred();
+    const staleView = app.render(); const pending = staleView.saveSummary(); await until(f, phase);
+    assert.doesNotMatch(app.render().summaryFeedback, /尚未写入|再明确确认保存/);
+    assert.match(app.render().summaryFeedback, /正在|等待|核实/);
+    await staleView.saveSummary(); await staleView.previewSummary();
+    app.render().setDraft('竞争消息');
+    const calls = [...f.calls];
+    await app.render().sendMessage(); await app.render().requestTutoring('next'); await app.render().requestDecomposition();
+    await app.render().requestLearningCoaching('diagnosis'); await app.render().requestReflectionCoaching();
+    await app.render().switchGenerationModel(); await app.render().connect();
+    for (const kind of ['direct', 'delete', 'pending', 'forget', 'import', 'restore']) await mutation(f, app, kind);
+    assert.deepEqual(f.calls, calls);
+    app.render().setSurface('Today');
+    f.gates[phase].resolve(); await pending;
+    assert.equal(app.render().summaryStatus.outcome, 'complete', app.render().summaryFeedback);
+    assert.equal(f.calls.filter((name) => name === 'archive').length, 1);
+    assert.equal(app.render().connectionSwitchGuard.current, 'idle');
+  });
+}
+
+test('actual App summary: partial recovery seals edits and ending session retains original exact candidate', async () => {
+  const { f, app } = appFixture(); await reviewedSummary(app);
+  const candidate = app.render().summaryCandidate;
+  f.gates.update = deferred(); f.gates.update.reject(new Error('patch failed'));
+  await app.render().saveSummary();
+  assert.equal(app.render().summaryStatus.outcome, 'archive_only');
+  const attempts = app.render().changes.filter((change) => change.source === 'learning_summary');
+  assert.equal(attempts.find((change) => change.block === 'ARCHIVE').status, 'applied');
+  assert.equal(attempts.find((change) => change.block === 'LEARNING_MODEL').status, 'failed');
+  const review = app.render().summaryReview; app.render().editSummary({ learned: '不得替换' });
+  app.render().resetTutoring();
+  assert.equal(app.render().summaryCandidate, candidate); assert.equal(app.render().summaryReview, review);
+  delete f.gates.update;
+  await app.render().saveSummary();
+  assert.equal(app.render().summaryStatus.outcome, 'complete');
+  assert.equal(f.calls.filter((name) => name === 'archive').length, 1);
+  assert.equal(app.render().failedDecision, undefined);
+  for (const attempt of attempts) {
+    const resolved = app.render().changes.find((change) => change.id === attempt.id);
+    assert.equal(resolved.status, 'applied');
+    assert.match(resolved.afterSummary, /不判定每次请求是否独立成功/);
+    if (attempt.error) assert.ok(resolved.afterSummary.includes(attempt.error));
+  }
+  assert.equal(app.render().changes.filter((change) => change.source === 'learning_summary' && change.block === 'LEARNING_MODEL').length, 2);
+});
+
+test('actual App summary: lost append, late rebind and privacy changes retain unknown receipt and never duplicate', async () => {
+  for (const reason of ['lost', 'rebind', 'privacy']) {
+    const { f, app } = appFixture(); await reviewedSummary(app);
+    f.calls.length = 0; f.gates.archive = deferred();
+    const pending = app.render().saveSummary(); await until(f, 'archive');
+    assert.equal(app.render().summaryStatus.attempted, true);
+    if (reason === 'rebind') app.render().agentBindingRef.current = { client: f.client, agentId: 'agent-2' };
+    if (reason === 'privacy') { app.render().setPrivacy({ ...app.render().privacy, temporarySession: true }); app.render(); }
+    if (reason === 'lost') f.gates.archive.reject(new Error('response lost')); else f.gates.archive.resolve();
+    await pending; delete f.gates.archive;
+    assert.equal(app.render().summaryStatus.outcome, 'unknown');
+    assert.doesNotMatch(app.render().summaryFeedback, /尚未写入|再明确确认保存/);
+    assert.ok(app.render().failedDecision);
+    assert.equal(app.render().changes.find((change) => change.source === 'learning_summary' && change.block === 'ARCHIVE').status, 'failed');
+    assert.ok(app.render().summaryCandidate); assert.ok(app.render().summaryReview);
+    await app.render().saveSummary();
+    assert.equal(f.calls.filter((name) => name === 'archive').length, 1);
+    assert.equal(f.calls.includes('update'), false);
+    assert.ok(app.render().changes.some((change) => change.source === 'learning_summary' && change.agentId === 'agent-1'));
+  }
+});
+
+test('actual App summary: recovery resolves only candidate audit IDs and preserves prior/unrelated failures and check history', async () => {
+  const { f, app } = appFixture(); await reviewedSummary(app);
+  const candidate = app.render().summaryCandidate;
+  const unrelated = [
+    { source: 'user', block: 'CURRENT_CONTEXT', operation: 'correct' },
+    { source: 'learning_summary', block: 'ARCHIVE', operation: 'learning_episode_archive', after: candidate.archiveRecord.text },
+    { source: 'learning_summary', block: 'LEARNING_MODEL', operation: 'learning_model_upsert', after: candidate.modelUpdate.nextValue },
+    { source: 'learning_summary', block: 'SESSION', operation: 'learning_summary_readback', before: candidate.identityTag },
+    { source: 'learning_summary', block: 'LEARNING_MODEL', operation: 'learning_model_upsert', agentId: 'agent-2' },
+  ].map((patch) => domains.createMemoryChange({ agentId: 'agent-1', status: 'failed', error: 'prior unrelated failure', ...patch }));
+  app.render().setChanges(unrelated);
+  const originalArchive = f.client.archiveText;
+  f.client.archiveText = async (...args) => { await originalArchive(...args); throw new Error('response lost'); };
+  await app.render().saveSummary();
+  const failedReadback = app.render().changes.find((change) => change.operation === 'learning_summary_readback' && !unrelated.some(({ id }) => id === change.id));
+  assert.equal(app.render().summaryStatus.outcome, 'unknown');
+  assert.equal(failedReadback.status, 'failed');
+  f.gates.update = deferred();
+  const recovery = app.render().saveSummary();
+  assert.match(app.render().summaryFeedback, /正在检查/);
+  await until(f, 'update');
+  const ownAudits = () => app.render().changes.filter((change) => !unrelated.some(({ id }) => id === change.id));
+  assert.equal(ownAudits().find((change) => change.block === 'ARCHIVE').status, 'applied');
+  assert.equal(ownAudits().find((change) => change.block === 'LEARNING_MODEL').status, 'failed');
+  assert.equal(ownAudits().find((change) => change.id === failedReadback.id).status, 'failed');
+  f.gates.update.resolve(); await recovery;
+  assert.equal(app.render().summaryStatus.outcome, 'complete');
+  assert.ok(ownAudits().every((change) => change.status === 'applied'));
+  const resolvedCheck = ownAudits().find((change) => change.id === failedReadback.id);
+  assert.ok(resolvedCheck.after.includes(failedReadback.after));
+  assert.ok(resolvedCheck.after.includes(failedReadback.error));
+  assert.match(resolvedCheck.after, /后续精确回读已确认完成/);
+  for (const prior of unrelated) assert.deepEqual(app.render().changes.find((change) => change.id === prior.id), prior);
+  assert.equal(app.render().failedDecision.id, unrelated[0].id);
+  assert.equal(f.calls.filter((name) => name === 'archive').length, 1);
+});
+
+test('actual App summary: completed receipt after external exact Block recovery records no unattempted Block audit', async () => {
+  const { f, app } = appFixture(); await reviewedSummary(app);
+  const candidate = app.render().summaryCandidate, originalArchive = f.client.archiveText;
+  f.client.archiveText = async (...args) => { await originalArchive(...args); throw new Error('response lost'); };
+  await app.render().saveSummary();
+  f.memory.blocks = f.memory.blocks.map((block) => block.id === candidate.learningBlock.id
+    ? { ...block, value: candidate.modelUpdate.nextValue, metadata: candidate.metadata } : block);
+  await app.render().saveSummary();
+  assert.equal(app.render().summaryStatus.outcome, 'complete');
+  assert.equal(app.render().failedDecision, undefined);
+  assert.equal(f.calls.includes('update'), false);
+  assert.equal(app.render().changes.some((change) => change.source === 'learning_summary' && change.block === 'LEARNING_MODEL'), false);
+});
+
+test('actual App summary: capture cancel and preview privacy change across await never publish a usable candidate', async () => {
+  for (const reason of ['cancel', 'privacy']) {
+    const { f, app } = appFixture(); await app.render().requestTutoring('start'); app.render().openSummary(); app.render().editSummary({ reviewed: true });
+    f.calls.length = 0; f.gates.capture = deferred();
+    const pending = app.render().previewSummary(); await until(f, 'capture');
+    if (reason === 'cancel') app.render().invalidateSummary();
+    else { app.render().setPrivacy({ ...app.render().privacy, temporarySession: true }); app.render(); }
+    f.gates.capture.resolve(); await pending;
+    assert.equal(app.render().summaryCandidate, null); assert.equal(f.calls.includes('archive'), false);
+    assert.ok(app.render().summaryReview); assert.equal(app.render().connectionSwitchGuard.current, 'idle');
+  }
+});
+
+test('actual App summary: same-event privacy change blocks stale save closure before rerender', async () => {
+  for (const patch of [{ temporarySession: true }, { doNotRememberTerms: ['分数'] }]) {
+    const { f, app } = appFixture(); await reviewedSummary(app);
+    const view = app.render(); view.updatePrivacySettings(patch);
+    await view.saveSummary();
+    assert.equal(f.calls.includes('archive'), false); assert.equal(app.render().summaryStatus.attempted, false);
+  }
+});
+
+test('actual App summary: real submitted answer is the practice source, user review is required', async () => {
+  const { f, app } = appFixture(); await app.render().requestTutoring('start');
+  const question = app.render().tutoringSession.question.text;
+  app.render().editTutoringDraft('不同，因为两个饼的整体大小不同。'); await app.render().requestTutoring('answer');
+  app.render().openSummary(); app.render().editSummary({ evidenceKind: 'practice' }); await app.render().previewSummary();
+  assert.equal(app.render().summaryCandidate, null);
+  app.render().editSummary({ reviewed: true }); await app.render().previewSummary();
+  const episode = app.render().summaryCandidate.episode;
+  assert.equal(episode.state, 'developing'); assert.equal(episode.diagnosis.questions[0], question.normalize('NFKC'));
+  assert.equal(episode.diagnosis.response, '不同,因为两个饼的整体大小不同。'); assert.equal(f.calls.includes('archive'), false);
+});
+
+test('actual App summary: competing mutations block preview before first await and preserve review for explicit retry', async () => {
+  for (const kind of ['direct', 'delete', 'pending', 'forget', 'import', 'restore']) {
+    const { f, app } = appFixture(); await reviewedSummary(app); app.render().invalidateSummary();
+    const boundary = kind === 'direct' ? 'update' : kind === 'delete' ? 'delete' : 'workflow';
+    f.calls.length = 0; f.gates[boundary] = deferred();
+    const pending = mutation(f, app, kind); await until(f, boundary);
+    const calls = [...f.calls]; await app.render().previewSummary(); assert.deepEqual(f.calls, calls);
+    assert.ok(app.render().summaryReview);
+    f.gates[boundary].reject(new Error('before write')); await pending; delete f.gates[boundary];
+    assert.equal(app.render().connectionSwitchGuard.current, 'idle');
+  }
 });
 
 // Reserved live-model journeys: fixtures below only exercise application binding.

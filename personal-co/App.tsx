@@ -58,6 +58,10 @@ import {
   tutoringShortcut,
 } from './src/domain/learning-tutoring.mjs';
 import {
+  SUMMARY_FIELDS, SUMMARY_REVIEW_PROMPT, createSummaryEpisode, prepareTutoringSummary,
+  prepareSummaryCandidate, executeSummaryPersistence, summaryReceipt,
+} from './src/domain/learning-summary.mjs';
+import {
   CONNECTION_TYPES,
   WEEKLY_REVIEW_SECTIONS,
   buildWeeklyReviewCoachRequest,
@@ -252,6 +256,17 @@ export default function App() {
   const tutoringNonce = useRef(`tutor-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`);
   const [tutoringBusy, setTutoringBusy] = useState(false);
   const [tutoringFeedback, setTutoringFeedback] = useState('');
+  const [summaryReview, setSummaryReview] = useState<ReturnType<typeof prepareTutoringSummary> | null>(null);
+  const summarySessionRef = useRef<ReturnType<typeof createTutoringSession> | null>(null);
+  const summaryReviewRef = useRef<ReturnType<typeof prepareTutoringSummary> | null>(null);
+  const summaryRevision = useRef(0);
+  const summaryCandidateRef = useRef<Awaited<ReturnType<typeof prepareSummaryCandidate>> | null>(null);
+  const [summaryCandidate, setSummaryCandidate] = useState<Awaited<ReturnType<typeof prepareSummaryCandidate>> | null>(null);
+  const [summaryStatus, setSummaryStatus] = useState<ReturnType<typeof summaryReceipt> | null>(null);
+  const [summaryPastReceipts, setSummaryPastReceipts] = useState<ReturnType<typeof summaryReceipt>[]>([]);
+  const [summaryBusy, setSummaryBusy] = useState(false);
+  const [summaryFeedback, setSummaryFeedback] = useState('');
+  const summaryAuditRef = useRef(new WeakMap<object, { mutations: string[]; readbacks: string[] }>());
   const [learningCoachOutput, setLearningCoachOutput] = useState('');
   const [learningFeedback, setLearningFeedback] = useState('');
   const [learningFeedbackTone, setLearningFeedbackTone] = useState<LearningFeedbackTone>('neutral');
@@ -276,6 +291,8 @@ export default function App() {
   const [reflectionFeedback, setReflectionFeedback] = useState('');
   const [reflectionFeedbackTone, setReflectionFeedbackTone] = useState<LearningFeedbackTone>('neutral');
   const [privacy, setPrivacy] = useState(() => createPrivacySettings());
+  const summaryPrivacyRef = useRef(privacy);
+  summaryPrivacyRef.current = privacy;
   const [doNotRememberText, setDoNotRememberText] = useState('');
   const [forgetTerm, setForgetTerm] = useState('');
   const [forgetPreview, setForgetPreview] = useState<ReturnType<typeof createForgetPreview> | null>(null);
@@ -306,6 +323,12 @@ export default function App() {
 
   function appendChanges(...nextChanges: MemoryChangeRecord[]) {
     setChanges((current) => [...nextChanges, ...current]);
+  }
+
+  function updatePrivacySettings(patch: Partial<ReturnType<typeof createPrivacySettings>>) {
+    const next = { ...summaryPrivacyRef.current, ...patch };
+    summaryPrivacyRef.current = next;
+    setPrivacy(next);
   }
 
   async function connect() {
@@ -628,6 +651,7 @@ export default function App() {
   }
 
   function resetTutoring(feedback = '输入已修改；本次辅导已结束，草稿保留，请重新确认开始。') {
+    invalidateSummary();
     tutoringRevision.current += 1;
     tutoringSessionRef.current = null;
     setTutoringSession(null);
@@ -640,6 +664,7 @@ export default function App() {
   }
 
   function editTutoringDraft(value: string) {
+    invalidateSummary();
     tutoringRevision.current += 1;
     setTutoringDraft(value);
     if (tutoringBusy) setTutoringFeedback('回答草稿已修改，本轮回复将丢弃；远端请求与记忆核对仍会继续。');
@@ -714,6 +739,7 @@ export default function App() {
         if (result.outcome === 'reconciliation_failed') setGovernanceNotice(`辅导记忆核对失败，请查看变更记录：${result.error}`);
         if (!isCurrent()) return;
         if (result.outcome === 'coached' && result.session && currentLearningAgentId(expectedClient) === expectedAgentId) {
+          invalidateSummary();
           tutoringSessionRef.current = result.session;
           setTutoringSession(result.session);
           if (['answer', 'ask'].includes(action)) setTutoringDraft((current) => current === submittedDraft ? '' : current);
@@ -731,6 +757,144 @@ export default function App() {
       setLearningBusy(false);
       setTutoringBusy(false);
     }
+  }
+
+  function invalidateSummary() {
+    summaryRevision.current += 1;
+    const candidate = summaryCandidateRef.current;
+    if (candidate && summaryReceipt(candidate).attempted) return;
+    summaryCandidateRef.current = null;
+    setSummaryCandidate(null);
+    setSummaryStatus(null);
+  }
+
+  function openSummary() {
+    if (connectionSwitchGuard.current !== 'idle') return;
+    const candidate = summaryCandidateRef.current;
+    if (candidate && summaryReceipt(candidate).attempted) {
+      const receipt = summaryReceipt(candidate);
+      if (receipt.outcome !== 'complete' || candidate.session === tutoringSessionRef.current) {
+        setSummaryFeedback('已有保存回执，请核对这份记录；不会生成重复候选。');
+        return;
+      }
+      setSummaryPastReceipts((current) => [...current, receipt]);
+    }
+    try {
+      const session = tutoringSessionRef.current;
+      const review = prepareTutoringSummary(session);
+      summaryRevision.current += 1;
+      summarySessionRef.current = session;
+      summaryReviewRef.current = review;
+      summaryCandidateRef.current = null;
+      setSummaryCandidate(null); setSummaryStatus(null); setSummaryReview(review);
+      setSummaryFeedback('这份建议来自已接受的辅导内容，未经独立核实。请修改并审阅后预览；尚未保存。');
+    } catch (error) { setSummaryFeedback(error instanceof Error ? error.message : '没有可总结的辅导历史。'); }
+  }
+
+  function editSummary(patch: Partial<ReturnType<typeof prepareTutoringSummary>>) {
+    const candidate = summaryCandidateRef.current;
+    if (candidate && summaryReceipt(candidate).attempted) return;
+    if (!summaryReviewRef.current) return;
+    invalidateSummary();
+    const review = { ...summaryReviewRef.current, ...patch };
+    if (!Object.hasOwn(patch, 'reviewed')) review.reviewed = false;
+    summaryReviewRef.current = review; setSummaryReview(review);
+  }
+
+  async function previewSummary() {
+    if (connectionSwitchGuard.current !== 'idle' || sending || importBusy || snapshotBusy) return;
+    if (!client || !agent || connection !== 'connected') { setSummaryFeedback('请连接原助手后预览，草稿已保留。'); return; }
+    const session = summarySessionRef.current, review = summaryReviewRef.current;
+    if (!session || !review || tutoringSessionRef.current !== session) { setSummaryFeedback('辅导历史已变化或结束；请重新打开简短总结，原草稿保留。'); return; }
+    if (summaryCandidateRef.current && summaryReceipt(summaryCandidateRef.current).attempted) return;
+    const expectedClient = client, expectedAgentId = agent.id, revision = summaryRevision.current;
+    connectionSwitchGuard.current = 'learning'; setLearningBusy(true); setSummaryBusy(true);
+    const isCurrent = () => summaryRevision.current === revision && tutoringSessionRef.current === session;
+    try {
+      if (session.agentId !== expectedAgentId) throw new Error('总结属于原助手；不能保存到新助手。');
+      await expectedClient.runPersistentWorkflow('learning summary preview', async (workflow) => {
+        const candidate = await prepareSummaryCandidate({
+          workflow, session, review, currentAgentId: () => currentLearningAgentId(expectedClient), isCurrent,
+          getPrivacy: () => summaryPrivacyRef.current,
+          metadataForUpdate: ({ block, episode }: { block: AgentBlock; episode: { completedAt: string } }) => buildPersonalCoMetadata(block.metadata, {
+            source: 'learning_summary', epistemicState: 'observed', operation: 'learning_model_upsert', timestamp: episode.completedAt,
+          }),
+        });
+        if (!isCurrent() || currentLearningAgentId(expectedClient) !== expectedAgentId) return;
+        summaryCandidateRef.current = candidate; setSummaryCandidate(candidate); setSummaryStatus(summaryReceipt(candidate));
+        setSummaryFeedback('预览已准备，尚未写入。请核对状态、证据、Archive 和记忆前后内容，再明确确认保存。');
+      });
+    } catch (error) { setSummaryFeedback(`未生成保存预览：${error instanceof Error ? error.message : '读取失败。'} 草稿已保留。`); }
+    finally { connectionSwitchGuard.current = 'idle'; setLearningBusy(false); setSummaryBusy(false); }
+  }
+
+  async function saveSummary() {
+    if (connectionSwitchGuard.current !== 'idle' || sending || importBusy || snapshotBusy) return;
+    const candidate = summaryCandidateRef.current;
+    if (!candidate || !client || !agent || connection !== 'connected') { setSummaryFeedback('需要原助手的有效预览或保存回执。'); return; }
+    const expectedClient = client, expectedAgentId = candidate.agentId, revision = summaryRevision.current;
+    if (agent.id !== expectedAgentId) { setSummaryFeedback(`回执属于 ${expectedAgentId}；当前助手不同，不能继续写入。`); return; }
+    if (summaryReceipt(candidate).outcome === 'complete') { setSummaryFeedback('这份总结已准确回读完成，不会再次写入。'); return; }
+    connectionSwitchGuard.current = 'learning'; setLearningBusy(true); setSummaryBusy(true);
+    setSummaryFeedback(summaryReceipt(candidate).attempted
+      ? '正在检查原保存回执并核实未完成的结果；不会再次追加 Archive。'
+      : '正在核对保存基线并保存总结；请等待准确回读结果。');
+    const audit = summaryAuditRef.current.get(candidate) ?? { mutations: [], readbacks: [] };
+    summaryAuditRef.current.set(candidate, audit);
+    const recordReceipt = (receipt: ReturnType<typeof summaryReceipt>) => {
+      setSummaryStatus(receipt);
+      if (receipt.outcome === 'unknown') setSummaryFeedback('Archive 已尝试追加，结果尚未核实；正在等待准确回读，不会重复追加。');
+      if (receipt.outcome === 'archive_only') setSummaryFeedback('Archive 已准确回读；正在核实或继续 LEARNING_MODEL 保存，请等待结果。');
+      // Every attempted operation is logged immediately, including unknown delivery and late results.
+      for (const mutation of receipt.mutations.slice(audit.mutations.length)) {
+        const change = createMemoryChange({
+          block: mutation.target, operation: mutation.target === 'ARCHIVE' ? 'learning_episode_archive' : 'learning_model_upsert',
+          source: 'learning_summary', epistemicState: 'observed', agentId: expectedAgentId,
+          before: mutation.target === 'ARCHIVE' ? '' : candidate.learningBlock.value,
+          after: mutation.target === 'ARCHIVE' ? candidate.archiveRecord.text : candidate.modelUpdate.nextValue,
+          status: 'failed', error: '已尝试，结果等待精确回读；请查看总结回执。', timestamp: candidate.episode.completedAt,
+        }) as MemoryChangeRecord;
+        audit.mutations.push(change.id);
+        appendChanges(change);
+      }
+      const provenIds = new Set<string>(receipt.mutations.flatMap((mutation: { status: string }, index: number) => mutation.status === 'applied' ? [audit.mutations[index]] : []));
+      if (receipt.outcome === 'complete') audit.readbacks.forEach((id) => provenIds.add(id));
+      setChanges((current) => current.map((change) => {
+        if (!provenIds.has(change.id) || change.agentId !== expectedAgentId || change.source !== 'learning_summary' || change.status !== 'failed') return change;
+        const resolved = createMemoryChange({ ...change, status: 'applied', error: null,
+          after: change.operation === 'learning_summary_readback'
+            ? `${change.after}\n当次检查：${change.error ?? '未完成'}\n后续精确回读已确认完成：${receipt.archiveId}` : change.after,
+        }) as MemoryChangeRecord;
+        return { ...resolved, afterSummary: `${resolved.afterSummary}\n目标结果已精确回读；不判定每次请求是否独立成功。原记录：${change.error ?? '等待核实'}` };
+      }));
+    };
+    try {
+      await expectedClient.runPersistentWorkflow('learning summary save or check', async (workflow) => {
+        const result = await executeSummaryPersistence({
+          workflow, candidate, confirmed: true, currentAgentId: () => currentLearningAgentId(expectedClient),
+          isCurrent: () => summaryRevision.current === revision && tutoringSessionRef.current === candidate.session,
+          getPrivacy: () => summaryPrivacyRef.current, onReceipt: recordReceipt,
+        });
+        if (result.memory && currentLearningAgentId(expectedClient) === expectedAgentId) { setBlocks(result.memory.blocks); setArchive(result.memory.archive); }
+        const receipt = result.receipt;
+        const readback = createMemoryChange({
+          block: 'SESSION', operation: 'learning_summary_readback', source: 'learning_summary', epistemicState: 'observed',
+          agentId: expectedAgentId, before: candidate.identityTag, after: `${receipt.outcome}: ${receipt.archiveId ?? '尚无准确 Archive ID'}`,
+          status: receipt.outcome === 'complete' ? 'applied' : 'failed', error: receipt.error,
+        }) as MemoryChangeRecord;
+        audit.readbacks.push(readback.id);
+        appendChanges(readback);
+        setSummaryFeedback(receipt.outcome === 'complete'
+          ? `已保存并准确回读：${candidate.episode.state}。用户审阅，不代表模型认证或已掌握。`
+          : `保存未完成或未核实：${receipt.error ?? '请查看回执。'} 不会再次追加 Archive。`);
+      });
+    } catch (error) { setSummaryFeedback(`保存或检查未完成：${error instanceof Error ? error.message : '连接失败。'} 原预览和回执保留，请检查后继续。`); }
+    finally { connectionSwitchGuard.current = 'idle'; setLearningBusy(false); setSummaryBusy(false); }
+  }
+
+  function viewSummaryArchive(receipt: ReturnType<typeof summaryReceipt>) {
+    if (receipt.agentId !== agent?.id) { setSummaryFeedback(`请连接原助手 ${receipt.agentId} 查看这份记录。`); return; }
+    setArchiveSearch(receipt.identityTag.slice('summary:'.length)); setSurface('Archive');
   }
 
   async function requestLearningCoaching(phase: LearningCoachPhase) {
@@ -1797,6 +1961,13 @@ export default function App() {
   const surfaceLabel = surface === 'Settings' ? '连接与设置' : surface === 'Today' ? '今天' : SECONDARY_SECTIONS.find((item) => item.surface === surface)?.label;
   const pendingChanges = changes.filter((change) => change.status === 'pending' && change.agentId === agent?.id);
   const failedDecision = changes.find((change) => change.status === 'failed' && change.agentId === agent?.id);
+  const summarySealed = summaryStatus?.attempted === true;
+  let summaryProposedState = 'exposed';
+  let summaryEvidenceError = '';
+  if (summaryReview && summarySessionRef.current) {
+    try { summaryProposedState = createSummaryEpisode(summarySessionRef.current, { ...summaryReview, reviewed: true }, '2000-01-01T00:00:00.000Z').state; }
+    catch (error) { summaryEvidenceError = error instanceof Error ? error.message : '证据尚不完整。'; }
+  }
 
   function pendingDecisionCards() {
     return pendingChanges.map((change) => {
@@ -1906,7 +2077,7 @@ export default function App() {
               {tutoringOpen && (
                 <View style={styles.decompositionPanel}>
                   <Text style={styles.sectionTitle}>一起学清楚，一次一小步</Text>
-                  <Text style={styles.fieldHelp}>对话里以“带我学…”或“检查理解…”开头，点击发送只会准备此入口。先用非敏感材料试用；仅本次页面保留，刷新会丢失。服务端可能保留对话记录；这里不会保存课程、写入学习状态或判断掌握。</Text>
+                  <Text style={styles.fieldHelp}>对话里以“带我学…”或“检查理解…”开头，点击发送只会准备此入口。先用非敏感材料试用；辅导草稿仅本次页面保留，刷新会丢失。服务端可能保留对话记录；可选择简短总结并明确保存，不会自动写入学习状态或判断掌握。</Text>
                   <Text style={styles.fieldLabel}>辅导目标 · {tutoringGoal.length}/1000</Text>
                   <TextInput accessibilityLabel="辅导目标" value={tutoringGoal} onChangeText={(value) => { setTutoringGoal(value); resetTutoring(); }} multiline placeholder="例如：分数为什么要先确定整体？" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
                   <Text style={styles.fieldLabel}>辅导材料（可选）· {tutoringMaterial.length}/8000</Text>
@@ -1948,6 +2119,48 @@ export default function App() {
                     {(tutoringSession || tutoringBusy) && <Pressable accessibilityRole="button" onPress={() => resetTutoring('本次辅导已结束，输入草稿保留；未保存或标记学习完成。若仍有请求，远端与记忆核对继续到完成。')} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>结束本次辅导</Text></Pressable>}
                   </View>
                   {tutoringFeedback ? <View accessibilityLiveRegion="polite" style={styles.noticeBox}><Text style={styles.noticeText}>{tutoringFeedback}</Text></View> : null}
+                  {tutoringSession && <Pressable accessibilityRole="button" disabled={persistentWritesPaused} onPress={openSummary} style={[styles.secondaryOutlineButton, persistentWritesPaused && styles.buttonDisabled]}><Text style={styles.secondaryOutlineText}>简短总结</Text></Pressable>}
+                  {summaryReview && <View style={styles.decompositionOutline}>
+                    <Text style={styles.sectionTitle}>简短总结 · 保存前审阅</Text>
+                    <Text style={styles.fieldHelp}>根据真实已接受的辅导内容准备；模型讲解、反馈与建议均未经独立核实。阅读或自述仅为 exposed；练习证据需真实提交回答；应用证据是用户确认，非模型认证。不必参加测验，也可以只审阅这份总结。</Text>
+                    {([['learned', '已接触的内容'], ['needsWork', '还需核实或练习'], ['nextStep', '下一步']] as const).map(([field, label]) => <View key={field}>
+                      <Text style={styles.fieldLabel}>{label} · {summaryReview[field].length}/{SUMMARY_FIELDS[field]}</Text>
+                      <TextInput accessibilityLabel={label} value={summaryReview[field]} editable={!summarySealed && !summaryBusy} onChangeText={(value) => editSummary({ [field]: value })} multiline style={styles.compactTextArea} />
+                    </View>)}
+                    <Text style={styles.fieldLabel}>实际证据 · 由你选择并审阅</Text>
+                    <View style={styles.secondaryNav}>{[['read_only', '阅读或自述'], ['practice', '已提交练习'], ['application', '实际应用'], ['transfer', '迁移应用'], ['retrieval_failure', '回忆失败'], ['contradiction', '发现矛盾']].map(([kind, label]) => <Pressable key={kind} accessibilityRole="button" accessibilityState={{ selected: summaryReview.evidenceKind === kind }} disabled={summarySealed || summaryBusy} onPress={() => editSummary({ evidenceKind: kind })} style={[styles.presetButton, summaryReview.evidenceKind === kind && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{label}</Text></Pressable>)}</View>
+                    {['application', 'transfer'].includes(summaryReview.evidenceKind) && <>
+                      {([['steps', '实际步骤'], ['result', '实际结果'], ['basis', '核实依据']] as const).map(([field, label]) => <View key={field}><Text style={styles.fieldLabel}>{label} · {summaryReview[field].length}/{SUMMARY_FIELDS[field]}</Text><TextInput accessibilityLabel={label} value={summaryReview[field]} editable={!summarySealed && !summaryBusy} onChangeText={(value) => editSummary({ [field]: value })} multiline style={styles.compactTextArea} /></View>)}
+                      <Text style={styles.fieldHelp}>请填写你实际执行、观察和核实的内容。点击审阅确认这些是你的证据，不是把模型赞扬当作证明。</Text>
+                    </>}
+                    <Text style={styles.cardBody}>{SUMMARY_REVIEW_PROMPT}</Text>
+                    <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: summaryReview.reviewed }} disabled={summarySealed || summaryBusy} onPress={() => editSummary({ reviewed: !summaryReview.reviewed })} style={[styles.presetButton, summaryReview.reviewed && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{summaryReview.reviewed ? '✓ ' : ''}我已审阅这份总结</Text></Pressable>
+                    <Text style={styles.fieldLabel}>拟记录状态：{summaryEvidenceError ? '证据不足' : summaryProposedState} · 用户确认，非模型认证</Text>
+                    {summaryEvidenceError ? <Text style={styles.errorText}>{summaryEvidenceError}</Text> : null}
+                    <Text style={styles.fieldHelp}>原始字段包含空白，超出上限会拒绝，不会截断。未保存草稿、预览和未完成回执仅保留在本页；刷新会丢失恢复入口。结果不明时先核对 Archive，请勿重新发起同一总结。</Text>
+                    {!summarySealed && <View style={styles.secondaryNav}>
+                      <Pressable accessibilityRole="button" disabled={memoryControlsDisabled || importBusy || snapshotBusy || !summaryReview.reviewed || Boolean(summaryEvidenceError)} onPress={() => void previewSummary()} style={[styles.primaryButton, (memoryControlsDisabled || !summaryReview.reviewed || Boolean(summaryEvidenceError)) && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>预览保存内容</Text></Pressable>
+                      <Pressable accessibilityRole="button" onPress={() => { invalidateSummary(); setSummaryFeedback('预览已取消，审阅草稿保留；未开始保存。'); }} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>取消保存预览</Text></Pressable>
+                    </View>}
+                    {summaryCandidate && <View style={styles.previewBox}>
+                      <Text style={styles.fieldLabel}>精确保存预览 · Agent {summaryCandidate.agentId}</Text>
+                      <Text selectable style={styles.cardBody}>状态：{summaryCandidate.episode.state}{'\n'}来源：{summaryCandidate.episode.source}{'\n'}实际问题 / 审阅：{summaryCandidate.episode.diagnosis.questions.join('\n')}{'\n'}实际回答 / 确认：{summaryCandidate.episode.diagnosis.response}{'\n'}证据：{summaryCandidate.episode.verification.detail}</Text>
+                      <Text style={styles.fieldLabel}>Archive 原文、标签、时间</Text>
+                      <Text selectable style={styles.cardBody}>{summaryCandidate.archiveRecord.text}{'\n'}{summaryCandidate.archiveRecord.tags.join('\n')}{'\n'}{summaryCandidate.archiveRecord.createdAt}</Text>
+                      <Text style={styles.fieldLabel}>LEARNING_MODEL · {summaryCandidate.learningBlock.id} · 容量 {summaryCandidate.learningBlock.limit}</Text>
+                      <Text selectable style={styles.cardBody}>保存前：{'\n'}{summaryCandidate.learningBlock.value}{'\n'}元数据：{JSON.stringify(summaryCandidate.learningBlock.metadata ?? null)}{'\n'}保存后：{'\n'}{summaryCandidate.modelUpdate.nextValue}{'\n'}元数据：{JSON.stringify(summaryCandidate.metadata)}</Text>
+                      {!summarySealed && <Pressable accessibilityRole="button" disabled={memoryControlsDisabled} onPress={() => void saveSummary()} style={[styles.primaryButton, memoryControlsDisabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>确认保存总结</Text></Pressable>}
+                    </View>}
+                    {summaryStatus?.attempted && <View style={styles.noticeBox}>
+                      <Text style={styles.fieldLabel}>保存回执 · {summaryStatus.outcome}</Text>
+                      <Text selectable style={styles.noticeText}>原 Agent：{summaryStatus.agentId}{'\n'}{summaryStatus.identityTag}{'\n'}Archive ID：{summaryStatus.archiveId ?? '尚未核实'}{'\n'}{summaryStatus.error}</Text>
+                      <Text style={styles.fieldHelp}>此候选已封存，不能改写或重复追加。只有唯一准确的 Archive 已存在且 Block 未漂移时，检查才会继续缺失的 Block 更新。</Text>
+                      {summaryStatus.outcome !== 'complete' && <Pressable accessibilityRole="button" disabled={memoryControlsDisabled} onPress={() => void saveSummary()} style={[styles.primaryButton, memoryControlsDisabled && styles.buttonDisabled]}><Text style={styles.primaryButtonText}>检查并继续未完成保存</Text></Pressable>}
+                      <Pressable accessibilityRole="button" onPress={() => viewSummaryArchive(summaryStatus)} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>在 Archive 查看此记录</Text></Pressable>
+                    </View>}
+                  </View>}
+                  {summaryPastReceipts.map((receipt) => <Pressable key={receipt.identityTag} accessibilityRole="button" onPress={() => viewSummaryArchive(receipt)} style={styles.secondaryOutlineButton}><Text style={styles.secondaryOutlineText}>已保存回执：{receipt.identityTag}</Text></Pressable>)}
+                  {summaryFeedback ? <View accessibilityLiveRegion="polite" style={styles.noticeBox}><Text style={styles.noticeText}>{summaryFeedback}</Text></View> : null}
                 </View>
               )}
               {sendFeedback ? <View style={styles.errorBox}><Text style={styles.errorText}>{sendFeedback}</Text><Pressable accessibilityRole="button" onPress={() => setSurface('Settings')} style={styles.secondaryButton}><Text style={styles.textButtonText}>查看连接设置</Text></Pressable></View> : null}
@@ -2369,8 +2582,8 @@ export default function App() {
                     {['English', '简体中文'].map((language) => <Pressable key={language} onPress={() => setPrivacy((current: ReturnType<typeof createPrivacySettings>) => ({ ...current, language }))} style={[styles.presetButton, privacy.language === language && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{language}</Text></Pressable>)}
                   </View>
                   <Text style={styles.fieldLabel}>Do-not-remember terms</Text>
-                  <TextInput value={doNotRememberText} onChangeText={(value) => { setDoNotRememberText(value); setPrivacy((current: ReturnType<typeof createPrivacySettings>) => ({ ...current, doNotRememberTerms: parseDoNotRememberTerms(value) })); }} multiline placeholder="Separate literal terms with commas or new lines" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
-                  <View style={styles.fixedRow}><View style={styles.toggleCopy}><Text style={styles.fixedTitle}>Temporary session</Text><Text style={styles.fieldHelp}>Requests no writes and reconciles detected writes after every message.</Text></View><Pressable onPress={() => setPrivacy((current: ReturnType<typeof createPrivacySettings>) => ({ ...current, temporarySession: !current.temporarySession }))} style={[styles.presetButton, privacy.temporarySession && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{privacy.temporarySession ? 'On' : 'Off'}</Text></Pressable></View>
+                  <TextInput value={doNotRememberText} onChangeText={(value) => { setDoNotRememberText(value); updatePrivacySettings({ doNotRememberTerms: parseDoNotRememberTerms(value) }); }} multiline placeholder="Separate literal terms with commas or new lines" placeholderTextColor="#9693a3" style={styles.compactTextArea} />
+                  <View style={styles.fixedRow}><View style={styles.toggleCopy}><Text style={styles.fixedTitle}>Temporary session</Text><Text style={styles.fieldHelp}>Requests no writes and reconciles detected writes after every message.</Text></View><Pressable onPress={() => updatePrivacySettings({ temporarySession: !summaryPrivacyRef.current.temporarySession })} style={[styles.presetButton, privacy.temporarySession && styles.presetButtonActive]}><Text style={styles.presetButtonText}>{privacy.temporarySession ? 'On' : 'Off'}</Text></Pressable></View>
                 </View>
               </View>
               <View style={styles.portabilityCard}>
