@@ -1,0 +1,68 @@
+task_id: WP-0044-runtime-confinement
+status: ACCEPTED
+scope_type: implementation
+objective: "Make the supported runtime launch boundary reproducible and prove with actual isolated execution that it cannot read/write canonical host-owned memory while authorized host persistence still works."
+why: "WP0043 is only cooperative ownership. Native App Server filesystem commands are separate from turn tool allowlists, so real OS confinement is required before integration."
+provenance: {created_at: "2026-09-12", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0041/WP0043"], trust_level: repo_controlled}
+context_profile: full
+risk_class: runtime_filesystem_confinement
+fallback_verification: {allowed: false, reason: "Independent pre-execution security review and final verification required.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget:
+  max_steps: 18
+  max_tool_calls: 110
+  extension_reason: "Bounded allowance for two independently evidenced readiness repairs, unavailable fixer fallback and final corroboration; no new feature scope or repeated successful live probe."
+  trace_path: .ai/AGENT_REPORTS/WP-0044-verifier.md
+  cancellation: {owner: master, condition: "Stop before unreviewed live execution, real data/credentials/providers, unsafe path grants or untracked child processes."}
+module_outputs:
+  intake: "Previous turn progress: canonical store delivered814ed63; full assistant incomplete."
+  scope: "MacOS deny-default launch-spec module, tests and fixed synthetic confinement probe; no app UI/backend switch."
+  context: "Reuse WP0041 reviewed OS grants, exact existing published runtime and WP0043 store; narrow runtime dependency tree to read-only and writes to separate state root."
+  routing: "One implementer; master scopes exact native protocol/launch evidence. Read-only security reviewer before actual execution, final independent verifier after actual probe. No children/parallel writers."
+  verification: "Unit/negative tests then security PASS; master actual isolated no-provider probe, independently corroborated denial/host-save/cleanup results. No redundant full app/persistence-restart suite."
+  integration: "Commit/push only accepted source/tests/probe and scoped artifacts to existing repo; preserve unrelated dirty memory."
+  memory: "Record exact pins/platform, proof boundaries and pending authenticated gateway/lifecycle/retention/migration/provider integration."
+allowed_files:
+  - personal-co/server/runtime-sandbox.mjs
+  - personal-co/tests/runtime-sandbox.test.mjs
+  - scripts/probe_runtime_confinement.mjs
+  - tests/test_runtime_confinement_probe.mjs
+  - .ai/WORK_PACKAGES/WP-0044-runtime-confinement.yaml
+  - .ai/AGENT_REPORTS/WP-0044-implementer.md
+  - .ai/AGENT_REPORTS/WP-0044-fixer.md
+  - .ai/AGENT_REPORTS/WP-0044-security.md
+  - .ai/AGENT_REPORTS/WP-0044-runtime.md
+  - .ai/AGENT_REPORTS/WP-0044-verifier.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo paths, existing runtime package/state/profile changes, dependencies/config/auth/credentials/real data. No provider/model calls, runtime_start/input/terminal sessions, installations or batch deletion. Scoped Git delivery separately authorized."]
+inputs: [scripts/probe_app_server_contract.mjs, personal-co/server/canonical-memory-store.mjs, personal-co/src/domain/app-server-memory-codec.mjs, .ai/AGENT_REPORTS/WP-0041-runtime.md, .ai/AGENT_REPORTS/WP-0043-verifier.md]
+runtime_pin:
+  version: "0.32.5"
+  git_head: "1cf724938689a8f2bdb63bc03807db79a73d8f2d"
+  cli_sha256: "00e243ec4d963dec0e5130556e25916c478671507e7dc27e7513a9187703e1df"
+  reuse_dependency_root: "/private/tmp/personal-co-wp0041.qRnOrc/node_modules"
+acceptance_criteria:
+  - "AC1: No-dependency host module creates validated macOS sandbox launch spec, no import-time I/O/process. Require explicit canonical absolute disjoint dependency/state/protected directories; reject broad roots, symlinks/overlap/control or profile-injection paths. Verify existing trusted runtime0.32.5 CLI hash and Node compatibility. State/protected roots owned/private; no automatic path repair or existing data mutation. Fail closed on unsupported platform; no unsandboxed fallback."
+  - "AC2: Deny-default profile; dependency tree read-only, writes only exact state subtree/dev-null, protected root denies read/write and lies outside every allowed data root. Reuse narrow reviewed WP0041 OS/Node/sh/Git/library/metadata grants, not broad /usr /Library /System or home. No outbound network/keychain/credential access; bind/inbound literal loopback only. Empty explicit child environment plus necessary fixed keys; no HOME override, inherited tokens/config or shell interpolation."
+  - "AC3: Fixed import-safe synthetic probe creates a fresh private canonical fixture root with separate state/protected dirs; no caller-selected real data target. Start only verified launch command after external review gate; bounded startup/logs/requests, exact owned child cleanup/finally and loopback endpoint checks. Native commands limited to info/one synthetic Agent and exact fixture read/write targets, no inference/tools/terminals. Never answer unsolicited tool/permission instructions."
+  - "AC4: Actual probe shows runtime can use its allowed state/Agent memory, cannot native-read/write the protected canonical file, and same-profile Node child cannot read/write/rename/link protected files/directories or access an unrelated synthetic canary/outbound reserved-address endpoint. Host WP0043 store remains readable, exact unchanged after attacks, then can commit/read a protected revision. Denials must be observed, not inferred from config or protocol validation alone. No repeat restart-persistence/model tests."
+  - "AC5: Unit/negative tests cover path/pin/environment/profile/endpoint boundaries and probe timeout/failure cleanup using controlled mocks; independent security PASS before actual runtime execution. Final verifier corroborates actual report, hashes, synthetic bytes and owned process/listener termination. New synthetic roots retained; only individual owned lock/temp cleanup allowed, no recursive/batch deletion."
+  - "AC6: Record evidence/current state/queue before acceptance, exact macOS/Node/runtime pins and residuals. Not Linux/Windows deployment, authenticated/public gateway, provider access, lifecycle recovery, erasure/retention or completed migration. Native unauthenticated loopback service allowed only for this disposable synthetic experiment; no UI switch."
+design_boundary: "Canonical host record belongs to the same synthetic runtime Agent but is not exposed to the runtime. Future broker will inject only approved relevant context; no second Agent/persona database. Confinement launch is offline/no-provider proof only, not production deployability."
+validation_commands:
+  - cd personal-co && node --test tests/runtime-sandbox.test.mjs
+  - node --test tests/test_runtime_confinement_probe.mjs
+  - cd personal-co && node --test tests/canonical-memory-store.test.mjs
+  - cd personal-co && npm run typecheck
+  - "After security PASS only: node scripts/probe_runtime_confinement.mjs with explicit installed dependency root; exact invocation/evidence in runtime report."
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "Stop only owned probe processes; preserve old runtime install/state/profile, real data and retained fresh synthetic artifacts. No service/UI switch to revert."
+human_approval_required: false
+approval_note: "Standing authority covers necessary scoped sandbox implementation and reviewed fresh synthetic runtime execution; no spending/credentials/real data or global permissions change."
+pre_spawn_checklist: {task: "Four exact new implementation/test/probe files", why: "Implement bounded launcher/probe while master verifies pinned native protocol and records boundary", route: "One implementer then security review then actual run/final verifier", context: "WP/old reviewed profile/pinned protocol/store only, no history fork", writable: "Only four listed source/test/probe paths", forbidden: "All other repo paths, actual execution before security review, existing runtime/data modifications", output: "Common14 fields plus exact hashes/validation/risks", stop: "Unsafe grants or unbounded execution/real data pressure", verification: "Independent security gate and actual confinement evidence", approval: "Standing authority; synthetic-only"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
+repair_scope: "Fix2 after actual attempt1 and independent FAIL: only scripts/probe_runtime_confinement.mjs and tests/test_runtime_confinement_probe.mjs; require exact returned tags [marker, git-memory-enabled], preserve other identity checks and add genuine positive/missing/duplicate/unexpected-tag regressions. No launcher/grants/protocol expansion; no live execution before focused re-review. Fix1 parser/PATH resolved separately. Master-direct bounded fixer fallback: followup_task returned agent thread limit reached; independent final security gate remains required."
