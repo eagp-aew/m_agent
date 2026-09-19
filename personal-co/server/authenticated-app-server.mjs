@@ -1,6 +1,7 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { createRuntimeSandbox, RUNTIME_PIN } from './runtime-sandbox.mjs';
+import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
 
 const LIMITS = Object.freeze({ sockets: 2, pending: 8, requestBytes: 8192,
   messageBytes: 1048576, fragments: 64, bufferedChunks: 64, unsolicited: 32,
@@ -93,6 +94,8 @@ function validateResponse(message, pending) {
       && ['agent_management', 'conversation_management', 'memory_management', 'runtime_start', 'split_channels']
         .every(key => typeof message.capabilities[key] === 'boolean')
       && message.capabilities.agent_management && message.capabilities.conversation_management, 'RUNTIME_MISMATCH');
+  } else if (pending.type === 'agent_create') {
+    check(record(message.agent) && id(message.agent.id), 'INVALID_RESPONSE');
   } else if (pending.type === 'agent_retrieve' || pending.type === 'conversation_retrieve') {
     const key = pending.type === 'agent_retrieve' ? 'agent' : 'conversation';
     check(record(message[key]) && message[key].id === pending.fields[`${key}_id`], 'INVALID_RESPONSE');
@@ -178,16 +181,11 @@ function createConnection(url, token, onClosed, { WebSocketImpl, handshakeMs, re
   lifetimeSignal?.addEventListener('abort', abort, { once: true });
   if (lifetimeSignal?.aborted) abort();
 
-  const client = Object.freeze({
-    // Passive, never-rejecting notification. False means cleanup could not be
-    // confirmed before its deadline; a later close cannot rewrite that result.
-    closed: didClose,
-    request(type, input = {}, options = {}) {
+  let creationDispatched = false;
+  function dispatch(type, shape, signal) {
       try {
-        const signal = signalOption(options);
         check(!terminal, 'CLOSED'); check(!signal?.aborted, 'ABORTED');
         check(pending.size < LIMITS.pending, 'PENDING_LIMIT');
-        const shape = requestShape(type, input);
         const requestId = randomUUID();
         const payload = JSON.stringify({ type, request_id: requestId, ...shape });
         check(Buffer.byteLength(payload) <= LIMITS.requestBytes, 'REQUEST_LIMIT');
@@ -202,6 +200,29 @@ function createConnection(url, token, onClosed, { WebSocketImpl, handshakeMs, re
         return Promise.reject(error(['CLOSED', 'ABORTED', 'PENDING_LIMIT', 'REQUEST_LIMIT', 'FORBIDDEN_COMMAND'].includes(failure.code)
           ? failure.code : 'INVALID_REQUEST'));
       }
+  }
+  const client = Object.freeze({
+    // Passive, never-rejecting notification. False means cleanup could not be
+    // confirmed before its deadline; a later close cannot rewrite that result.
+    closed: didClose,
+    request(type, input = {}, options = {}) {
+      try { return dispatch(type, requestShape(type, input), signalOption(options)); }
+      catch (failure) { return Promise.reject(error(failure.code === 'FORBIDDEN_COMMAND' ? 'FORBIDDEN_COMMAND' : 'INVALID_REQUEST')); }
+    },
+    // This single named host bootstrap operation is not an arbitrary write API.
+    // Once attempted, even an ambiguous send/timeout must never replay here.
+    createAssistantAgent(marker, options = {}) {
+      try {
+        const signal = signalOption(options);
+        check(typeof marker === 'string' && /^personal-co-bootstrap-v1-[a-f0-9]{32}$/.exec(marker)?.[0] === marker);
+        check(!terminal, 'CLOSED'); check(!signal?.aborted, 'ABORTED');
+        check(!creationDispatched, 'CREATE_ALREADY_ATTEMPTED');
+        creationDispatched = true;
+        return dispatch('agent_create', { body: { name: 'Personal Co', system: SYSTEM_PROMPT,
+          tags: ['personal-co-v1', marker], tools: [], memory_blocks: [] } }, signal);
+      } catch (failure) {
+        return Promise.reject(error(['CLOSED', 'ABORTED', 'CREATE_ALREADY_ATTEMPTED'].includes(failure.code) ? failure.code : 'INVALID_REQUEST'));
+      }
     },
     async close() { fail('CLOSED'); check(await didClose, 'CLEANUP_FAILED'); },
   });
@@ -214,8 +235,10 @@ function createConnection(url, token, onClosed, { WebSocketImpl, handshakeMs, re
  * Its SHA256 verifier is intentionally public; the 256-bit random capability
  * stays in closures and only enters the native Authorization header.
  * Read RPC results are untrusted upstream data, never authorization decisions.
- * Query support is deliberately a bounded subset of the pinned read protocol;
- * includes/secrets, arbitrary relationships and mutations are not supported.
+ * request() supports only six bounded read commands; includes/secrets, arbitrary
+ * relationships and mutations are rejected. The separate createAssistantAgent()
+ * method permits one fixed bootstrap creation attempt per client, never arbitrary
+ * writes or replay after an ambiguous outcome.
  * Local Agent tags match ALL tags; Agent/conversation ordering is upstream's
  * fixed ordering. SDK filters ignored by the local backend are rejected here.
  * Only named conversations are supported; ambiguous "default" is excluded.
@@ -254,7 +277,7 @@ export async function createAuthenticatedAppServer(roots, {
         await connection.opened;
         const info = await connection.client.request('app_server_info');
         check(!disposed, 'DISPOSED'); check(!signal?.aborted, 'ABORTED');
-        return Object.freeze({ info, request: connection.client.request, close: connection.client.close,
+        return Object.freeze({ info, request: connection.client.request, createAssistantAgent: connection.client.createAssistantAgent, close: connection.client.close,
           closed: connection.client.closed });
       } catch (failure) {
         try { await connection.client.close(); } catch { throw error('CLEANUP_FAILED'); }

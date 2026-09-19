@@ -2,6 +2,7 @@ import path from 'node:path';
 import { createAuthenticatedAppServer } from './authenticated-app-server.mjs';
 import { createConversationReader } from './conversation-reader.mjs';
 import { startOwned, validateEndpoint, listenerGone } from './runtime-process.mjs';
+import { prepareAssistantBootstrap } from './assistant-bootstrap.mjs';
 
 const leases = new Set();
 class SessionError extends Error {
@@ -50,15 +51,29 @@ async function bounded(promise, ms) {
  * never cross this handle. Third argument is trusted tests only, not user/model
  * options; observe receives only public lifecycle evidence, never credentials.
  */
-export function createManagedReadSession(config, options = {}, {
+export function createManagedReadSession(config, options = {}, seams = {}) {
+  return managedSession(config, options, seams, false);
+}
+
+/** Roots-only first-run/reopen entrypoint. ready resolves {agentId}, not memory.
+ * Uses the same runtime owner; initialization adds a cooperative disk lock and
+ * irreversible creation intent. Pending/ambiguous creation never auto-retries.
+ * Does not implement a canonical context bridge, providers or browser auth.
+ */
+export function initializeManagedReadSession(config, options = {}, seams = {}) {
+  return managedSession(config, options, seams, true);
+}
+
+function managedSession(config, options, {
   makeAuth = createAuthenticatedAppServer, start = startOwned, checkListenerGone = listenerGone,
+  prepare = prepareAssistantBootstrap,
   startupMs = 25000, cleanupMs = 7000, observe = () => {},
-} = {}) {
-  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'agentId']);
+}, initialize) {
+  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', ...initialize ? [] : ['agentId']]);
   exact(options, ['signal']);
-  const { agentId } = config;
-  check(typeof agentId === 'string' && agentId !== 'default' && agentId.length <= 128
-    && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.exec(agentId)?.[0] === agentId, 'INVALID_CONFIG');
+  let { agentId } = config;
+  check(initialize || (typeof agentId === 'string' && agentId !== 'default' && agentId.length <= 128
+    && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.exec(agentId)?.[0] === agentId), 'INVALID_CONFIG');
   const roots = Object.freeze({ dependencyRoot: config.dependencyRoot, stateRoot: config.stateRoot, protectedRoot: config.protectedRoot });
   for (const value of Object.values(roots)) check(typeof value === 'string'
     && path.isAbsolute(value) && path.normalize(value) === value && value.startsWith('/private/tmp/'), 'INVALID_CONFIG');
@@ -75,6 +90,7 @@ export function createManagedReadSession(config, options = {}, {
   let child;
   let client;
   let reader;
+  let preparation;
   let endpoint;
   let cleanupTask;
   let lateCleanupFailed = false;
@@ -125,6 +141,7 @@ export function createManagedReadSession(config, options = {}, {
     }
     const settled = await attempt('STARTUP_UNSETTLED', async () => { await startupTask.catch(() => {}); return true; });
     if (settled && auth) authClosed = await attempt('AUTH_CLEANUP_FAILED', async () => { await auth.dispose(); return true; }) === true;
+    if (preparation) await attempt('BOOTSTRAP_CLEANUP_FAILED', () => preparation.close());
     if (lateCleanupFailed) { failures.push('LATE_CLEANUP_FAILED'); authClosed = false; }
     if (endpoint) portGone = await attempt('LISTENER_CLEANUP_FAILED', () => checkListenerGone(endpoint)) === true;
     if (portGone === false) failures.push('LISTENER_UNCONFIRMED');
@@ -143,6 +160,14 @@ export function createManagedReadSession(config, options = {}, {
       try { await auth.dispose(); } catch { lateCleanupFailed = true; }
       return;
     }
+    if (initialize) {
+      try { preparation = await prepare(roots, { signal: lifetime.signal }); }
+      catch (error) { if (error.code === 'CLEANUP_FAILED') lateCleanupFailed = true; throw error; }
+      if (phase !== 'starting') {
+        try { await preparation.close(); } catch { lateCleanupFailed = true; }
+        return;
+      }
+    }
     child = start(auth.launchSpec);
     void child.failed.then(() => transition('PROCESS_FAILED'));
     void child.done.then(() => transition('PROCESS_EXITED'));
@@ -157,6 +182,17 @@ export function createManagedReadSession(config, options = {}, {
       return;
     }
     void client.closed.then(clean => transition(clean === false ? 'SOCKET_CLEANUP_FAILED' : 'SOCKET_CLOSED'));
+    if (initialize) {
+      let identity;
+      try { identity = await preparation.resolve(client); }
+      finally {
+        // Cleanup may already have exhausted its deadline while filesystem IO
+        // was pending. Still release our late-settled preparation; never ready.
+        if (phase !== 'starting') try { await preparation.close(); } catch { lateCleanupFailed = true; }
+      }
+      if (phase !== 'starting') return;
+      agentId = identity.agentId;
+    }
     const response = await client.request('agent_list', { query: { tags: ['personal-co-v1'], limit: 2 } }, { signal: lifetime.signal });
     check(response?.success === true && Array.isArray(response.agents) && response.agents.length === 1
       && response.agents[0]?.id === agentId && Array.isArray(response.agents[0].tags)
@@ -164,7 +200,7 @@ export function createManagedReadSession(config, options = {}, {
       && response.agents[0].tags.includes('personal-co-v1'), 'AGENT_MISMATCH');
     if (phase !== 'starting') return;
     reader = createConversationReader(client, { agentId });
-    phase = 'ready'; clearTimeout(startupTimer); resolveReady(); announce({ type: 'ready' });
+    phase = 'ready'; clearTimeout(startupTimer); resolveReady(initialize ? Object.freeze({ agentId }) : undefined); announce({ type: 'ready' });
   });
   void startupTask.catch(failure => transition(failure instanceof SessionError ? failure.code : 'STARTUP_FAILED'));
   external?.addEventListener('abort', abort, { once: true });

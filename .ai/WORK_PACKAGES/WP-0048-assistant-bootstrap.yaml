@@ -1,0 +1,68 @@
+task_id: WP-0048-assistant-bootstrap
+status: ACCEPTED
+scope_type: implementation
+objective: "Remove manual Agent-ID provisioning: initialize one persistent native Agent plus canonical six-block memory, then reopen the same managed read session."
+why: "WP0047 requires a preexisting Agent ID. First-run durable binding is required before a usable browser/chat connection; it does not replace those remaining requirements."
+provenance: {created_at: "2026-09-13", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0047d9bbf3d"], trust_level: repo_controlled}
+context_profile: full
+risk_class: native_creation_durable_identity_memory_initialization
+fallback_verification: {allowed: false, reason: "Independent security review before native execution and final corroboration required.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 20, max_tool_calls: 110, trace_path: .ai/AGENT_REPORTS/WP-0048-verifier.md, cancellation: {owner: master, condition: "Unreviewed native execution, provider/private/old-state access, destructive recovery, credential exposure, scope or budget excess."}}
+module_outputs:
+  intake: "2026-09-19 resume: previous turn product/test progress before writer usage-limit error; six-file diff preserved,80 controlled PASS reported before final guard, no independent/native proof yet. Reuse same scoped writer. Full S0/S2-S6/live learning goal and standing authorization unchanged."
+  scope: "Six product/test paths; singleton first-run/reopen and canonical defaults, no browser/provider/production migration."
+  context: "Reuse lifecycle/auth/store/codec/block factories and pinned runtime. Native create assigns random ID, has no idempotency key and may append MemFS tag. Inventory excludes hidden agents."
+  routing: "Single implementer exact local files; main concurrently reviews durable identity/ambiguity. One independent security-aware verifier before native and final corroboration; no children."
+  verification: "Controlled real-filesystem bootstrap/ambiguity/lifecycle tests, existing related tests/typecheck. One reviewed actual bootstrap-close-reopen journey, not historical probe replay."
+  integration: "Six product files plus WP/three reports scoped commit/push; five mixed historical memory paths local only."
+  memory: "Actual initialization/reopen proof and temporary macOS/module lease/partial-creation limits; no provider/browser/canonical-context/privacy/full deployment acceptance."
+allowed_files:
+  - personal-co/server/assistant-bootstrap.mjs
+  - personal-co/tests/assistant-bootstrap.test.mjs
+  - personal-co/server/authenticated-app-server.mjs
+  - personal-co/tests/authenticated-app-server.test.mjs
+  - personal-co/server/managed-read-session.mjs
+  - personal-co/tests/managed-read-session.test.mjs
+  - .ai/WORK_PACKAGES/WP-0048-assistant-bootstrap.yaml
+  - .ai/AGENT_REPORTS/WP-0048-implementer.md
+  - .ai/AGENT_REPORTS/WP-0048-verifier.md
+  - .ai/AGENT_REPORTS/WP-0048-runtime.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo writes; repo dependency/manifests, runtime-process/sandbox/store/codec/domain/UI changes, production roots/config/network grants, old install/state, credentials/private data/providers, migration, data deletion or batch cleanup."]
+environment_recovery:
+  observed_at: "2026-09-19"
+  cause: "Prior exact CLI path stat ENOENT after interrupted week; no assumption about who removed it. Node remains24.15.0."
+  owner: master
+  generated_root: /private/tmp/personal-co-wp0048-runtime.o3519u
+  allowed_generated_outputs: "Fresh isolated package.json/package-lock/node_modules/npm-cache under this exact root only; no existing app or old-install mutation."
+  method: "Official registry confirms exact0.32.5 gitHead and original SHA512. Clean-env scoped npm install, ignore-scripts/no-audit/no-fund, explicit private cache/config/prefix; never run lifecycle scripts. Check CLI SHA256 and new lock before execution."
+  integrity: "sha512-b7rHPKEYe7w6iZ9MTQ9g3uvb9XTnEufXFfb553rGg2dww2xpDXQ9T8f3uSBsV8/ILBnRma15qy1scQMbuoLyUw=="
+  caveat: "Old transitive lock unavailable; fresh resolved graph is not claimed identical. Freeze new lock and independently review installation boundary before native execution. Test accepts explicit WP0048_DEPENDENCY_ROOT, sandbox/pin constraints unchanged."
+  result: "Install completed successfully with all lifecycle scripts disabled:331 packages installed,390 lock entries including root/platform optionals. CLI SHA256 matches original pin; lock SHA256 eb475ec460f708fe365a7c41c6691fca0fae98ba77eb08e2286fd1152206d8b7. Not executed yet; independent installation/source review pending."
+frozen_source_sha256: a135d68fd74c6956e131fba7c05c5a8b5f9655dfcc9ebe0a58440a1d6b8ca793
+acceptance_evidence: "Independent final AC1-AC8 handoff and pre-accept PASS;81 controlled/3 adverse/typecheck/whitespace, native bootstrap-reopen1/1 and read-only disk/identity/hash/PID/group/listener corroboration. Six product files724 insertions/20 deletions. Main report metadata fix1, product fixes0. Ten scoped delivery paths; five mixed historical memory paths retained locally."
+inputs: [personal-co/server/managed-read-session.mjs, personal-co/server/authenticated-app-server.mjs, personal-co/server/canonical-memory-store.mjs, personal-co/src/domain/app-server-memory-codec.mjs, personal-co/src/domain/memory.mjs, personal-co/src/domain/policy.mjs, personal-co/server/runtime-sandbox.mjs]
+human_approval_required: false
+approval_note: "Standing authority covers bounded creation API/durable initialization and necessary same-pin isolated recovery after verified missing artifact. Native only after independent frozen-source/installation PASS. Single exact owned ephemeral-lock unlink is scoped cleanup; never delete intent/canonical/native data, steal stale locks or batch-delete fixtures."
+acceptance_criteria:
+  - "AC1: Add named host-only createAssistantAgent(marker,{signal}) or equivalent operation with fixed Personal Co name/system prompt, personal-co-v1 and strict random bootstrap marker tags, tools[]/memory_blocks[], no arbitrary model/keys/tools/files. Generic request stays six-read-only, rejects agent_create. Snapshot arguments, validate/correlate response ID, retain auth/capability/deadline protections, at most one creation dispatch per client and no ambiguous retry. Native-added MemFS tag is compatible."
+  - "AC2: Bootstrap captures exact roots, validates private owned canonical dirs/files, bounded parsing/size/shape and symlink/hardlink/inode checks, acquires cooperative exclusive bootstrap lock. Fresh initialization requires empty native state/protected data except own lock and empty tagged inventory. Persist immutable private intent with stateRoot/random marker using no-clobber creation and file/directory sync BEFORE create RPC. Corruption/mismatch/lock failures never create or overwrite. Remove only exact owned lock; no stale stealing."
+  - "AC3: Fresh intent permits one create followed by exact visible singleton/tag/marker/retrieved-ID validation. Existing intent NEVER permits create; resolve only same marker-bound visible singleton, reject missing/duplicate/foreign/changed Agent or root, no persona fallback. Intent means creation may have happened, so unknown/absent outcome retains evidence and needs recovery. Interruption after native creation may resume canonical initialization only for same owned Agent; no adoption of unrelated existing data."
+  - "AC4: Reuse unchanged canonical store/codec/createMemoryBlocks/PERSONA_TEXT/MEMORY_POLICY_TEXT: stable IDs, six defaults, empty Archive/revision0 and host runtime-binding extension that bootstrap never rewrites. Reopen validates exact binding/Agent/schema/policy and reads without overwriting confirmed blocks/Archive or changing IDs/revision. Standalone store extensions are host-owned, not mechanically immutable against trusted commits. Unknown publication never blindly replayed/erased. Four writable/two protected blocks; native MemFS is not canonical, no canonical private contents sent to runtime and no context-bridge claim."
+  - "AC5: Explicit managed initialization entrypoint uses SAME lifecycle implementation, no second process owner. Existing createManagedReadSession with agentId stays compatible and never auto-creates. New roots-only entrypoint bootstraps after authentication and before existing identity preflight/reader readiness. Publish bounded identity/read/status/terminal/close handles only, no raw client/spec/credentials/memory. Abort/late cleanup cannot publish ready, release uncertain lease or create after cancellation. Keep sandbox/module ownership limits."
+  - "AC6: Controlled real fresh-filesystem/mocked-client tests cover first/reopen, lost create response/pending intent, duplicates/mismatch/changed binding, concurrent owner, invalid permissions/symlink/hardlink/corrupt/oversized intent, no overwrite, cancellation/partial canonical recovery. Transport creation shape/limits and managed lifecycle tests; existing store/manager/auth/reader/typecheck/whitespace pass. Default runs never native; guarded native digests cover new transitive source/policy imports."
+  - "AC7: Only after independent frozen-source security PASS, one opt-in fresh private-root/default actual manager journey: bootstrap one synthetic Agent, confirm ready/empty named history/canonical6 revision0, close; reopen same roots, prove same Agent/canonical bytes/no duplicate, close. Reuse pinned install, only creation/read RPC, no native file/provider/input/tool commands. Public hashes/IDs/roots/PIDs/endpoints/cleanup only, no tokens/full records. Retain fixtures and independently corroborate disk/identity/hash/process/listener evidence without replay."
+  - "AC8: Independent AC/security and preaccept/memory/Git delivery. Record pending-creation recovery, module-local runtime lease versus cooperative init lock, native-visible uniqueness/local sync/temporary macOS limits. Browser/provider/canonical-context/privacy/production and full objective remain unfinished."
+validation_commands:
+  - "WP0045_RUN_NATIVE=0 WP0047_RUN_NATIVE=0 WP0048_RUN_NATIVE=0 node --test personal-co/tests/assistant-bootstrap.test.mjs personal-co/tests/managed-read-session.test.mjs personal-co/tests/authenticated-app-server.test.mjs personal-co/tests/conversation-reader.test.mjs personal-co/tests/canonical-memory-store.test.mjs"
+  - "cd personal-co && npm run typecheck"
+  - "Guarded actual WP0048 bootstrap/reopen only after independent review; exact invocation/hashes in report."
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "No production switch/migration. Stop only owned test runtime, retain intent/canonical/native data and all unrelated changes."
+pre_spawn_checklist: {task: "Six-file bootstrap/lifecycle integration", why: "Implementation alongside master's durable identity/ambiguity review", route: "Single implementer then independent security-aware verifier", context: "WP/current host modules/defaults/pinned narrow source", writable: "Six named product files", forbidden: "All others/native before review/private/old state/provider/dependencies/deletion", output: "Common14/frozen hashes/native invocation", stop: "Scope/authority/unreviewed native/budget", verification: "Controlled files/lifecycle, reviewed native bootstrap/reopen and corroboration", approval: "Standing authority; no children/parallel writers"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]

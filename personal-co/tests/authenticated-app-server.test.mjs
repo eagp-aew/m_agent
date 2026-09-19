@@ -7,6 +7,7 @@ import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createServer } from 'node:http';
 import { createAuthenticatedAppServer } from '../server/authenticated-app-server.mjs';
+import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
 import { RUNTIME_PIN } from '../server/runtime-sandbox.mjs';
 import { startOwned, listenerGone } from '../../scripts/probe_runtime_confinement.mjs';
 
@@ -76,6 +77,50 @@ test('factory composes native auth flags, creates fresh private capability after
   await a.dispose(); await b.dispose(); assert.ok(socket.closed);
   await assert.rejects(a.connect(url), code('DISPOSED'));
   await assert.rejects(createAuthenticatedAppServer({}, { makeSandbox: async () => { throw new Error('private validation text'); } }), code('LAUNCH_VALIDATION_FAILED'));
+});
+
+test('named bootstrap creation has one fixed bounded dispatch while generic writes remain forbidden', async () => {
+  const marker = `personal-co-bootstrap-v1-${'a'.repeat(32)}`;
+  const transport = mockTransport({ send(socket, request, callback) {
+    callback?.(); queueMicrotask(() => socket.message(response(request, request.type === 'agent_create'
+      ? { agent: { id: 'agent-local-new', tags: ['personal-co-v1', marker, 'native-memfs'] } } : {})));
+  } });
+  const host = await factory(transport); const client = await host.connect(url);
+  const invalid = ['', marker + '\n', 'agent-1', { marker }];
+  for (const value of invalid) await assert.rejects(client.createAssistantAgent(value), code('INVALID_REQUEST'));
+  let invoked = false;
+  await assert.rejects(client.createAssistantAgent(marker, { get signal() { invoked = true; } }), code('INVALID_REQUEST'));
+  assert.equal(invoked, false);
+  await assert.rejects(client.createAssistantAgent(marker, { tools: [] }), code('INVALID_REQUEST'));
+  const controller = new AbortController(); controller.abort();
+  await assert.rejects(client.createAssistantAgent(marker, { signal: controller.signal }), code('ABORTED'));
+  await assert.rejects(client.request('agent_create', { body: {} }), code('FORBIDDEN_COMMAND'));
+  const options = {}; const creation = client.createAssistantAgent(marker, options); options.signal = controller.signal;
+  await assert.rejects(client.createAssistantAgent(marker), code('CREATE_ALREADY_ATTEMPTED'));
+  assert.equal((await creation).agent.id, 'agent-local-new');
+  const sent = transport.sockets[0].sent; assert.equal(sent.length, 2);
+  assert.deepEqual(sent[1].body, { name: 'Personal Co', system: SYSTEM_PROMPT,
+    tags: ['personal-co-v1', marker], tools: [], memory_blocks: [] });
+  assert.ok(Buffer.byteLength(JSON.stringify(sent[1])) < 8192); await host.dispose();
+});
+
+test('creation malformed response, lost reply and abort terminate without a second dispatch', async () => {
+  for (const kind of ['bad-id', 'wrong-envelope', 'timeout', 'abort', 'send-error']) {
+    const controller = new AbortController();
+    const transport = mockTransport({ send(socket, request, callback) {
+      if (request.type !== 'agent_create') return queueMicrotask(() => socket.message(response(request)));
+      if (kind === 'send-error') return callback(new Error('PRIVATE_SEND'));
+      if (kind === 'abort') return controller.abort();
+      if (kind === 'timeout') return;
+      queueMicrotask(() => socket.message(response(request, kind === 'bad-id' ? { agent: { id: 'bad/id' } }
+        : { type: 'agent_retrieve_response', agent: { id: 'agent-new' } })));
+    } });
+    const host = await factory(transport, { requestMs: 5 }); const client = await host.connect(url);
+    await assert.rejects(client.createAssistantAgent(`personal-co-bootstrap-v1-${'b'.repeat(32)}`, { signal: controller.signal }));
+    await assert.rejects(client.createAssistantAgent(`personal-co-bootstrap-v1-${'b'.repeat(32)}`));
+    assert.equal(transport.sockets[0].sent.filter(request => request.type === 'agent_create').length, 1);
+    await host.dispose();
+  }
 });
 
 test('endpoint and custom header rejection happen before socket creation', async () => {
@@ -366,7 +411,7 @@ test('real ws enforces the configured fragmented-message bound', async t => {
 // frozen bytes; the digest is NOT authentication or proof a review took place.
 const reviewFiles = ['../server/authenticated-app-server.mjs', './authenticated-app-server.test.mjs',
   '../server/package.json', '../server/package-lock.json', '../server/runtime-sandbox.mjs', '../../scripts/probe_runtime_confinement.mjs',
-  '../server/runtime-process.mjs'];
+  '../server/runtime-process.mjs', '../src/domain/policy.mjs'];
 async function reviewedDigest() {
   const hash = createHash('sha256');
   for (const file of reviewFiles) hash.update(await fs.readFile(new URL(file, import.meta.url)));

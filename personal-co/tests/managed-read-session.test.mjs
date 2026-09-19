@@ -6,7 +6,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
-import { createManagedReadSession } from '../server/managed-read-session.mjs';
+import { createManagedReadSession, initializeManagedReadSession } from '../server/managed-read-session.mjs';
 import { createAuthenticatedAppServer } from '../server/authenticated-app-server.mjs';
 import { startOwned, validateEndpoint, listenerGone } from '../server/runtime-process.mjs';
 import { RUNTIME_PIN } from '../server/runtime-sandbox.mjs';
@@ -111,6 +111,82 @@ test('managed ready/read/close composes ownership and exposes only bounded sanit
   assert.ok(f.process.signals.includes('SIGTERM')); assert.ok(f.auth.disposals >= 1);
   await assert.rejects(f.session.listMessages('conv-1'), code('NOT_READY'));
   const again = sessionFixture({}, {}, f.config); await again.session.ready; await again.session.close();
+});
+
+test('roots-only initialization shares lifecycle, returns identity only, and closes preparation', async () => {
+  const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();
+  let closed = 0; let resolved = 0;
+  const session = initializeManagedReadSession(roots, {}, { makeAuth: auth.makeAuth, start: child.start,
+    checkListenerGone: async () => true, prepare: async captured => {
+      assert.deepEqual(captured, roots); assert.equal(child.starts, 0);
+      return { async resolve(client) { assert.equal(client, auth.client); resolved++; return { agentId }; }, async close() { closed++; } };
+    } });
+  assert.deepEqual(await session.ready, { agentId }); assert.equal(resolved, 1);
+  assert.deepEqual(Object.keys(session).sort(), ['close', 'listConversations', 'listMessages', 'ready', 'status', 'terminal']);
+  assert.equal((await session.close()).cleanup.confirmed, true); assert.equal(closed, 1);
+  assert.throws(() => initializeManagedReadSession(config()), code('INVALID_CONFIG'));
+});
+
+test('late preparation, preparation rejection with retained lock, and close failure preserve cleanup truth', async () => {
+  for (const kind of ['late', 'reject-unclean', 'close-unclean', 'unsettled']) {
+    const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();
+    const gate = deferred(); let closed = 0;
+    const session = initializeManagedReadSession(roots, {}, { makeAuth: auth.makeAuth, start: child.start,
+      checkListenerGone: async () => true, cleanupMs: 100, prepare: async () => {
+        if (kind === 'late' || kind === 'unsettled') await gate.promise;
+        if (kind === 'reject-unclean') throw Object.assign(new Error('PRIVATE_LOCK'), { code: 'CLEANUP_FAILED' });
+        return { async resolve() { return { agentId }; }, async close() { closed++; if (kind === 'close-unclean') throw new Error('PRIVATE_CLOSE'); } };
+      } });
+    if (kind === 'close-unclean') await session.ready;
+    else await tick();
+    const closing = session.close(); if (kind === 'late') gate.resolve();
+    const result = await closing; assert.equal(result.cleanup.confirmed, kind === 'late');
+    if (kind !== 'close-unclean') assert.equal(child.starts, 0);
+    if (kind !== 'late') assert.throws(() => initializeManagedReadSession(roots), code('STATE_IN_USE'));
+    if (kind === 'unsettled') { gate.resolve(); await tick(); }
+    if (kind !== 'reject-unclean') assert.ok(closed >= 1);
+  }
+});
+
+test('bootstrap resolution after cleanup deadline still closes preparation without readiness or lease release', async () => {
+  const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();
+  const gate = deferred(); const entered = deferred(); let closed = 0;
+  const session = initializeManagedReadSession(roots, {}, { makeAuth: auth.makeAuth, start: child.start,
+    checkListenerGone: async () => true, cleanupMs: 20, prepare: async () => ({
+      async resolve() { entered.resolve(); await gate.promise; return { agentId }; }, async close() { closed++; },
+    }) });
+  await entered.promise; const result = await session.close(); assert.equal(result.cleanup.confirmed, false);
+  assert.equal(closed, 0); gate.resolve(); await tick(); assert.equal(closed, 1);
+  assert.throws(() => initializeManagedReadSession(roots), code('STATE_IN_USE'));
+  assert.equal(session.status().phase, 'failed'); await assert.rejects(session.ready, code('CLOSED'));
+});
+
+test('managed initialization with real bootstrap files reopens one identity without manual provisioning', async t => {
+  const root = await fs.realpath(await fs.mkdtemp('/private/tmp/personal-co-wp0048-managed-'));
+  const roots = { dependencyRoot: '/private/tmp/wp0047-test-install/node_modules',
+    stateRoot: path.join(root, 'state'), protectedRoot: path.join(root, 'protected') };
+  await fs.mkdir(roots.stateRoot, { mode: 0o700 }); await fs.mkdir(roots.protectedRoot, { mode: 0o700 });
+  let agents = []; let creations = 0; let bytes;
+  for (let run = 0; run < 2; run++) {
+    const auth = authFixture({ request: async type => {
+      if (type === 'agent_list') return { success: true, agents };
+      if (type === 'agent_retrieve') return { success: true, agent: agents[0] };
+      if (type === 'conversation_list') return { success: true, conversations: [] };
+    } });
+    auth.client.createAssistantAgent = async marker => {
+      creations++; agents = [{ id: agentId, tags: [TAG, marker, 'native-memfs'] }];
+      return { success: true, agent: agents[0] };
+    };
+    const child = controlledProcess();
+    const session = initializeManagedReadSession(roots, {}, { makeAuth: auth.makeAuth,
+      start: child.start, checkListenerGone: async () => true });
+    try {
+      assert.deepEqual(await session.ready, { agentId }); assert.deepEqual((await session.listConversations()).items, []);
+      const current = await fs.readFile(path.join(roots.protectedRoot, 'canonical-memory.json'));
+      if (run === 0) bytes = current; else assert.deepEqual(current, bytes);
+    } finally { assert.equal((await session.close()).cleanup.confirmed, true); }
+  }
+  assert.equal(creations, 1); t.diagnostic(`Retained synthetic fixture: ${root}`);
 });
 
 test('stateRoot lease rejects duplicates and input authority is captured before awaits', async () => {
@@ -278,7 +354,9 @@ test('real authenticated loopback ws and reader compose with controlled owned pr
 // Review attestation/change detection only, not authentication or proof of review.
 const reviewFiles = ['../server/runtime-process.mjs', '../server/managed-read-session.mjs', './managed-read-session.test.mjs',
   '../server/authenticated-app-server.mjs', './authenticated-app-server.test.mjs', '../../scripts/probe_runtime_confinement.mjs',
-  '../server/runtime-sandbox.mjs', '../server/conversation-reader.mjs', '../server/package.json', '../server/package-lock.json'];
+  '../server/runtime-sandbox.mjs', '../server/conversation-reader.mjs', '../server/package.json', '../server/package-lock.json',
+  '../server/assistant-bootstrap.mjs', '../server/canonical-memory-store.mjs', '../src/domain/app-server-memory-codec.mjs',
+  '../src/domain/memory.mjs', '../src/domain/policy.mjs'];
 async function reviewDigest() {
   const digest = createHash('sha256');
   for (const file of reviewFiles) digest.update(await fs.readFile(new URL(file, import.meta.url)));
