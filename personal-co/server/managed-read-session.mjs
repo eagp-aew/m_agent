@@ -69,8 +69,10 @@ function managedSession(config, options, {
   prepare = prepareAssistantBootstrap,
   startupMs = 25000, cleanupMs = 7000, observe = () => {},
 }, initialize) {
-  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', ...initialize ? [] : ['agentId']]);
+  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'retainedOnly', ...initialize ? [] : ['agentId']]);
   exact(options, ['signal']);
+  const retainedOnly = config.retainedOnly === undefined ? false : config.retainedOnly;
+  check(typeof retainedOnly === 'boolean', 'INVALID_CONFIG');
   let { agentId } = config;
   check(initialize || (typeof agentId === 'string' && agentId !== 'default' && agentId.length <= 128
     && /^[A-Za-z0-9][A-Za-z0-9_-]*$/.exec(agentId)?.[0] === agentId), 'INVALID_CONFIG');
@@ -199,7 +201,7 @@ function managedSession(config, options, {
       && response.agents[0].tags.length <= 32 && response.agents[0].tags.every(tag => typeof tag === 'string' && tag.length <= 256)
       && response.agents[0].tags.includes('personal-co-v1'), 'AGENT_MISMATCH');
     if (phase !== 'starting') return;
-    reader = createConversationReader(client, { agentId });
+    reader = createConversationReader(client, { agentId, retainedOnly });
     phase = 'ready'; clearTimeout(startupTimer); resolveReady(initialize ? Object.freeze({ agentId }) : undefined); announce({ type: 'ready' });
   });
   void startupTask.catch(failure => transition(failure instanceof SessionError ? failure.code : 'STARTUP_FAILED'));

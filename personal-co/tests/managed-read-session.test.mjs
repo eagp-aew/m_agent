@@ -94,6 +94,15 @@ function sessionFixture(behavior = {}, processOptions = {}, suppliedConfig = con
   return { auth, process, events, session, config: suppliedConfig };
 }
 
+test('managed retainedOnly is captured and passed to reader, default host behavior stays compatible', async () => {
+  const supplied = { ...config(), retainedOnly: true }; const f = sessionFixture({}, {}, supplied);
+  supplied.retainedOnly = false; await f.session.ready;
+  assert.deepEqual((await f.session.listConversations()).items, []);
+  await assert.rejects(f.session.listMessages('conv-1'), code('READ_FAILED')); await f.session.close();
+  assert.throws(() => createManagedReadSession({ ...config(), retainedOnly: 1 }), code('INVALID_CONFIG'));
+  assert.throws(() => createManagedReadSession({ ...config(), retainedOnly: null }), code('INVALID_CONFIG'));
+});
+
 test('managed ready/read/close composes ownership and exposes only bounded sanitized handles', async () => {
   const f = sessionFixture();
   assert.equal(f.session.status().phase, 'starting');

@@ -1,0 +1,66 @@
+task_id: WP-0049-local-browser-reader
+status: ACCEPTED
+scope_type: implementation
+objective: "Connect the existing Expo application to the managed local assistant through a bounded loopback read boundary: launch, see real status, browse explicitly retained conversations/history, and close safely."
+why: "WP0048 proves host startup but App still uses the legacy remote SDK. Deliver a browser-visible vertical slice, preserving the full chat/classification/privacy/provider goal rather than claiming a read viewer completes it."
+provenance: {created_at: "2026-09-19", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0048:7f47477600e2a904d47484c3b42c0411ea27a6e1"], trust_level: repo_controlled}
+context_profile: full
+risk_class: local_browser_auth_privacy_boundary_and_existing_ui_entry
+fallback_verification: {allowed: false, reason: "Independent security and browser-boundary verification required.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 30, max_tool_calls: 160, trace_path: .ai/AGENT_REPORTS/WP-0049-verifier.md, cancellation: {owner: master, condition: "Unreviewed native launch, private/provider data, token disclosure in reports, unexpected scope/dependency change, destructive recovery or budget exhaustion."}}
+module_outputs:
+  intake: "Previous turn PROGRESS: WP0048 delivered7f47477, remote verified. Full assistant remains incomplete. Standing scope authorization applies."
+  scope: "Twelve product/test/docs files; real Expo entry and same-origin read host/CLI, no new provider or upstream writes beyond unchanged first-run bootstrap."
+  context: "Reuse initializeManagedReadSession, read DTOs and Expo export. Reader currently has no privacy filtering, so browser path must opt into explicit retained-tag admission before exposure."
+  routing: "One exact-file local implementer: source paths clean, mixed metadata reserved to main. Main reviews boundary/test plan concurrently; one independent security-aware verifier, no children/parallel writers."
+  verification: "Controlled actual HTTP and client/reader/lifecycle regressions, typecheck/export, browser desktop/narrow synthetic journeys, then one independently reviewed actual default-host startup/read/cleanup test."
+  integration: "Only twelve verified product files plus WP/reports delivered; mixed historical memory remains local."
+  memory: "Browser read access and privacy admission are partial progress toward S2; model sends/canonical context/actual retention enforcement and production deployment remain open."
+allowed_files:
+  - personal-co/server/local-read-host.mjs
+  - personal-co/server/local-read-cli.mjs
+  - personal-co/server/conversation-reader.mjs
+  - personal-co/server/managed-read-session.mjs
+  - personal-co/tests/local-read-host.test.mjs
+  - personal-co/tests/conversation-reader.test.mjs
+  - personal-co/tests/managed-read-session.test.mjs
+  - personal-co/src/services/local-read-client.mjs
+  - personal-co/src/components/LocalAssistant.tsx
+  - personal-co/tests/local-read-client.test.mjs
+  - personal-co/App.tsx
+  - personal-co/README.md
+  - .ai/WORK_PACKAGES/WP-0049-local-browser-reader.yaml
+  - .ai/AGENT_REPORTS/WP-0049-implementer.md
+  - .ai/AGENT_REPORTS/WP-0049-verifier.md
+  - .ai/AGENT_REPORTS/WP-0049-browser.md
+  - .ai/AGENT_REPORTS/WP-0049-runtime.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["Other repo writes; dependencies/manifests, auth transport, sandbox/process/store/codec/policy, old-state/private data, production roots/config, provider/input/tool/file mutation RPC, migrations, deletion/batch cleanup. No secret tokens in durable reports or browser storage."]
+generated_outputs: "Ignored personal-co/dist export; retained fresh private synthetic test fixtures. Main may create one exact fixture driver via apply_patch under a fresh mktemp directory for actual browser QA, with public synthetic capability and fake session only. Existing restored dependencyRoot is read-only; no reinstall."
+inputs: [personal-co/App.tsx, personal-co/server/managed-read-session.mjs, personal-co/server/conversation-reader.mjs, personal-co/server/assistant-bootstrap.mjs, personal-co/server/runtime-sandbox.mjs, personal-co/PRODUCT_ROADMAP.md]
+human_approval_required: false
+approval_note: "Standing authorization covers this named local browser API/security/user-visible scope and verified commit/push. No provider spend, real-user data, native execution before frozen review or privacy confirmation bypass."
+acceptance_criteria:
+  - "AC1: Add explicit retainedOnly boolean opt-in to reader and managed session (default false preserves accepted host callers); browser host always forces true. Admit only conversations with personal-co-retained-v1 and without privacy:temporary or privacy:excluded; unknown/unmarked excluded, no auto-adoption. List filtering preserves raw-page accounting/overlap/opaque cursors and may return empty page with continuation. History checks admission before dispatch and again before delivery; forged ID, privacy change, foreign/hidden record fails closed. Document tags as a trusted-host convention, not deletion or complete temporary-mode enforcement."
+  - "AC2: Standard-library loopback HTTP host serves existing exported Expo assets and exactly three bounded POST JSON read routes: status, conversations, messages. Bind literal127.0.0.1 on dynamic port; exact Host and Origin for APIs, no CORS/proxy/redirect/upstream URL/config forwarding. Separate random256-bit browser capability (never native capability), authorization header only, timing-safe comparison, no query/cookie/storage credentials. Limit body/response/header/sockets/concurrency/deadlines; reject malformed/extra fields, unauthorized OPTIONS/unknown routes. Disconnect aborts only its read. Errors static, no raw records/tokens/paths. CSP self scripts/connect/frame denial, no-store/referrer denial/nosniff."
+  - "AC3: Static serving uses a trusted canonical owned webRoot disjoint from runtime/protected/dependency roots; only index and required allowlisted public asset types, bounded regular files, no symlink/traversal/dot/source-map/private files or SPA fallback on API paths. No new dependencies or custom dashboard. Review actual Expo export for CSP compatibility."
+  - "AC4: Host owns exactly one initializeManagedReadSession lifetime, awaits ready and binds one Agent, exposes host-only launch URL plus idempotent close/terminal (not raw upstream client/spec). Browser token lives only in process/browser memory, supplied via URL fragment and synchronously stripped before requests; local-mode query marker survives refresh and shows re-open-link help if capability lost. No local/session storage or provider-key prompt. Shutdown/failure revokes capability, aborts pending reads, stops HTTP sockets/listener and closes owned managed session; uncertain cleanup never claimed success. CLI takes explicit trusted roots/webRoot and prints only deliberate operator launch link, never native token/raw logs; SIGINT/SIGTERM close owned resources. No deletion or automatic retry/recreate."
+  - "AC5: Minimal App entry wrapper selects a dedicated local read surface only for explicit local launch; legacy app remains unchanged otherwise. Reuse React Native components/style language: Chinese connection/error/empty states, retained conversation list/search/manual continuation/selected chronological text history/omitted-attachment notice. Plain text rendering, no HTML. Stale selection/search/abort results cannot overwrite current view; errors do not impersonate empty success, consumed cursors never auto-replayed. Explicit disconnect clears visible data/capability locally; no fake send button or full-chat claim. Desktop and390px usable and accessible."
+  - "AC6: Targeted host/client/reader/manager tests cover auth/Origin/Host/CORS, shape and byte limits, abort/shutdown, static traversal/symlinks, retained/unmarked/temporary/changed visibility, cursor continuity, client stale/abort/token handling and legacy opt-out. Related auth/bootstrap/store tests, typecheck and Expo export pass; full app test only if needed for App wrapper regression coverage. Existing native opt-ins remain off."
+  - "AC7: Main actual-browser QA on compiled existing Expo app with controlled fake-session HTTP host at desktop/390px: list/history/search/empty/error/continuation/stale-selection/disconnect/missing-link/XSS-as-text and legacy offline entry. Synthetic fixtures clearly identified; no model-output quality claim. Independently review frozen source and known installation before one opt-in default actual host initialization/authenticated status/empty retained list/close test; retain public hash/identity/PID/port/cleanup evidence, no browser/native tokens or raw logs. Independent final corroboration without replay."
+  - "AC8: Independent security/AC verifier and protocol preaccept pass; update memory/decision/queue and commit/push only scoped delivery. Record temporary macOS roots, port-local capability/refresh recovery, trusted retained-tags (not full privacy implementation), no sends/provider/canonical-context/classification/production completeness. Full goal stays active."
+validation_commands:
+  - "WP0045_RUN_NATIVE=0 WP0047_RUN_NATIVE=0 WP0048_RUN_NATIVE=0 WP0049_RUN_NATIVE=0 node --test personal-co/tests/local-read-host.test.mjs personal-co/tests/local-read-client.test.mjs personal-co/tests/conversation-reader.test.mjs personal-co/tests/managed-read-session.test.mjs"
+  - "WP0045_RUN_NATIVE=0 WP0047_RUN_NATIVE=0 WP0048_RUN_NATIVE=0 WP0049_RUN_NATIVE=0 node --test personal-co/tests/authenticated-app-server.test.mjs personal-co/tests/assistant-bootstrap.test.mjs personal-co/tests/canonical-memory-store.test.mjs"
+  - "cd personal-co && npm run typecheck"
+  - "cd personal-co && EXPO_NO_TELEMETRY=1 npm run export:web"
+  - "Actual-browser QA and exact independently reviewed guarded native test; commands/digests supplied in implementer report before execution."
+  - git diff --check
+  - python3 -B scripts/validate_protocol.py
+rollback_plan: "Local path opt-in; legacy app untouched. Close only owned server/process, retain synthetic data and unrelated edits. No migration/deletion or automatic recovery."
+pre_spawn_checklist: {task: "Twelve-file local browser read vertical slice", why: "Bounded implementation alongside master's security/QA planning", route: "Single implementer then independent verifier", context: "Current WP and narrow host/reader/App paths", writable: "Twelve exact product paths plus implementer report", forbidden: "Other writes/private/old state/provider/upstream before review/dependencies/deletion", output: "Common14 with hashes/native command/fixture seam", stop: "Scope/security/missing context/budget", verification: "Controlled HTTP/client/lifecycle + actual browser + reviewed native", approval: "Standing authorization; no children"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]

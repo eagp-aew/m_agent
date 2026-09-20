@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
+import LocalAssistant from './src/components/LocalAssistant';
+import { consumeLocalLaunch, createLocalReadClient } from './src/services/local-read-client.mjs';
 import {
   ActivityIndicator,
   Pressable,
@@ -190,7 +192,16 @@ function EmptyState({ symbol, title, copy }: { symbol: string; title: string; co
   );
 }
 
+// Capture and strip the fragment synchronously, before rendering/requests. The
+// transient launch object is not retained; disconnect drops the client bearer.
+const localEntry = (() => {
+  const launch = typeof window === 'undefined' ? { local: false } : consumeLocalLaunch(window.location, window.history);
+  return { local: launch.local, client: 'capability' in launch && launch.capability ? createLocalReadClient(launch) : undefined };
+})();
 export default function App() {
+  return localEntry.local ? <LocalAssistant client={localEntry.client} /> : <LegacyApp />;
+}
+function LegacyApp() {
   const { width } = useWindowDimensions();
   const compact = width < 820;
   const [surface, setSurface] = useState<Surface>('Chat');

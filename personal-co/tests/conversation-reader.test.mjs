@@ -35,6 +35,33 @@ function fixture(override = () => undefined) {
 }
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 
+test('retained-only admission filters raw pages without losing empty-page continuation', async () => {
+  const rows = Array.from({ length: 23 }, (_, index) => ({ ...conversation(`conv-${index}`),
+    tags: index === 20 ? ['personal-co-retained-v1'] : index === 21 ? ['personal-co-retained-v1', 'privacy:temporary'] : [] }));
+  const f = fixture((type, fields) => type === 'conversation_list' ? {
+    conversations: fields.query.after ? rows.slice(19) : rows.slice(0, 21),
+  } : undefined);
+  const reader = createConversationReader(f.client, { agentId: AGENT, retainedOnly: true });
+  const first = await reader.listConversations(); assert.deepEqual(first.items, []); assert.ok(first.cursor);
+  const second = await reader.listConversations({ cursor: first.cursor });
+  assert.deepEqual(second.items.map(row => row.id), ['conv-20']); assert.equal(second.cursor, null); reader.close();
+  assert.throws(() => createConversationReader(f.client, { agentId: AGENT, retainedOnly: 'true' }), code('INVALID_INPUT'));
+  assert.throws(() => createConversationReader(f.client, { agentId: AGENT, retainedOnly: null }), code('INVALID_INPUT'));
+});
+
+test('retained-only history rejects unknown/temporary/excluded and rechecks privacy before delivery', async () => {
+  for (const changed of [false, true]) for (const tags of [[], ['privacy:temporary'], ['personal-co-retained-v1', 'privacy:excluded']]) {
+    let fetched = false;
+    const f = fixture(type => {
+      if (type === 'conversation_messages_list') fetched = true;
+      if (type === 'conversation_retrieve') return { conversation: { ...conversation('conv-1'),
+        tags: changed && !fetched ? ['personal-co-retained-v1'] : tags } };
+    });
+    const reader = createConversationReader(f.client, { agentId: AGENT, retainedOnly: true });
+    await assert.rejects(reader.listMessages('conv-1'), code('PRIVACY_EXCLUDED')); assert.equal(fetched, changed); reader.close();
+  }
+});
+
 test('list returns only immutable bounded display fields with same-Agent pre/post inventory checks', async () => {
   const f = fixture(type => type === 'conversation_list' ? { conversations: [
     { ...conversation('conv-1'), configuration: 'INTERNAL_CONFIG', tools: ['INTERNAL_TOOL'], hidden: false },

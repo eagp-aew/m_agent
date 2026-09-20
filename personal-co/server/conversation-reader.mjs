@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 const TAG = 'personal-co-v1';
+const retained = row => row.tags.includes('personal-co-retained-v1')
+  && !row.tags.includes('privacy:temporary') && !row.tags.includes('privacy:excluded');
 const PAGE = 20;
 const MAX_ROWS = 1000;
 const MAX_CURSORS = 32;
@@ -86,8 +88,10 @@ function visibleMessage(row, agentId, conversationId) {
  * Display strings remain untrusted text: render as text, never HTML/instructions.
  * Only user/assistant text survives projection; omittedAttachments reports any
  * non-text visible content. Internal-only pages still return their continuation.
- * This deliberately provides no temporary-conversation privacy filtering; the
- * future trusted broker must apply product privacy gates before browser access.
+ * retainedOnly opts into positive retained-tag admission and rejects temporary,
+ * excluded and unmarked histories. This trusted-host tagging convention is not
+ * deletion or complete temporary-session enforcement. Default false preserves
+ * existing host callers; browser brokers must force true.
  *
  * Pages are descending. Lists use one-row lookahead; history follows the pinned
  * native next_before/has_more contract. Continuations start at the previous
@@ -100,8 +104,10 @@ function visibleMessage(row, agentId, conversationId) {
  * already dispatched may complete under its transport deadline. close is final.
  */
 export function createConversationReader(client, config) {
-  options(config, ['agentId']);
+  options(config, ['agentId', 'retainedOnly']);
   const agentId = config.agentId;
+  const retainedOnly = config.retainedOnly === undefined ? false : config.retainedOnly;
+  check(typeof retainedOnly === 'boolean', 'INVALID_INPUT');
   check(entityId(agentId) && client && typeof client.request === 'function', 'INVALID_INPUT');
   const request = client.request.bind(client);
   const cursors = new Map();
@@ -141,7 +147,9 @@ export function createConversationReader(client, config) {
   }
   async function ownConversation(conversationId, signal) {
     const result = await rpc('conversation_retrieve', { conversation_id: conversationId }, signal);
-    return conversation(get(result, 'conversation'), agentId, conversationId);
+    const row = conversation(get(result, 'conversation'), agentId, conversationId);
+    check(!retainedOnly || retained(row), 'PRIVACY_EXCLUDED');
+    return row;
   }
   function pageState(kind, binding, cursor) {
     if (cursor === undefined) return { kind, binding, native: undefined, seen: new Set() };
@@ -205,7 +213,7 @@ export function createConversationReader(client, config) {
           const displayed = projected.slice(0, PAGE);
           await identity(signal); alive(signal);
           const cursor = issue(state, projected.length > PAGE ? displayed.at(-2).id : null, displayed.map(row => row.id));
-          return Object.freeze({ items: Object.freeze(displayed), cursor });
+          return Object.freeze({ items: Object.freeze(retainedOnly ? displayed.filter(retained) : displayed), cursor });
         });
       } catch { return Promise.reject(new ReaderError('INVALID_INPUT')); }
     },

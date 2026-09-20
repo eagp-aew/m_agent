@@ -49,7 +49,25 @@ The adapter never performs cross-provider fallback. Before listing or creating a
 
 Settings keeps draft values separate from the active connection. The explicit model-switch action closes an adapter-instance write barrier before its first wait and drains token-scoped leases held across each already-started message/reconciliation, forget, import, or restore workflow; workflows started after the latch fail closed. It then validates the target generation model and locked embedding, captures all six Blocks (including their limits) plus the full Archive, updates only the generation model on the same Agent ID, and reads everything back before committing the draft. Full Archive pages must provide a unique advancing cursor, so ambiguous pagination aborts before the forward update instead of accepting a partial snapshot. Any failure after the forward update is attempted triggers a same-ID original-model rollback and fresh verification. If rollback cannot be proven, that adapter instance remains write-locked and requires operator inspection; embedding migration, Agent replacement, deletion, and automatic fallback are never attempted. The documented presets are DeepSeek V4 Pro for routine use and GPT-5.6 Terra as a manual quality switch; availability still depends on the exact handles registered by your Letta server.
 
-## Run locally
+## Experimental local read mode (macOS)
+
+The existing app now has an explicit Chinese local read surface. This is partial progress toward the same assistant: status, retained conversations and text history only. Sending, model/provider calls, classification, canonical model context and complete privacy/retention enforcement are not implemented in this path. The legacy application below remains the default when `?local=1` is absent.
+
+Build the existing Expo app with `EXPO_NO_TELEMETRY=1 npm run export:web`. A trusted operator supplies four canonical absolute directories: the independently reviewed pinned Letta Code 0.32.5 `node_modules`, private mode-0700 native state and protected memory roots, and the exported `dist` web root. Data roots must satisfy the unchanged experimental `/private/tmp/...` sandbox restrictions; web assets must be owned, unlinked public files and disjoint from all data/dependency roots. Fresh initialization requires empty state/protected directories. Existing intent never permits replacement creation; do not erase locks or records to force a retry.
+
+After independent runtime/source review, launch from `personal-co` with explicit paths:
+
+```sh
+node server/local-read-cli.mjs --dependencyRoot /private/tmp/REVIEWED_INSTALL/node_modules --stateRoot /private/tmp/YOUR_SESSION/state --protectedRoot /private/tmp/YOUR_SESSION/protected --webRoot /ABSOLUTE/PATH/personal-co/dist
+```
+
+The CLI deliberately prints a private operator launch link on literal `127.0.0.1` with a dynamically assigned port. Do not share or save that link in reports. Its fragment contains a new 256-bit browser capability, not the native runtime capability. The app immediately removes the fragment and uses only an Authorization header; neither credential nor viewed data is stored in local/session storage. Refresh retains local mode but loses access: reopen the complete terminal link. **断开连接** clears this page's data and credential; it does not stop the host. Ctrl+C in the terminal closes the host's HTTP sockets and its one owned managed runtime. Cleanup uncertainty is reported, never treated as success or retried automatically.
+
+The browser host always forces `retainedOnly: true`. Only conversations tagged `personal-co-retained-v1`, without `privacy:temporary` or `privacy:excluded`, may be displayed. Unmarked histories are not automatically adopted. History admission is rechecked before fetching and before delivery. Tags are a trusted-host convention, not access control against another same-user process, deletion proof or full temporary-session privacy enforcement. This read slice provides no tag-writing control. Empty filtered pages may still have a continuation. Failed continuation outcomes are uncertain: the UI never replays them and instead offers deliberate fresh reload.
+
+Only `POST /api/local/status`, `/api/local/conversations` and `/api/local/messages` exist. Exact Host/Origin, header bearer, body/response limits and finite concurrency apply; no CORS, arbitrary RPC, browser-supplied paths or native credentials. The CSP permits self-hosted scripts/connections and the inline styles required by React Native Web, not inline scripts or frames. Static serving excludes source maps, dotfiles, metadata and path/link escapes. Limits: four concurrent HTTP requests, one active read and at most three waiting deliveries (canceled waiters never dispatch), 32 sockets, 4 KiB request body, 2 MiB response, 8 MiB asset, 10-second request and cleanup-reporting bounds; the underlying reader also retains its finite cursor/raw-row budgets. The host/module locks are cooperative and this is not production deployment.
+
+## Run locally (legacy remote adapter)
 
 Requirements: Node.js 20+ and a reachable Letta server.
 
