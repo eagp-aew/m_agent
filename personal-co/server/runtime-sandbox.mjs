@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
+import { types } from 'node:util';
 
 export const RUNTIME_PIN = Object.freeze({
   version: '0.32.5', gitHead: '1cf724938689a8f2bdb63bc03807db79a73d8f2d',
@@ -11,6 +12,30 @@ const sha256 = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const requireValue = (value, code) => { if (!value) throw new Error(code); };
 const inside = (parent, child) => child === parent || child.startsWith(`${parent}/`);
 const overlap = (a, b) => inside(a, b) || inside(b, a);
+
+// Trusted operator configuration only; never accept URLs, credentials or native
+// model settings. Capture before any asynchronous validation/launch work.
+export function captureLocalChatConfig(value) {
+  requireValue(value && typeof value === 'object' && !types.isProxy(value) && Object.getPrototypeOf(value) === Object.prototype, 'invalid_chat_config');
+  const descriptors = Object.getOwnPropertyDescriptors(value);
+  requireValue(Reflect.ownKeys(descriptors).length === 2 && ['model', 'providerPort'].every(key =>
+    descriptors[key]?.enumerable && Object.hasOwn(descriptors[key], 'value')), 'invalid_chat_config');
+  const { model, providerPort } = value;
+  requireValue(typeof model === 'string' && /^lmstudio\/[A-Za-z0-9][A-Za-z0-9._/-]{0,199}$/.exec(model)?.[0] === model
+    && !model.includes('..') && !['lmstudio/auto', 'lmstudio/default', 'lmstudio/unselected'].includes(model)
+    && Number.isInteger(providerPort) && providerPort > 0 && providerPort <= 65535, 'invalid_chat_config');
+  return Object.freeze({ model, providerPort });
+}
+
+export function deriveLocalChatSandbox(base, input) {
+  const { providerPort } = captureLocalChatConfig(input);
+  requireValue(base.command === '/usr/bin/sandbox-exec' && base.args[0] === '-p' && base.args[1] === base.profile, 'invalid_chat_base');
+  const profile = `${base.profile}(allow network-outbound (remote ip "127.0.0.1:${providerPort}"))\n`;
+  return Object.freeze({ ...base, profile, profileSha256: sha256(profile),
+    args: Object.freeze(['-p', profile, ...base.args.slice(2)]),
+    options: Object.freeze({ ...base.options, env: Object.freeze({ ...base.options.env,
+      LMSTUDIO_BASE_URL: `http://127.0.0.1:${providerPort}/v1` }) }) });
+}
 
 function safePath(value) {
   requireValue(typeof value === 'string' && /^\/[A-Za-z0-9/_. -]+$/.test(value)

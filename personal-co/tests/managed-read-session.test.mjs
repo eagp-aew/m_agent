@@ -136,6 +136,26 @@ test('roots-only initialization shares lifecycle, returns identity only, and clo
   assert.throws(() => initializeManagedReadSession(config()), code('INVALID_CONFIG'));
 });
 
+test('chat configuration is roots-only opt-in, captured before awaits, and opens bound receipts only after validated identity', async () => {
+  const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();
+  const chat = { providerPort: 12345, model: 'lmstudio/synthetic' }; let captured; let resolved = false; let storeClosed = 0;
+  const session = initializeManagedReadSession({ ...roots, chat }, {}, {
+    makeAuth: async (input, options) => { captured = options; return auth.makeAuth(input); }, start: child.start,
+    checkListenerGone: async () => true,
+    prepare: async () => ({ async resolve() { resolved = true; return { agentId }; }, async close() {} }),
+    openOperations: input => {
+      assert.equal(resolved, true); assert.deepEqual(input, { directory: roots.protectedRoot, agentId });
+      return { listPending: () => [], close: () => { storeClosed++; } };
+    },
+  });
+  chat.providerPort = 99999; chat.model = 'openai/forbidden'; await session.ready;
+  assert.equal(typeof captured.makeSandbox, 'function');
+  assert.deepEqual(Object.keys(session.chat).sort(), ['get', 'listPending', 'recoverCreate', 'submit']);
+  assert.deepEqual(session.chat.listPending(), []); await session.close(); assert.equal(storeClosed, 1);
+  assert.throws(() => createManagedReadSession({ ...config(), chat: { providerPort: 12345, model: 'lmstudio/x' } }), code('INVALID_CONFIG'));
+  assert.throws(() => initializeManagedReadSession({ ...roots, chat: { providerPort: 12345, model: 'lmstudio/auto' } }), code('INVALID_CONFIG'));
+});
+
 test('late preparation, preparation rejection with retained lock, and close failure preserve cleanup truth', async () => {
   for (const kind of ['late', 'reject-unclean', 'close-unclean', 'unsettled']) {
     const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();

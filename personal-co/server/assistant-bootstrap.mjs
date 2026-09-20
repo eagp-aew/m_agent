@@ -123,8 +123,20 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
       const expected = { schema: 'personal-co-bootstrap', version: 1, ...roots, marker: intent.marker };
       check(JSON.stringify(expected) === existing.text, 'INVALID_INTENT');
       intentText = existing.text; intentStat = existing.stat; fresh = false;
-      check(entries.every(name => [BOOTSTRAP_LOCK, BOOTSTRAP_INTENT, CANONICAL_MEMORY_FILE].includes(name)), 'EXISTING_DATA');
-      await read(path.join(roots.protectedRoot, CANONICAL_MEMORY_FILE), MAX_CANONICAL_BYTES, true);
+      const canonical = await read(path.join(roots.protectedRoot, CANONICAL_MEMORY_FILE), MAX_CANONICAL_BYTES, true);
+      const receipts = entries.includes('operations.sqlite');
+      const journal = entries.includes('operations.sqlite-journal');
+      check(entries.every(name => [BOOTSTRAP_LOCK, BOOTSTRAP_INTENT, CANONICAL_MEMORY_FILE,
+        'operations.sqlite', 'operations.sqlite-journal'].includes(name))
+        && (!receipts || canonical !== null) && (!journal || receipts), 'EXISTING_DATA');
+      // Metadata admission only. The managed receipt owner validates schema and
+      // exact Agent binding after canonical bootstrap resolves. No DB IO/replay.
+      for (const name of ['operations.sqlite', 'operations.sqlite-journal']) {
+        if (!entries.includes(name)) continue;
+        const file = path.join(roots.protectedRoot, name);
+        privateFile(await io.lstat(file), 256 * 1024 * 1024);
+        check(await io.realpath(file) === file, 'UNSAFE_PATH');
+      }
     } else {
       check(entries.length === 1 && entries[0] === BOOTSTRAP_LOCK && (await io.readdir(roots.stateRoot)).length === 0, 'EXISTING_DATA');
       fresh = true;

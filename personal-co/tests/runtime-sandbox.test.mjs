@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRuntimeSandbox, RUNTIME_PIN } from '../server/runtime-sandbox.mjs';
+import { createRuntimeSandbox, RUNTIME_PIN, captureLocalChatConfig, deriveLocalChatSandbox } from '../server/runtime-sandbox.mjs';
 
 const roots = { dependencyRoot: '/private/tmp/installed/node_modules',
   stateRoot: '/private/tmp/synthetic/state', protectedRoot: '/private/tmp/synthetic/protected' };
@@ -40,6 +40,32 @@ test('deny-default spec pins command/argv, clean environment and separate permis
   } finally {
     if (inherited === undefined) delete process.env.LETTA_API_KEY; else process.env.LETTA_API_KEY = inherited;
   }
+});
+
+test('optional chat preserves baseline sandbox exactly except literal loopback port and clean provider environment', async () => {
+  const base = await createRuntimeSandbox(roots, environment());
+  const config = captureLocalChatConfig({ model: 'lmstudio/synthetic/model', providerPort: 12345 });
+  const derived = deriveLocalChatSandbox(base, config);
+  assert.ok(Object.isFrozen(config));
+  assert.equal(derived.profile, `${base.profile}(allow network-outbound (remote ip "127.0.0.1:12345"))\n`);
+  assert.deepEqual(derived.args, ['-p', derived.profile, ...base.args.slice(2)]);
+  assert.deepEqual(derived.options, { ...base.options, env: { ...base.options.env, LMSTUDIO_BASE_URL: 'http://127.0.0.1:12345/v1' } });
+  assert.equal(derived.roots, base.roots); assert.notEqual(derived.profileSha256, base.profileSha256);
+  assert.ok(Object.isFrozen(derived.options.env) && Object.isFrozen(derived.args));
+  assert.ok(!base.options.env.LMSTUDIO_BASE_URL && !base.profile.includes('network-outbound'));
+});
+
+test('chat operator configuration rejects endpoint, fallback, getters, hidden fields and out-of-range ports', () => {
+  for (const model of ['local/default', 'lmstudio/default', 'lmstudio/auto', 'lmstudio/unselected', 'openai/x',
+    'lmstudio/x\n', 'lmstudio/../x', 'http://127.0.0.1:12345', 'lmstudio/x?token=y']) {
+    assert.throws(() => captureLocalChatConfig({ model, providerPort: 12345 }));
+  }
+  for (const providerPort of [0, 65536, 1.5, '12345', NaN]) assert.throws(() => captureLocalChatConfig({ model: 'lmstudio/x', providerPort }));
+  assert.throws(() => captureLocalChatConfig({ model: 'lmstudio/x', providerPort: 12345, apiKey: 'private' }));
+  let read = false;
+  assert.throws(() => captureLocalChatConfig({ get model() { read = true; return 'lmstudio/x'; }, providerPort: 12345 }));
+  assert.equal(read, false);
+  assert.throws(() => captureLocalChatConfig(Object.defineProperty({ model: 'lmstudio/x' }, 'providerPort', { value: 12345 })));
 });
 
 test('unsupported platform and incompatible Node fail before filesystem access', async () => {

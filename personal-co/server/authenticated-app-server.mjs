@@ -2,6 +2,8 @@ import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import { createRuntimeSandbox, RUNTIME_PIN } from './runtime-sandbox.mjs';
 import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
+import { createLocalChatConnection } from './local-chat-channel.mjs';
+import { captureLocalChatConfig } from './runtime-sandbox.mjs';
 
 const LIMITS = Object.freeze({ sockets: 2, pending: 8, requestBytes: 8192,
   messageBytes: 1048576, fragments: 64, bufferedChunks: 64, unsolicited: 32,
@@ -250,7 +252,7 @@ function createConnection(url, token, onClosed, { WebSocketImpl, handshakeMs, re
  */
 export async function createAuthenticatedAppServer(roots, {
   makeSandbox = createRuntimeSandbox, WebSocketImpl = WebSocket,
-  handshakeMs = LIMITS.handshakeMs, requestMs = LIMITS.requestMs,
+  handshakeMs = LIMITS.handshakeMs, requestMs = LIMITS.requestMs, turnMs = 120000,
 } = {}) {
   let base;
   try { base = await makeSandbox(roots); } catch { throw error('LAUNCH_VALIDATION_FAILED'); }
@@ -265,6 +267,28 @@ export async function createAuthenticatedAppServer(roots, {
   let disposing;
   return Object.freeze({
     launchSpec,
+    async connectChat(url, binding, options = {}) {
+      check(!disposed, 'DISPOSED'); endpoint(url);
+      fields(binding, ['agentId', 'stateRoot', 'model', 'providerPort'], ['agentId', 'stateRoot', 'model', 'providerPort']);
+      check(id(binding.agentId) && binding.stateRoot === roots.stateRoot, 'INVALID_REQUEST');
+      const chat = captureLocalChatConfig({ model: binding.model, providerPort: binding.providerPort });
+      const captured = Object.freeze({ agentId: binding.agentId, stateRoot: binding.stateRoot, model: chat.model });
+      const signal = signalOption(options);
+      check(!signal?.aborted, 'ABORTED'); check(owned.size < LIMITS.sockets, 'CONNECTION_LIMIT');
+      let connection;
+      connection = createLocalChatConnection(url, token, () => owned.delete(connection),
+        { WebSocketImpl, handshakeMs, requestMs, turnMs }, signal, captured);
+      owned.add(connection);
+      try {
+        await connection.opened; await connection.client.verify();
+        check(!disposed && !signal?.aborted, 'DISPOSED');
+        const { verify: ignored, ...named } = connection.client;
+        return Object.freeze(named);
+      } catch {
+        try { await connection.client.close(); } catch { throw error('CLEANUP_FAILED'); }
+        throw error('CHAT_CHANNEL_FAILED');
+      }
+    },
     async connect(url, options = {}) {
       check(!disposed, 'DISPOSED');
       endpoint(url);

@@ -3,6 +3,9 @@ import { createAuthenticatedAppServer } from './authenticated-app-server.mjs';
 import { createConversationReader } from './conversation-reader.mjs';
 import { startOwned, validateEndpoint, listenerGone } from './runtime-process.mjs';
 import { prepareAssistantBootstrap } from './assistant-bootstrap.mjs';
+import { captureLocalChatConfig, createRuntimeSandbox, deriveLocalChatSandbox } from './runtime-sandbox.mjs';
+import { openChatOperationStore } from './chat-operation-store.mjs';
+import { createLocalChatOperations } from './local-chat-operations.mjs';
 
 const leases = new Set();
 class SessionError extends Error {
@@ -58,7 +61,9 @@ export function createManagedReadSession(config, options = {}, seams = {}) {
 /** Roots-only first-run/reopen entrypoint. ready resolves {agentId}, not memory.
  * Uses the same runtime owner; initialization adds a cooperative disk lock and
  * irreversible creation intent. Pending/ambiguous creation never auto-retries.
- * Does not implement a canonical context bridge, providers or browser auth.
+ * Optional trusted chat:{providerPort,model} enables host-private segment B.
+ * Fixed protected policy only; selective canonical context admission (segment C)
+ * is REQUIRED before HTTP/browser enablement. No arbitrary RPC/settings return.
  */
 export function initializeManagedReadSession(config, options = {}, seams = {}) {
   return managedSession(config, options, seams, true);
@@ -67,9 +72,14 @@ export function initializeManagedReadSession(config, options = {}, seams = {}) {
 function managedSession(config, options, {
   makeAuth = createAuthenticatedAppServer, start = startOwned, checkListenerGone = listenerGone,
   prepare = prepareAssistantBootstrap,
+  openOperations = openChatOperationStore, operationMs = 180000,
   startupMs = 25000, cleanupMs = 7000, observe = () => {},
 }, initialize) {
-  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'retainedOnly', ...initialize ? [] : ['agentId']]);
+  exact(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'retainedOnly', ...initialize ? ['chat'] : ['agentId']]);
+  let chatConfig;
+  if (config.chat !== undefined) {
+    try { chatConfig = captureLocalChatConfig(config.chat); } catch { throw new SessionError('INVALID_CONFIG'); }
+  }
   exact(options, ['signal']);
   const retainedOnly = config.retainedOnly === undefined ? false : config.retainedOnly;
   check(typeof retainedOnly === 'boolean', 'INVALID_CONFIG');
@@ -93,6 +103,8 @@ function managedSession(config, options, {
   let client;
   let reader;
   let preparation;
+  let operationStore;
+  let operations;
   let endpoint;
   let cleanupTask;
   let lateCleanupFailed = false;
@@ -111,6 +123,7 @@ function managedSession(config, options, {
     if (phase === 'closing' || phase === 'closed' || phase === 'failed') return terminal;
     phase = 'closing'; reason = code; clearTimeout(startupTimer);
     reader?.close(); // Invalidate delivery before awaiting any cleanup work.
+    void operations?.close();
     rejectReady(new SessionError(code));
     lifetime.abort(); external?.removeEventListener('abort', abort);
     cleanupTask = cleanup();
@@ -143,6 +156,8 @@ function managedSession(config, options, {
     }
     const settled = await attempt('STARTUP_UNSETTLED', async () => { await startupTask.catch(() => {}); return true; });
     if (settled && auth) authClosed = await attempt('AUTH_CLEANUP_FAILED', async () => { await auth.dispose(); return true; }) === true;
+    if (operations) await attempt('CHAT_UNSETTLED', () => operations.close());
+    if (operationStore) await attempt('CHAT_STORE_CLEANUP_FAILED', () => operationStore.close());
     if (preparation) await attempt('BOOTSTRAP_CLEANUP_FAILED', () => preparation.close());
     if (lateCleanupFailed) { failures.push('LATE_CLEANUP_FAILED'); authClosed = false; }
     if (endpoint) portGone = await attempt('LISTENER_CLEANUP_FAILED', () => checkListenerGone(endpoint)) === true;
@@ -157,7 +172,8 @@ function managedSession(config, options, {
   }
   startupTask = Promise.resolve().then(async () => {
     if (phase !== 'starting') return;
-    auth = await makeAuth(roots);
+    auth = await makeAuth(roots, ...(chatConfig ? [{ makeSandbox: async captured =>
+      deriveLocalChatSandbox(await createRuntimeSandbox(captured), chatConfig) }] : []));
     if (phase !== 'starting') {
       try { await auth.dispose(); } catch { lateCleanupFailed = true; }
       return;
@@ -201,6 +217,12 @@ function managedSession(config, options, {
       && response.agents[0].tags.length <= 32 && response.agents[0].tags.every(tag => typeof tag === 'string' && tag.length <= 256)
       && response.agents[0].tags.includes('personal-co-v1'), 'AGENT_MISMATCH');
     if (phase !== 'starting') return;
+    if (chatConfig) {
+      operationStore = openOperations({ directory: roots.protectedRoot, agentId });
+      operations = createLocalChatOperations({ store: operationStore, agentId, model: chatConfig.model,
+        signal: lifetime.signal, operationMs, stop: () => transition('CHAT_UNCERTAIN'),
+        connect: () => auth.connectChat(endpoint, { agentId, stateRoot: roots.stateRoot, ...chatConfig }, { signal: lifetime.signal }) });
+    }
     reader = createConversationReader(client, { agentId, retainedOnly });
     phase = 'ready'; clearTimeout(startupTimer); resolveReady(initialize ? Object.freeze({ agentId }) : undefined); announce({ type: 'ready' });
   });
@@ -218,6 +240,12 @@ function managedSession(config, options, {
     }
   }
   return Object.freeze({ ready, terminal, status: () => Object.freeze({ phase, reason }),
+    ...(chatConfig ? { chat: Object.freeze({
+      submit(value) { check(phase === 'ready', 'NOT_READY'); return operations.submit(value); },
+      get(operationId) { check(phase === 'ready', 'NOT_READY'); return operations.get(operationId); },
+      listPending() { check(phase === 'ready', 'NOT_READY'); return operations.listPending(); },
+      recoverCreate(operationId) { check(phase === 'ready', 'NOT_READY'); return operations.recoverCreate(operationId); },
+    }) } : {}),
     listConversations: (...args) => read('listConversations', args),
     listMessages: (...args) => read('listMessages', args),
     close: () => transition('CLOSED'),

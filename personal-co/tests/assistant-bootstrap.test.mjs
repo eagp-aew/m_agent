@@ -10,6 +10,7 @@ import { createMemoryBlocks } from '../src/domain/memory.mjs';
 import { PERSONA_TEXT, MEMORY_POLICY_TEXT } from '../src/domain/policy.mjs';
 import { initializeManagedReadSession } from '../server/managed-read-session.mjs';
 import { RUNTIME_PIN } from '../server/runtime-sandbox.mjs';
+import { openChatOperationStore } from '../server/chat-operation-store.mjs';
 
 const TAG = 'personal-co-v1';
 const agentId = 'agent-local-synthetic';
@@ -90,6 +91,41 @@ test('fresh intent is synced before one create; six stable defaults and exact re
   assert.deepEqual(await initialize(f, client), { agentId }); assert.equal(client.creates, 1);
   assert.deepEqual(await fs.readFile(f.data), before); assert.deepEqual(await fs.readFile(f.intent), intentBefore);
   assert.deepEqual((await fs.readdir(f.roots.protectedRoot)).sort(), [BOOTSTRAP_INTENT, CANONICAL_MEMORY_FILE].sort());
+});
+
+test('existing canonical bootstrap admits real bound receipt database without recreating Agent or redispatch', async t => {
+  const f = await fixture(t); const client = nativeFixture(); await initialize(f, client);
+  const request = { operationId: '12345678-1234-4234-8234-123456789abc', kind: 'create', title: 'Retained' };
+  let store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+  assert.equal(store.reserve(request).dispatchAllowed, true); store.close();
+  assert.deepEqual(await initialize(f, client), { agentId });
+  store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+  assert.equal(store.reserve(request).dispatchAllowed, false); store.close();
+  assert.equal(client.creates, 1);
+});
+
+test('receipt metadata admission rejects unsafe files, missing canonical, orphan journal and unknown sidecars', async t => {
+  for (const kind of ['permissions', 'symlink', 'hardlink', 'directory', 'oversize', 'orphan', 'wal', 'shm', 'unknown', 'missing-canonical']) {
+    const f = await fixture(t); const client = nativeFixture();
+    if (kind === 'missing-canonical') {
+      const lost = nativeFixture({ lost: true }); await assert.rejects(initialize(f, lost)); client.agents = lost.agents;
+    } else await initialize(f, client);
+    const database = path.join(f.roots.protectedRoot, 'operations.sqlite');
+    if (kind === 'symlink' || kind === 'hardlink') {
+      const target = path.join(f.root, 'synthetic-receipts'); await fs.writeFile(target, 'synthetic', { mode: 0o600 });
+      if (kind === 'symlink') await fs.symlink(target, database); else await fs.link(target, database);
+    } else if (kind === 'directory') await fs.mkdir(database, { mode: 0o700 });
+    else if (!['orphan', 'wal', 'shm', 'unknown'].includes(kind)) {
+      await fs.writeFile(database, 'synthetic', { mode: kind === 'permissions' ? 0o644 : 0o600 });
+      if (kind === 'oversize') await fs.truncate(database, 256 * 1024 * 1024 + 1);
+    } else await fs.writeFile(path.join(f.roots.protectedRoot,
+      kind === 'orphan' ? 'operations.sqlite-journal' : kind === 'unknown' ? 'unknown' : `operations.sqlite-${kind}`), 'synthetic', { mode: 0o600 });
+    await assert.rejects(initialize(f, client), failure());
+  }
+  const f = await fixture(t); const client = nativeFixture(); await initialize(f, client);
+  for (const name of ['operations.sqlite', 'operations.sqlite-journal']) await fs.writeFile(path.join(f.roots.protectedRoot, name), 'metadata-only', { mode: 0o600 });
+  assert.deepEqual(await initialize(f, client), { agentId });
+  assert.throws(() => openChatOperationStore({ directory: f.roots.protectedRoot, agentId }));
 });
 
 test('lost creation reply resumes only same marker Agent; missing outcome never creates again', async t => {

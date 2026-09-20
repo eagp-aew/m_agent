@@ -38,3 +38,15 @@ Managed session will own store; governed operations reserve/settle it; HTTP proj
 Candidate later product paths (not yet write-authorized): existing local-read-host/cli, managed-read-session, authenticated-app-server, runtime-sandbox, conversation-reader, local-read-client and LocalAssistant; new bounded local-chat-channel and local-chat-operations. Relevant-context admission may require one focused domain module. Bootstrap/canonical store/codec, legacy adapter, manifests and synthetic probe remain unchanged unless a concrete need is separately scoped.
 
 Validation plan: store transactions/reopen/concurrent handles/schema/private paths/uncertainty first; then channel/operations and affected read regressions, typecheck/export, actual browser desktop/narrow and independently reviewed integrated native journey. Reuse WP0050 evidence instead of replaying its standalone probe. No synthetic-provider evidence promoted to real-model quality.
+
+## Native scout B — PARTIAL source map
+
+Read-only explorer returned PARTIAL after bounded source inspection; no writes, tests, native execution or private-state reads. Initial oversized generic search stopped; master supplied exact ranges and ten further calls. One mistyped rg option was corrected. Prior source pin/evidence reused, not runtime validation.
+
+- Pinned Letta0.32.5 CLI at external:/private/tmp/personal-co-wp0048-runtime.o3519u/node_modules/@letta-ai/letta-code/letta.js: 105608–105759 per-connection subscriptions and sequence; 397960–398003 runtime_start adds rather than replaces scope; 418553–418562 scoped commands subscribe. Fresh one-operation socket avoids stale scope accumulation.
+- Native lines419586–419649 install close cleanup;415000–415037 request cancellation/remove queues/unsubscribe;101185–101200 evict only idle scopes. Socket close is not a hard inference-stop receipt; uncertain outcomes stop the owned process and remain unknown.
+- Native137097–137141 user projections expose OTID, assistant projections lack run/turn/OTID.138768–138795 missing pagination cursor silently leaves range unbounded. Require exact tail boundary, bounded advancement, unique expected OTID/user/final original textpart, new following assistant rows and correlated terminal under exclusive host writing; timestamps are not causal proof.
+- Native144324–144343 conversation model/settings override Agent;144477–144538 system hash controls compilation. Reject unexpected overrides before input. No inference from Agent model alone.
+- Root corroboration this continuation:419407 getParsedRuntimeScope requires runtime property, absent from six read commands.422340 default single socket attachment;223569 lifecycle only pong and223579 parsed command list excludes ACK. ACK is not durable acceptance evidence. Broadcast budget still enforced. Source-only evidence does not prove real-provider quality or full event isolation.
+
+Next action: packaged segmentB actual managed-session consumer. Privacy-selected canonical context and browser enablement remain required segmentC; no fullWP acceptance.
