@@ -1,0 +1,71 @@
+task_id: WP-0051-local-chat-integration
+status: ASSIGNED
+scope_type: implementation
+objective: "Connect the existing local assistant UI to governed persistent conversation creation and sending, with durable operation identity and honest recovery states."
+why: "WP0050 proved the native turn contract but the existing local UI remains read-only. Deliver the user flow rather than another isolated probe."
+provenance: {created_at: "2026-09-19", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0050:71f0f1c4c739630ce49ccab3fe3368754d1e74b8"], trust_level: repo_controlled, verified_by: pending}
+context_profile: full
+phase: SEGMENT_A_VERIFIED_NEXT_INTEGRATION
+segment_a_verification: "Independent18/18 plus3 fresh adverse trigger names and valid-schema control PASS; exact one-query/33test-line repair verified by reverse hashes. Overall report PARTIAL because fullWPAC1-6 not satisfied. No fullWP acceptance; verified progress commit permitted under standing authorization, then continue host/UI/context integration."
+report_metadata_correction: "check-report required explicit accepted_limitations for PARTIAL; master added narrow WIP-segment limitations, no fullWP criteria waived. INTEGRATION_CONFLICT metadatafix only, product/evidence unchanged. Totalfix2=1product+1metadata."
+report_path_correction: "Full audit found6 author-report path spellings incompatible with validator (relative skill path, external fixture marker, colon line suffixes). Master inspected parser and allWP0051 report references before one bounded correction. Totalfix3=1product+2metadata under standing authorization; product hashes unchanged, no test replay or relaxed gate."
+repair_1_result: "Regression-first reproduced5 unexpected schema admissions; exact known implicit-index exclusion is a one-query change. Fixer18/18 PASS plus syntax/whitespace; frozen source d173daf6/tests516f8bee. Independent recheck pending, no wholeWP acceptance."
+repair_1: "IMPLEMENTATION_BUG: SQL LIKE underscore wildcard hides user trigger sqliteXerase; existing schema can erase inserted receipts, granting twice. One bounded schema predicate fix plus adverse name tests, no data repair/replay. Standing authorization applies. Independent reverify required before integration/push."
+implementation_segments:
+  - id: A
+    status: VERIFIED
+    objective: "Durable protected-side create/send operation receipts, consumed by the upcoming existing-host integration. This segment alone does not satisfy AC1/AC4 or accept WP0051."
+    files: [personal-co/server/chat-operation-store.mjs, personal-co/tests/chat-operation-store.test.mjs, .ai/AGENT_REPORTS/WP-0051-implementer.md]
+    route: "Single local writer; product paths new and disjoint from existing dirty memory; master owns package/memory, explorer read-only. No children."
+    design: "Use node:sqlite DatabaseSync already available in pinned Node24.15.0/SQLite3.51.3, no installed dependency/service. Agent-bound private operations.sqlite in protectedRoot, bounded data, sync FULL transactions; no raw SQL/browser/native authority. Reserve inserts UNKNOWN and returns dispatchAllowed only on successful first insertion. Duplicate exact request returns stored outcome with false; changed payload conflicts. Never replay unknown across reopen. Store opaque host-validated completion evidence, not an exactly-once backend claim."
+    acceptance: "Atomic reserve-before-side-effect permission; same/op-ID changed data rejection, concurrent handles/reopen dedupe, exact Agent binding, completion/failed evidence consistency, sanitized errors/private bounded file checks, unknown survives crash or uncertain write and never grants a second dispatch. Retained conversation data only, no canonical writes."
+    validation: "node --test personal-co/tests/chat-operation-store.test.mjs; node --check personal-co/server/chat-operation-store.mjs; git diff --check. Independent store-segment verification before integration consumer implementation. No native/provider/network execution."
+fallback_verification: {allowed: false, reason: "Native turn authority and durable operation safety require independent verification.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 32, max_tool_calls: 180, trace_path: .ai/AGENT_REPORTS/WP-0051-verifier.md, cancellation: {owner: master, condition: "Unbounded scope, private data or credentials, unreviewed native execution, dependency installation, deletion, or budget exhaustion."}}
+module_outputs:
+  intake: "Previous goal turn NO_PROGRESS: authorization acknowledgment only. Current HEAD/worktree rechecked; no external blocker. Full assistant objective retained."
+  scope: "Existing local UI to retained conversation create/send/reopen and truthful durable receipts. Scout first; exact product reservations required before writes. No new standalone demo or replacement UI."
+  context: "Reuse accepted bootstrap/store/sandbox/read-host and WP0050 protocol/native evidence. Production roots/provider setup and canonical context retention need explicit scope decisions."
+  routing: "One read-only explorer maps host/transport/receipt seam while master inspects product UX/privacy requirements. Then one bounded implementer, independent verifier; no children or parallel writers."
+  verification: "Targeted offline tests, related regression/typecheck/build, actual browser and independently reviewed native integration where safe. Never equate synthetic provider with real model quality."
+  integration: "Exact verified paths only; preserve mixed historical memory and all unrelated work. Verified commit/push to existing branch authorized."
+  memory: "Record current evidence and remaining full-product requirements without accepting unfinished behavior."
+allowed_files:
+  - personal-co/server/chat-operation-store.mjs
+  - personal-co/tests/chat-operation-store.test.mjs
+  - .ai/WORK_PACKAGES/WP-0051-local-chat-integration.yaml
+  - .ai/AGENT_REPORTS/WP-0051-explorer.md
+  - .ai/AGENT_REPORTS/WP-0051-implementer.md
+  - .ai/AGENT_REPORTS/WP-0051-verifier.md
+  - .ai/AGENT_REPORTS/WP-0051-fixer.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other product writes until exact later segment reservations are recorded. No private runtime states, credentials, dependency changes, deletion, broad refactors, paid provider calls, remote messages, or arbitrary native RPC exposure."]
+generated_outputs: "Tests may create fresh synthetic private /private/tmp/personal-co-wp0051-* fixtures and retain them. No old states or cleanup/deletion. SQLite may manage its own exact database/journal files during transactions, no application batch deletion."
+integration_constraints:
+  - "Future submission handler must reserve before any native mutation and honor dispatchAllowed only in that call; response timeout/browser disconnect does not roll back the operation. Read-only status lookup must never dispatch."
+  - "Future create recovery requires exactly one same-Agent retained conversation with matching durable operation tag/metadata; zero results is not proof of no write."
+  - "Future send records host-correlated terminal before history proof; missing terminal remains unknown after restart even if messages are visible. Store evidence methods are host-private assertions, never browser/model RPC."
+  - "Future display projects original user text only from exact receipt/client OTID/conversation/Agent binding, never generic tag stripping."
+  - "Canonical freeform values are not safely auto-current/relevant merely because stored. Finalize explicit relevant-context/supersession admission before forwarding personal data; full snapshot probe is not production policy."
+  - "First provider integration may explicitly support operator-configured literal-loopback LM Studio exact model/port without fallback; real-model quality and durable non-temporary deployment remain required, not waived."
+inputs: [personal-co/PRODUCT_ROADMAP.md, .ai/AGENT_REPORTS/WP-0050-verifier.md, .ai/AGENT_REPORTS/WP-0050-explorer.md, personal-co/server/local-read-host.mjs, personal-co/server/managed-read-session.mjs, personal-co/src/components/LocalAssistant.tsx]
+human_approval_required: false
+approval_note: "Standing project authorization covers scoped implementation/security/API changes genuinely needed here and verified Git delivery. Product privacy/memory confirmation and no-batch-deletion rules remain."
+acceptance_criteria:
+  - "AC1: Existing local UI creates a named retained conversation on the same canonical Agent, sends plain text, displays persisted reply, and reopens it after host restart. No fake/demo reply in connected mode."
+  - "AC2: Durable host operation identity precedes every create/send side effect; duplicate/concurrent requests and restart never blindly resend an ambiguous operation. Unknown remains distinct from failed/completed; only correlated terminal plus persisted readback proves completion."
+  - "AC3: Preserve exact browser authority, bounded owned runtime lifecycle, no model tool execution, six canonical blocks and relevant-context privacy. No private context in user rows or raw authority/error leaks. Provider selection is explicit and no silent fallback."
+  - "AC4: UI preserves unsent/uncertain text, makes pending/unknown/recoverable states understandable, supports narrow screens and does not claim unsupported temporary mode or background reminders."
+  - "AC5: Independent adversarial tests cover duplicates/restart/ambiguous writes, lifecycle/error/cancellation, privacy and old read-path regressions. Browser and native evidence are distinguished from real-provider quality."
+  - "AC6: Record exact accepted scope/evidence/remaining limitations, update project memory, and commit/push only independently verified paths. Full assistant objective stays active."
+validation_commands:
+  - "Scout: read-only rg/sed/git inspections of scoped source/tests and existing native evidence; no runtime launch or test replay."
+  - "Implementation commands and exact product reservations must be finalized after scout, before any product write."
+  - "python3 -B scripts/validate_protocol.py"
+rollback_plan: "Preserve existing read mode and user data; stop only owned resources. Revert only task-specific edits if required, no deletion or destructive Git."
+output_required: "Common14 report fields and source-line evidence; verifier adds AC mapping, scope/forbidden checks and explicit score fields."
+pre_spawn_checklist: {task: "Map minimal existing-UI chat integration and durable receipt boundary", why: "Independent host mapping alongside master UX/privacy review", route: "scope unclear -> read-only explorer, local", context: "WP and accepted WP0050 findings plus directly affected host/UI/tests", writable: "none", forbidden: "all writes/private states/secrets", report: "common14 plus exact candidate files and integration sequence", stop: "missing context/scope expansion/private data/native launch", verification: "Master corroborates source references before packaging writer", approval: "Standing authorization; scout is read-only", parallel_batch: "none", child_agents: "none"}
