@@ -53,7 +53,7 @@ function conversation(row, agentId, expectedId) {
     createdAt: date(get(row, 'created_at')), updatedAt: date(get(row, 'updated_at')),
     lastMessageAt: date(get(row, 'last_message_at')) });
 }
-function visibleMessage(row, agentId, conversationId) {
+function visibleMessage(row, agentId, conversationId, originalUser) {
   const id = get(row, 'id');
   check(messageId(id) && get(row, 'agent_id') === agentId
     && get(row, 'conversation_id') === conversationId, 'OWNERSHIP_CHANGED');
@@ -61,6 +61,12 @@ function visibleMessage(row, agentId, conversationId) {
   check(typeof type === 'string' && type.length <= 128);
   if (type !== 'user_message' && type !== 'assistant_message') return { id, display: null, omitted: false };
   const content = get(row, 'content');
+  if (type === 'user_message' && originalUser) {
+    const original = originalUser({ agentId, conversationId, messageId: id, otid: get(row, 'otid'), content });
+    check(original === null || (typeof original === 'string' && original.length <= 16384));
+    return { id, omitted: original === null, display: Object.freeze({ id, role: 'user',
+      content: original === null ? '［原始用户文本未验证，已隐藏］' : original, date: date(get(row, 'date')) }) };
+  }
   let output = '';
   let omitted = false;
   if (typeof content === 'string') output = string(content, 65536);
@@ -104,10 +110,12 @@ function visibleMessage(row, agentId, conversationId) {
  * already dispatched may complete under its transport deadline. close is final.
  */
 export function createConversationReader(client, config) {
-  options(config, ['agentId', 'retainedOnly']);
+  options(config, ['agentId', 'retainedOnly', 'originalUser']);
   const agentId = config.agentId;
   const retainedOnly = config.retainedOnly === undefined ? false : config.retainedOnly;
   check(typeof retainedOnly === 'boolean', 'INVALID_INPUT');
+  const originalUser = config.originalUser;
+  check(originalUser === undefined || typeof originalUser === 'function', 'INVALID_INPUT');
   check(entityId(agentId) && client && typeof client.request === 'function', 'INVALID_INPUT');
   const request = client.request.bind(client);
   const cursors = new Map();
@@ -225,7 +233,7 @@ export function createConversationReader(client, config) {
           const response = await rpc('conversation_messages_list', { conversation_id: conversationId,
             query: { agent_id: agentId, limit: state.limit, order: 'desc', ...(state.native ? { before: state.native } : {}) } }, signal);
           const rows = get(response, 'messages'); account(rows, state, state.limit);
-          const rawProjected = rows.map(row => visibleMessage(row, agentId, conversationId));
+          const rawProjected = rows.map(row => visibleMessage(row, agentId, conversationId, originalUser));
           const next = get(response, 'next_before'); const more = get(response, 'has_more');
           check(typeof more === 'boolean' && next === (rawProjected.at(-1)?.id ?? null)
             && (!more || rawProjected.length === state.limit), 'INVALID_PAGINATION');

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createRuntimeSandbox, RUNTIME_PIN, captureLocalChatConfig, deriveLocalChatSandbox } from '../server/runtime-sandbox.mjs';
+import { createRuntimeSandbox, RUNTIME_PIN, captureLocalChatConfig, deriveLocalChatSandbox, createLocalChatProviderGuard } from '../server/runtime-sandbox.mjs';
 
 const roots = { dependencyRoot: '/private/tmp/installed/node_modules',
   stateRoot: '/private/tmp/synthetic/state', protectedRoot: '/private/tmp/synthetic/protected' };
@@ -47,12 +47,42 @@ test('optional chat preserves baseline sandbox exactly except literal loopback p
   const config = captureLocalChatConfig({ model: 'lmstudio/synthetic/model', providerPort: 12345 });
   const derived = deriveLocalChatSandbox(base, config);
   assert.ok(Object.isFrozen(config));
-  assert.equal(derived.profile, `${base.profile}(allow network-outbound (remote ip "127.0.0.1:12345"))\n`);
+  assert.equal(derived.profile, `${base.profile}(allow network-outbound (remote ip "127.0.0.1:12345"))\n`
+    + `(deny file-read-data (subpath "${roots.stateRoot}/providers"))\n(deny file-write* (subpath "${roots.stateRoot}/providers"))\n`);
   assert.deepEqual(derived.args, ['-p', derived.profile, ...base.args.slice(2)]);
-  assert.deepEqual(derived.options, { ...base.options, env: { ...base.options.env, LMSTUDIO_BASE_URL: 'http://127.0.0.1:12345/v1' } });
+  assert.deepEqual(derived.options, { ...base.options, env: { ...base.options.env, LMSTUDIO_BASE_URL: 'http://127.0.0.1:12345/v1', LETTA_DISABLE_MODS: '1' } });
   assert.equal(derived.roots, base.roots); assert.notEqual(derived.profileSha256, base.profileSha256);
   assert.ok(Object.isFrozen(derived.options.env) && Object.isFrozen(derived.args));
   assert.ok(!base.options.env.LMSTUDIO_BASE_URL && !base.profile.includes('network-outbound'));
+});
+
+test('provider admission is metadata-only and rechecks canonical private parent/root identity', async () => {
+  const absent = () => { throw Object.assign(new Error('synthetic missing'), { code: 'ENOENT' }); };
+  for (const mode of ['absent', 'directory', 'auth-file', 'auth-link', 'auth-error', 'parent-link', 'owner', 'mode', 'alias', 'swap-root', 'swap-parent']) {
+    let changed = false; let rootReads = 0;
+    const directory = ino => ({ ino, dev: 1, uid: 501, mode: 0o700, isDirectory: () => true });
+    const io = {
+      async lstat(file) {
+        if (file === roots.stateRoot) { rootReads++; return directory(mode === 'swap-root' && changed ? 9 : 1); }
+        if (file.endsWith('/auth.json')) {
+          if (mode === 'auth-error') throw Object.assign(new Error('PRIVATE'), { code: 'EACCES' });
+          if (mode.startsWith('auth-')) return { isFile: () => mode === 'auth-file' };
+          return absent();
+        }
+        if (mode === 'absent') return absent();
+        return { ...directory(mode === 'swap-parent' && changed ? 10 : 2),
+          ...(mode === 'owner' ? { uid: 999 } : mode === 'mode' ? { mode: 0o755 } : mode === 'parent-link' ? { isDirectory: () => false } : {}) };
+      },
+      async realpath(file) { return mode === 'alias' && file.endsWith('/providers') ? '/different' : file; },
+      readFile() { assert.fail('provider contents must never be read'); },
+    };
+    if (['absent', 'directory', 'swap-root', 'swap-parent'].includes(mode)) {
+      const guard = await createLocalChatProviderGuard(roots.stateRoot, { io, uid: 501 });
+      assert.ok(rootReads >= 2); changed = true;
+      if (mode.startsWith('swap-')) await assert.rejects(guard.check(), /provider admission failed/);
+      else await guard.check();
+    } else await assert.rejects(createLocalChatProviderGuard(roots.stateRoot, { io, uid: 501 }), /provider admission failed/);
+  }
 });
 
 test('chat operator configuration rejects endpoint, fallback, getters, hidden fields and out-of-range ports', () => {

@@ -4,8 +4,12 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { initializeManagedReadSession } from './managed-read-session.mjs';
+import { captureLocalChatConfig } from './runtime-sandbox.mjs';
+import { captureChatContext, captureContextQuery } from './local-chat-context.mjs';
 
 const BODY = 4096;
+const SUBMIT_BODY = 131072;
+const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.exec(value)?.[0] === value;
 const RESPONSE = 2097152;
 const ASSET = 8388608;
 const error = code => Object.assign(new Error('Local assistant unavailable.'), { code });
@@ -34,11 +38,54 @@ const HEADERS = Object.freeze({ 'Cache-Control': 'no-store', 'Referrer-Policy': 
   'Content-Security-Policy': "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; font-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'" });
 
 function readInput(route, value) {
+  if (route === 'context-preview') return captureContextQuery(value);
+  if (['operation', 'recover-create'].includes(route)) {
+    fields(value, ['operationId']); check(uuid(value.operationId)); return { operationId: value.operationId };
+  }
+  if (route === 'pending') { fields(value, []); return {}; }
+  if (route === 'submit') {
+    fields(value, ['operationId', 'kind', 'title', 'conversationId', 'text', 'context']);
+    check(uuid(value.operationId) && ['create', 'send'].includes(value.kind));
+    fields(value, value.kind === 'create' ? ['operationId', 'kind', 'title'] : ['operationId', 'kind', 'conversationId', 'text', 'context']);
+    const text = value.kind === 'create' ? value.title : value.text;
+    check(typeof text === 'string' && text.trim().length > 0 && text.isWellFormed() && !text.includes('\0')
+      && Buffer.byteLength(text) <= (value.kind === 'create' ? 256 : 16384));
+    if (value.kind === 'create') return { operationId: value.operationId, kind: value.kind, title: text };
+    check(entity(value.conversationId));
+    return { operationId: value.operationId, kind: value.kind, conversationId: value.conversationId, text,
+      ...(Object.hasOwn(value, 'context') ? { context: captureChatContext(value.context) } : {}) };
+  }
   fields(value, route === 'status' ? [] : route === 'conversations' ? ['search', 'cursor'] : ['conversationId', 'cursor']);
   if (route === 'messages') check(entity(value.conversationId));
   if (value.search !== undefined) check(typeof value.search === 'string' && value.search.length <= 256 && !/[\x00-\x1f\x7f]/.test(value.search));
   if (value.cursor !== undefined) check(typeof value.cursor === 'string' && /^[a-f0-9-]{36}$/.exec(value.cursor)?.[0] === value.cursor);
   return value;
+}
+function receipt(record) {
+  if (record === null) return null;
+  const request = record?.request;
+  check(uuid(request?.operationId) && ['create', 'send'].includes(request.kind)
+    && ['unknown', 'completed', 'failed'].includes(record.status), 'INVALID_DATA');
+  const conversationId = record.completion?.conversationId ?? (request.kind === 'send' ? request.conversationId : null);
+  check(conversationId === null || entity(conversationId), 'INVALID_DATA');
+  check(record.status !== 'completed' || conversationId !== null, 'INVALID_DATA');
+  check(record.failure === null || ['predispatch_rejected', 'terminal_failed'].includes(record.failure), 'INVALID_DATA');
+  const original = request.kind === 'create' ? request.title : request.text;
+  check(typeof original === 'string' && Buffer.byteLength(original) <= (request.kind === 'create' ? 256 : 16384), 'INVALID_DATA');
+  return { operationId: request.operationId, kind: request.kind, status: record.status, conversationId, failure: record.failure,
+    ...(request.kind === 'create' ? { title: original } : { text: original }) };
+}
+function preview(value) {
+  check(entity(value?.agentId) && Number.isSafeInteger(value.revision) && value.revision >= 0
+    && /^[a-f0-9]{64}$/.test(value.digest) && Array.isArray(value.items) && value.items.length <= 20
+    && typeof value.more === 'boolean' && Number.isSafeInteger(value.omitted) && value.omitted >= 0, 'INVALID_DATA');
+  const items = value.items.map(row => {
+    check(/^[a-f0-9]{64}$/.test(row.id) && typeof row.source === 'string' && row.source.length <= 128
+      && typeof row.text === 'string' && Buffer.byteLength(row.text) <= 4096
+      && typeof row.epistemicState === 'string' && row.epistemicState.length <= 128, 'INVALID_DATA');
+    return { id: row.id, source: row.source, text: row.text, epistemicState: row.epistemicState };
+  });
+  return { agentId: value.agentId, revision: value.revision, digest: value.digest, items, more: value.more, omitted: value.omitted };
 }
 function displayPage(route, page) {
   check(page && Array.isArray(page.items) && page.items.length <= 20 && (page.cursor === null
@@ -80,7 +127,8 @@ async function openHost(config, options = {}, {
   observe = () => {}, requestMs = 10000,
   listen = server => new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); }),
 } = {}) {
-  fields(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'webRoot']); fields(options, ['signal']);
+  fields(config, ['dependencyRoot', 'stateRoot', 'protectedRoot', 'webRoot', 'chat']); fields(options, ['signal']);
+  const chat = config.chat === undefined ? undefined : captureLocalChatConfig(config.chat);
   const captured = Object.freeze({ dependencyRoot: config.dependencyRoot, stateRoot: config.stateRoot,
     protectedRoot: config.protectedRoot, webRoot: config.webRoot });
   const signal = options.signal;
@@ -204,7 +252,9 @@ async function openHost(config, options = {}, {
       check(req.url?.length <= 1024 && pending.size < 4, 'BUSY');
       pending.add(controller); timer = setTimeout(() => controller.abort(), requestMs);
       req.on('aborted', disconnected); res.on('close', disconnected);
-      const route = { '/api/local/status': 'status', '/api/local/conversations': 'conversations', '/api/local/messages': 'messages' }[req.url];
+      const route = { '/api/local/status': 'status', '/api/local/conversations': 'conversations', '/api/local/messages': 'messages',
+        '/api/local/submit': 'submit', '/api/local/operation': 'operation', '/api/local/pending': 'pending',
+        '/api/local/recover-create': 'recover-create', '/api/local/context-preview': 'context-preview' }[req.url];
       if (route) {
         check(session.status().phase === 'ready', 'CLOSED');
         check(req.method === 'POST' && oneHeader(req, 'origin') === origin && !req.headers.cookie, 'DENIED');
@@ -212,16 +262,32 @@ async function openHost(config, options = {}, {
         check(typeof authorization === 'string' && /^Bearer [a-f0-9]{64}$/.exec(authorization)?.[0] === authorization
           && token && timingSafeEqual(Buffer.from(authorization.slice(7), 'hex'), Buffer.from(token, 'hex')), 'DENIED');
         check(oneHeader(req, 'content-type') === 'application/json' && !req.headers['content-encoding'], 'INVALID_REQUEST');
-        if (req.headers['content-length']) check(/^\d+$/.test(req.headers['content-length']) && Number(req.headers['content-length']) <= BODY, 'BODY_LIMIT');
+        const bodyLimit = route === 'submit' ? SUBMIT_BODY : BODY;
+        if (req.headers['content-length']) check(/^\d+$/.test(req.headers['content-length']) && Number(req.headers['content-length']) <= bodyLimit, 'BODY_LIMIT');
         const chunks = []; let length = 0;
-        const read = (async () => { for await (const chunk of req) { length += chunk.length; check(length <= BODY, 'BODY_LIMIT'); chunks.push(chunk); } })();
+        const read = (async () => { for await (const chunk of req) { length += chunk.length; check(length <= bodyLimit, 'BODY_LIMIT'); chunks.push(chunk); } })();
         await bounded(read, remaining()); check(!controller.signal.aborted, 'ABORTED');
         const input = readInput(route, JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))));
-        const work = route === 'status' ? Promise.resolve({ phase: 'ready', agentId })
-          : serializedRead(() => route === 'conversations' ? session.listConversations(input, { signal: controller.signal })
+        let work;
+        if (route === 'status') {
+          const current = session.status(); const activeOperationId = current.activeOperationId ?? null;
+          check(activeOperationId === null || uuid(activeOperationId), 'INVALID_DATA');
+          work = { phase: 'ready', agentId, chatEnabled: Boolean(chat && session.chat), activeOperationId };
+        } else if (['conversations', 'messages'].includes(route)) {
+          work = serializedRead(() => route === 'conversations' ? session.listConversations(input, { signal: controller.signal })
             : session.listMessages(input.conversationId, input.cursor === undefined ? {} : { cursor: input.cursor }, { signal: controller.signal }), controller.signal);
+        } else {
+          check(chat && session.chat, 'CHAT_DISABLED');
+          // Delivery cancellation never becomes operation cancellation. These
+          // named methods reserve synchronously; no request signal or retry.
+          if (route === 'submit') work = receipt(session.chat.submit(input));
+          if (route === 'operation') work = receipt(session.chat.get(input.operationId));
+          if (route === 'recover-create') work = receipt(session.chat.recoverCreate(input.operationId));
+          if (route === 'pending') { const rows = session.chat.listPending(); check(Array.isArray(rows) && rows.length <= 1, 'INVALID_DATA'); work = { items: rows.map(receipt) }; }
+          if (route === 'context-preview') work = Promise.resolve(session.chat.previewContext(input)).then(preview);
+        }
         const data = await bounded(work, remaining()); check(!closed && !controller.signal.aborted, 'ABORTED');
-        reply(res, 200, { ok: true, data: route === 'status' ? data : displayPage(route, data) });
+        reply(res, 200, { ok: true, data: ['conversations', 'messages'].includes(route) ? displayPage(route, data) : data });
       } else {
         check(req.method === 'GET', 'NOT_FOUND'); const file = await bounded(asset(req.url), remaining());
         check(!closed && !controller.signal.aborted, 'ABORTED');
@@ -229,7 +295,7 @@ async function openHost(config, options = {}, {
       }
     } catch (failure) {
       controller.abort(); // A deadline race must not leave this delivery alive.
-      const code = ['DENIED', 'NOT_FOUND', 'BUSY', 'BODY_LIMIT', 'RESPONSE_LIMIT', 'ABORTED', 'TIMEOUT', 'CLOSED'].includes(failure?.code) ? failure.code : 'READ_FAILED';
+      const code = ['DENIED', 'NOT_FOUND', 'BUSY', 'BODY_LIMIT', 'RESPONSE_LIMIT', 'ABORTED', 'TIMEOUT', 'CLOSED', 'CHAT_DISABLED', 'CONFLICT', 'INVALID', 'MISSING'].includes(failure?.code) ? failure.code : 'READ_FAILED';
       res.shouldKeepAlive = false;
       if (!req.complete) { res.once('finish', () => req.socket.destroy()); req.resume(); }
       if (!res.headersSent) reply(res, code === 'DENIED' ? 403 : code === 'NOT_FOUND' ? 404 : code === 'BUSY' ? 429 : 400, { ok: false, error: code });
@@ -239,7 +305,7 @@ async function openHost(config, options = {}, {
   try {
     check(!signal?.aborted, 'ABORTED');
     session = makeSession({ dependencyRoot: captured.dependencyRoot, stateRoot: captured.stateRoot,
-      protectedRoot: captured.protectedRoot, retainedOnly: true }, { signal: lifetime.signal }, { observe });
+      protectedRoot: captured.protectedRoot, retainedOnly: true, ...(chat ? { chat } : {}) }, { signal: lifetime.signal }, { observe });
     void session.terminal.then(() => close(), () => close());
     const identity = await bounded(session.ready, 32000); check(!closed && entity(identity?.agentId), 'NOT_READY'); agentId = identity.agentId;
     binding = listen(server);

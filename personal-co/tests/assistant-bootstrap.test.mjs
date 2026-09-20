@@ -125,6 +125,31 @@ test('bounded current canonical read requires successful resolve and preserves e
   await preparation.close(); await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
 });
 
+test('narrow ownership assertion works before resolve, never opens canonical data, and drains close', async t => {
+  const f = await fixture(t); const gate = deferred(); const entered = deferred(); let hold = false; let canonicalReads = 0;
+  const io = faultIO(async (file, operation) => {
+    if (file === f.data) canonicalReads++;
+    if (hold && file === f.lock && operation === 'read') { hold = false; entered.resolve(); await gate.promise; }
+  });
+  const preparation = await prepareAssistantBootstrap(f.roots, {}, { io });
+  await preparation.assertOwnership(); assert.equal(canonicalReads, 0);
+  await preparation.resolve(nativeFixture()); canonicalReads = 0;
+  await preparation.assertOwnership(); assert.equal(canonicalReads, 0);
+  hold = true; const checking = preparation.assertOwnership();
+  const rejected = assert.rejects(checking, { code: 'OWNERSHIP_UNAVAILABLE' }); await entered.promise;
+  let closed = false; const closing = preparation.close().then(() => { closed = true; });
+  await tick(); assert.equal(closed, false); gate.resolve(); await rejected; await closing;
+  await assert.rejects(preparation.assertOwnership(), { code: 'OWNERSHIP_UNAVAILABLE' });
+});
+
+test('ownership assertion rejects changed intent without reading canonical data', async t => {
+  const f = await fixture(t); const preparation = await prepareAssistantBootstrap(f.roots);
+  await preparation.resolve(nativeFixture());
+  await fs.appendFile(f.intent, ' ');
+  await assert.rejects(preparation.assertOwnership(), { code: 'OWNERSHIP_UNAVAILABLE' });
+  await preparation.close();
+});
+
 test('current canonical read revalidates policy, six block identity, Agent/runtime binding and private-file bounds', async t => {
   for (const kind of ['policy', 'block-id', 'agent', 'binding', 'missing-block', 'permission', 'oversize']) {
     const f = await fixture(t); const client = nativeFixture(); const preparation = await prepareAssistantBootstrap(f.roots);

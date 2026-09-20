@@ -227,6 +227,14 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
     }
   }
   return Object.freeze({
+    assertOwnership() {
+      if (!accepting || signal?.aborted) return Promise.reject(Object.assign(new Error('Assistant ownership unavailable.'), { code: 'OWNERSHIP_UNAVAILABLE' }));
+      const checking = readTail.then(async () => {
+        active(); await owner(); if (intentStat) await checkIntent();
+        await owner(); active();
+      }).catch(() => { throw Object.assign(new Error('Assistant ownership unavailable.'), { code: 'OWNERSHIP_UNAVAILABLE' }); });
+      readTail = checking.catch(() => {}); return checking;
+    },
     resolve(client) {
       if (task || !accepting) return Promise.reject(Object.assign(new Error('Assistant initialization failed.'), { code: 'ALREADY_ATTEMPTED' }));
       task = resolve(client).then(result => { resolved = true; return result; })

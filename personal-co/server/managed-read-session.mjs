@@ -3,7 +3,7 @@ import { createAuthenticatedAppServer } from './authenticated-app-server.mjs';
 import { createConversationReader } from './conversation-reader.mjs';
 import { startOwned, validateEndpoint, listenerGone } from './runtime-process.mjs';
 import { prepareAssistantBootstrap } from './assistant-bootstrap.mjs';
-import { captureLocalChatConfig, createRuntimeSandbox, deriveLocalChatSandbox } from './runtime-sandbox.mjs';
+import { captureLocalChatConfig, createRuntimeSandbox, deriveLocalChatSandbox, createLocalChatProviderGuard } from './runtime-sandbox.mjs';
 import { openChatOperationStore } from './chat-operation-store.mjs';
 import { createLocalChatOperations } from './local-chat-operations.mjs';
 
@@ -72,6 +72,7 @@ export function initializeManagedReadSession(config, options = {}, seams = {}) {
 function managedSession(config, options, {
   makeAuth = createAuthenticatedAppServer, start = startOwned, checkListenerGone = listenerGone,
   prepare = prepareAssistantBootstrap,
+  makeProviderGuard = createLocalChatProviderGuard,
   openOperations = openChatOperationStore, operationMs = 180000,
   startupMs = 25000, cleanupMs = 7000, observe = () => {},
 }, initialize) {
@@ -105,6 +106,7 @@ function managedSession(config, options, {
   let preparation;
   let operationStore;
   let operations;
+  let providerGuard;
   let endpoint;
   let cleanupTask;
   let lateCleanupFailed = false;
@@ -186,6 +188,13 @@ function managedSession(config, options, {
         return;
       }
     }
+    if (chatConfig) {
+      await preparation.assertOwnership();
+      if (phase !== 'starting') return;
+      providerGuard = await makeProviderGuard(roots.stateRoot);
+      await preparation.assertOwnership();
+      if (phase !== 'starting') return;
+    }
     child = start(auth.launchSpec);
     void child.failed.then(() => transition('PROCESS_FAILED'));
     void child.done.then(() => transition('PROCESS_EXITED'));
@@ -218,13 +227,23 @@ function managedSession(config, options, {
       && response.agents[0].tags.includes('personal-co-v1'), 'AGENT_MISMATCH');
     if (phase !== 'starting') return;
     if (chatConfig) {
+      await preparation.assertOwnership(); await providerGuard.check(); await preparation.assertOwnership();
+      if (phase !== 'starting') return;
       operationStore = openOperations({ directory: roots.protectedRoot, agentId });
       operations = createLocalChatOperations({ store: operationStore, agentId, model: chatConfig.model,
         readMemory: () => preparation.readMemory(),
         signal: lifetime.signal, operationMs, stop: () => transition('CHAT_UNCERTAIN'),
-        connect: () => auth.connectChat(endpoint, { agentId, stateRoot: roots.stateRoot, ...chatConfig }, { signal: lifetime.signal }) });
+        connect: async () => {
+          try {
+            check(phase === 'ready', 'NOT_READY');
+            await preparation.assertOwnership(); await providerGuard.check(); await preparation.assertOwnership();
+            check(phase === 'ready', 'NOT_READY');
+          } catch { void transition('PROVIDER_ADMISSION_FAILED'); throw new SessionError('PROVIDER_ADMISSION_FAILED'); }
+          return auth.connectChat(endpoint, { agentId, stateRoot: roots.stateRoot, ...chatConfig }, { signal: lifetime.signal });
+        } });
     }
-    reader = createConversationReader(client, { agentId, retainedOnly });
+    reader = createConversationReader(client, { agentId, retainedOnly,
+      ...(operations ? { originalUser: value => operations.originalUser(value) } : {}) });
     phase = 'ready'; clearTimeout(startupTimer); resolveReady(initialize ? Object.freeze({ agentId }) : undefined); announce({ type: 'ready' });
   });
   void startupTask.catch(failure => transition(failure instanceof SessionError ? failure.code : 'STARTUP_FAILED'));
@@ -240,7 +259,8 @@ function managedSession(config, options, {
       throw new SessionError(phase !== 'ready' ? 'NOT_READY' : failure?.code === 'ABORTED' ? 'READ_ABORTED' : 'READ_FAILED');
     }
   }
-  return Object.freeze({ ready, terminal, status: () => Object.freeze({ phase, reason }),
+  return Object.freeze({ ready, terminal, status: () => Object.freeze({ phase, reason,
+    chatEnabled: Boolean(chatConfig), activeOperationId: operations?.activeOperationId() ?? null }),
     ...(chatConfig ? { chat: Object.freeze({
       previewContext(input) { check(phase === 'ready', 'NOT_READY'); return operations.previewContext(input); },
       submit(value) { check(phase === 'ready', 'NOT_READY'); return operations.submit(value); },

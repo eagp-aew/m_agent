@@ -35,6 +35,22 @@ function fixture(override = () => undefined) {
 }
 function deferred() { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; }
 
+test('host-only original-user callback receives ownership and OTID before display projection', async () => {
+  const row = { ...message('m1', 'user_message'), otid: 'synthetic-otid', content: [{ type: 'text', text: 'PRIVATE_PREFIX' }, { type: 'text', text: 'original' }] };
+  const f = fixture(type => type === 'conversation_messages_list' ? page([row]) : undefined);
+  const received = [];
+  for (const original of ['original', null]) {
+    const reader = createConversationReader(f.client, { agentId: AGENT, originalUser(value) { received.push(value); return original; } });
+    const result = await reader.listMessages('conv-1');
+    assert.equal(result.items[0].content, original ?? '［原始用户文本未验证，已隐藏］');
+    assert.equal(result.omittedAttachments, original === null); assert.ok(!JSON.stringify(result).includes('PRIVATE_PREFIX'));
+    reader.close();
+  }
+  assert.deepEqual(received[0], { agentId: AGENT, conversationId: 'conv-1', messageId: 'm1', otid: 'synthetic-otid', content: row.content });
+  const reader = createConversationReader(f.client, { agentId: AGENT, originalUser() { throw new Error('PRIVATE_CONFLICT'); } });
+  await assert.rejects(reader.listMessages('conv-1'), code('READ_FAILED')); reader.close();
+});
+
 test('retained-only admission filters raw pages without losing empty-page continuation', async () => {
   const rows = Array.from({ length: 23 }, (_, index) => ({ ...conversation(`conv-${index}`),
     tags: index === 20 ? ['personal-co-retained-v1'] : index === 21 ? ['personal-co-retained-v1', 'privacy:temporary'] : [] }));

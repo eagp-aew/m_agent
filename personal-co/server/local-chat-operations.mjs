@@ -64,7 +64,7 @@ function visibleText(row) {
  */
 export function createLocalChatOperations({ store, connect, readMemory, agentId, model, stop, signal, operationMs = 180000 }) {
   check(entity(agentId) && typeof model === 'string' && Number.isInteger(operationMs) && operationMs > 0 && operationMs <= 180000);
-  let closed = false; let stopping = false; let busy = false; let task = Promise.resolve();
+  let closed = false; let stopping = false; let busy = false; let activeOperationId = null; let task = Promise.resolve();
   let previewing = false; let previewTask = Promise.resolve();
   function alive(channel) { check(!closed && !signal.aborted); channel?.assertHealthy(); }
   function stopOwner() {
@@ -190,8 +190,8 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
     }
   }
   function launch(record, recovery = false) {
-    busy = true;
-    task = Promise.resolve().then(() => execute(record, recovery)).finally(() => { busy = false; });
+    busy = true; activeOperationId = record.request.operationId;
+    task = Promise.resolve().then(() => execute(record, recovery)).finally(() => { busy = false; activeOperationId = null; });
     void task.catch(stopOwner);
   }
   const safeCall = fn => {
@@ -199,6 +199,21 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
     catch (failure) { throw error(['CONFLICT', 'BUSY', 'INVALID', 'MISSING'].includes(failure?.code) ? failure.code : 'CHAT_UNAVAILABLE'); }
   };
   return Object.freeze({
+    activeOperationId: () => closed ? null : activeOperationId,
+    originalUser({ agentId: owner, conversationId, messageId: id, otid, content }) {
+      return safeCall(() => {
+        alive(); check(owner === agentId);
+        if (typeof otid !== 'string' || /^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/.exec(otid)?.[0] !== otid) return null;
+        const record = store.get(otid);
+        if (!record) return null;
+        check(record.agentId === agentId && record.request.kind === 'send'
+          && record.failure !== 'predispatch_rejected'
+          && record.request.conversationId === conversationId && record.request.operationId === otid
+          && (record.status !== 'completed' || record.completion.userMessageId === id)
+          && originalUser(content, record.request.text), 'CONFLICT');
+        return record.request.text;
+      });
+    },
     previewContext(input = {}) {
       let query;
       try { alive(); check(!previewing, 'BUSY'); query = captureContextQuery(input); }

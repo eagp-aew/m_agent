@@ -7,6 +7,8 @@ import { createHash } from 'node:crypto';
 import { startLocalReadHost } from '../server/local-read-host.mjs';
 import { RUNTIME_PIN } from '../server/runtime-sandbox.mjs';
 import { createConversationReader } from '../server/conversation-reader.mjs';
+import { openChatOperationStore } from '../server/chat-operation-store.mjs';
+import { createLocalReadClient } from '../src/services/local-read-client.mjs';
 
 const capability = 'b'.repeat(64); // Explicit public synthetic browser-only token.
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
@@ -62,7 +64,7 @@ test('real HTTP host forces retainedOnly, exposes fixed projected reads and secu
   const { host, fake } = await hostFixture(t);
   assert.deepEqual(Object.keys(host).sort(), ['agentId', 'close', 'launchUrl', 'origin', 'terminal']);
   const status = await request(host); assert.equal(status.status, 200);
-  assert.deepEqual(JSON.parse(status.text).data, { phase: 'ready', agentId: 'agent-synthetic' });
+  assert.deepEqual(JSON.parse(status.text).data, { phase: 'ready', agentId: 'agent-synthetic', chatEnabled: false, activeOperationId: null });
   const list = await request(host, '/api/local/conversations', { body: JSON.stringify({ search: '中文' }) });
   assert.ok(!list.text.includes('PRIVATE_CANARY')); assert.equal(JSON.parse(list.text).data.items[0].summary, '<script>text</script>');
   const messages = await request(host, '/api/local/messages', { body: '{"conversationId":"conv-1"}' });
@@ -72,6 +74,64 @@ test('real HTTP host forces retainedOnly, exposes fixed projected reads and secu
   assert.ok(status.headers['content-security-policy'].includes("script-src 'self'"));
   const closing = host.close(); assert.equal(closing, host.close()); assert.equal((await closing).confirmed, true);
   assert.equal(await host.terminal, await closing); await assert.rejects(request(host));
+});
+
+test('fixed authenticated chat HTTP routes bind real durable receipts, exact DTO and escaped byte limits', async t => {
+  const config = await fixture(t); const fake = fakeSession();
+  const store = openChatOperationStore({ directory: config.protectedRoot, agentId: 'agent-synthetic' });
+  let dispatches = 0; let recoveries = 0;
+  fake.session.chat = {
+    submit(value) { const reserved = store.reserve(value); if (reserved.dispatchAllowed) dispatches++; return reserved.record; },
+    get: id => store.get(id), listPending: () => store.listPending(),
+    recoverCreate(id) { recoveries++; return store.get(id); },
+    previewContext: async () => ({ agentId: 'agent-synthetic', revision: 0, digest: 'a'.repeat(64), more: false, omitted: 0,
+      items: [{ id: 'b'.repeat(64), source: 'PROFILE', text: 'Quoted evidence', epistemicState: 'unknown', private: 'CANARY' }], private: 'CANARY' }),
+  };
+  const host = await startLocalReadHost({ ...config, chat: { providerPort: 12345, model: 'lmstudio/synthetic' } }, {}, { capability, makeSession: () => fake.session });
+  t.after(async () => { await host.close(); store.close(); });
+  const client = createLocalReadClient({ origin: host.origin, capability }, { fetchImpl: (url, options) =>
+    fetch(url, { ...options, headers: { ...options.headers, Origin: host.origin } }) });
+  t.after(() => client.disconnect());
+  assert.equal((await client.status()).chatEnabled, true);
+  const creation = { operationId: '12345678-1234-4234-8234-123456789012', kind: 'create', title: 'Original retained title' };
+  assert.equal((await client.submit(creation)).status, 'unknown'); await client.submit(creation); assert.equal(dispatches, 1);
+  const pending = await client.pending(); assert.equal(pending.items[0].title, creation.title);
+  assert.ok(!JSON.stringify(pending).includes('terminal')); assert.equal((await client.operation(creation.operationId)).status, 'unknown');
+  await client.recoverCreate(creation.operationId); assert.equal(recoveries, 1); assert.equal(dispatches, 1);
+  const record = store.get(creation.operationId); store.completeCreate({ operationId: creation.operationId, conversationId: 'conv-1', operationTag: record.operationTag });
+  const sending = { operationId: '22345678-1234-4234-8234-123456789012', kind: 'send', conversationId: 'conv-1', text: '\u0001'.repeat(16384) };
+  assert.ok(Buffer.byteLength(JSON.stringify(sending)) > 65536);
+  assert.equal((await client.submit(sending)).text, sending.text); assert.equal(dispatches, 2);
+  const preview = await client.previewContext(); assert.equal(preview.items[0].epistemicState, 'unknown'); assert.ok(!JSON.stringify(preview).includes('CANARY'));
+  for (const [route, input] of [['submit', { ...sending, model: 'forbidden' }], ['submit', { ...sending, text: 'x'.repeat(16385) }],
+    ['submit', { ...sending, context: { revision: 0, digest: 'a'.repeat(64), items: [], system: 'forbidden' } }],
+    ['operation', { operationId: sending.operationId, agentId: 'foreign' }], ['pending', { path: 'forbidden' }],
+    ['context-preview', { query: 'x'.repeat(4097) }], ['recover-create', { operationId: 'bad' }]]) {
+    assert.ok((await request(host, `/api/local/${route}`, { body: JSON.stringify(input) })).status >= 400);
+  }
+  for (const route of ['submit', 'operation', 'pending', 'recover-create', 'context-preview']) {
+    assert.equal((await request(host, `/api/local/${route}`, { method: 'GET', body: '' })).status, 403);
+    assert.equal((await request(host, `/api/local/${route}`, { headers: { Origin: 'http://foreign.invalid' } })).status, 403);
+  }
+  assert.equal(dispatches, 2);
+});
+
+test('HTTP response loss after synchronous reservation never cancels or redispatches chat', async t => {
+  const config = await fixture(t); const fake = fakeSession();
+  const store = openChatOperationStore({ directory: config.protectedRoot, agentId: 'agent-synthetic' });
+  let req; let submissions = 0; let dispatches = 0; const entered = deferred();
+  fake.session.chat = { submit(value) { submissions++; const reserved = store.reserve(value); if (reserved.dispatchAllowed) dispatches++;
+    req.destroy(); entered.resolve(); return reserved.record; }, get: id => store.get(id), listPending: () => store.listPending() };
+  const host = await startLocalReadHost({ ...config, chat: { providerPort: 12345, model: 'lmstudio/synthetic' } }, {}, { capability, makeSession: () => fake.session });
+  t.after(async () => { await host.close(); store.close(); });
+  const value = { operationId: '32345678-1234-4234-8234-123456789012', kind: 'create', title: 'kept' };
+  const url = new URL(host.origin);
+  req = httpRequest({ hostname: '127.0.0.1', port: url.port, path: '/api/local/submit', method: 'POST',
+    headers: { Origin: host.origin, Authorization: `Bearer ${capability}`, 'Content-Type': 'application/json' } });
+  req.on('error', () => {}); req.end(JSON.stringify(value)); await entered.promise; await tick();
+  assert.equal(store.get(value.operationId).status, 'unknown'); assert.equal(fake.closes, 0);
+  const result = await request(host, '/api/local/operation', { body: JSON.stringify({ operationId: value.operationId }) });
+  assert.equal(JSON.parse(result.text).data.title, value.title); assert.equal(submissions, 1); assert.equal(dispatches, 1);
 });
 
 test('auth, exact Origin/Host, duplicate headers, cookies, queries and OPTIONS never reach session reads', async t => {

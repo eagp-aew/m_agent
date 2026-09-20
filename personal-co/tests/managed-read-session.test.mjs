@@ -142,7 +142,8 @@ test('chat configuration is roots-only opt-in, captured before awaits, and opens
   const session = initializeManagedReadSession({ ...roots, chat }, {}, {
     makeAuth: async (input, options) => { captured = options; return auth.makeAuth(input); }, start: child.start,
     checkListenerGone: async () => true,
-    prepare: async () => ({ async resolve() { resolved = true; return { agentId }; }, async close() {} }),
+    prepare: async () => ({ async assertOwnership() {}, async resolve() { resolved = true; return { agentId }; }, async close() {} }),
+    makeProviderGuard: async () => ({ async check() {} }),
     openOperations: input => {
       assert.equal(resolved, true); assert.deepEqual(input, { directory: roots.protectedRoot, agentId });
       return { listPending: () => [], close: () => { storeClosed++; } };
@@ -154,6 +155,28 @@ test('chat configuration is roots-only opt-in, captured before awaits, and opens
   assert.deepEqual(session.chat.listPending(), []); await session.close(); assert.equal(storeClosed, 1);
   assert.throws(() => createManagedReadSession({ ...config(), chat: { providerPort: 12345, model: 'lmstudio/x' } }), code('INVALID_CONFIG'));
   assert.throws(() => initializeManagedReadSession({ ...roots, chat: { providerPort: 12345, model: 'lmstudio/auto' } }), code('INVALID_CONFIG'));
+});
+
+test('chat provider/ownership admission rejects before spawn, before ready, and cancels late admission', async () => {
+  for (const mode of ['provider', 'ownership', 'before-ready', 'late']) {
+    const { agentId: ignored, ...roots } = config(); const auth = authFixture(); const child = controlledProcess();
+    const gate = deferred(); const entered = deferred(); let closes = 0;
+    const session = initializeManagedReadSession({ ...roots, chat: { model: 'lmstudio/synthetic', providerPort: 12345 } }, {}, {
+      makeAuth: auth.makeAuth, start: child.start, checkListenerGone: async () => true,
+      prepare: async () => ({ async assertOwnership() { if (mode === 'ownership') throw new Error('PRIVATE'); },
+        async resolve() { return { agentId }; }, async close() { closes++; } }),
+      makeProviderGuard: async () => {
+        if (mode === 'provider') throw new Error('PRIVATE');
+        if (mode === 'late') { entered.resolve(); await gate.promise; }
+        return { async check() { if (mode === 'before-ready') throw new Error('PRIVATE'); } };
+      },
+      openOperations() { assert.fail('must not publish chat owner'); },
+    });
+    const rejected = assert.rejects(session.ready);
+    if (mode === 'late') { await entered.promise; const closing = session.close(); gate.resolve(); await closing; }
+    await rejected; assert.equal((await session.terminal).cleanup.confirmed, true);
+    assert.equal(child.starts, mode === 'before-ready' ? 1 : 0); assert.equal(closes, 1);
+  }
 });
 
 test('late preparation, preparation rejection with retained lock, and close failure preserve cleanup truth', async () => {

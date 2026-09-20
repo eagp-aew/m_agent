@@ -30,11 +30,48 @@ export function captureLocalChatConfig(value) {
 export function deriveLocalChatSandbox(base, input) {
   const { providerPort } = captureLocalChatConfig(input);
   requireValue(base.command === '/usr/bin/sandbox-exec' && base.args[0] === '-p' && base.args[1] === base.profile, 'invalid_chat_base');
-  const profile = `${base.profile}(allow network-outbound (remote ip "127.0.0.1:${providerPort}"))\n`;
+  const stateRoot = base.roots?.stateRoot;
+  safePath(stateRoot);
+  const profile = `${base.profile}(allow network-outbound (remote ip "127.0.0.1:${providerPort}"))\n`
+    + `(deny file-read-data (subpath "${stateRoot}/providers"))\n(deny file-write* (subpath "${stateRoot}/providers"))\n`;
   return Object.freeze({ ...base, profile, profileSha256: sha256(profile),
     args: Object.freeze(['-p', profile, ...base.args.slice(2)]),
     options: Object.freeze({ ...base.options, env: Object.freeze({ ...base.options.env,
-      LMSTUDIO_BASE_URL: `http://127.0.0.1:${providerPort}/v1` }) }) });
+      LMSTUDIO_BASE_URL: `http://127.0.0.1:${providerPort}/v1`, LETTA_DISABLE_MODS: '1' }) }) });
+}
+
+/** Chat-only metadata admission. Never opens/parses provider credential files.
+ * Same-UID cooperative ownership, not an atomic cross-process filesystem lock.
+ */
+export async function createLocalChatProviderGuard(stateRoot, { io = fs, uid = process.getuid?.() } = {}) {
+  safePath(stateRoot);
+  requireValue(Number.isInteger(uid) && /^\/private\/tmp\/[^/]+\/[^/]+(?:\/[^/]+)*$/.test(stateRoot), 'unsafe_provider_root');
+  const providers = path.join(stateRoot, 'providers'); const auth = path.join(providers, 'auth.json');
+  let rootIdentity; let providerIdentity;
+  const same = (a, b) => a.dev === b.dev && a.ino === b.ino;
+  async function directory(file, expected, optional = false) {
+    let stat;
+    try { stat = await io.lstat(file); } catch (failure) { if (optional && failure.code === 'ENOENT' && !expected) return null; throw failure; }
+    requireValue(stat.isDirectory() && stat.uid === uid && (stat.mode & 0o7777) === 0o700
+      && Number.isInteger(stat.dev) && Number.isInteger(stat.ino) && (!expected || same(stat, expected))
+      && await io.realpath(file) === file, 'unsafe_provider_root');
+    return stat;
+  }
+  async function check() {
+    try {
+      const root = await directory(stateRoot, rootIdentity);
+      rootIdentity ??= root;
+      const parent = await directory(providers, providerIdentity, true);
+      if (parent) providerIdentity ??= parent;
+      let missing = false;
+      try { await io.lstat(auth); } catch (failure) { if (failure.code === 'ENOENT') missing = true; else throw failure; }
+      requireValue(missing, 'provider_records_forbidden');
+      const after = await directory(providers, providerIdentity, true);
+      requireValue(Boolean(parent) === Boolean(after) && (!parent || same(parent, after)), 'provider_parent_changed');
+      await directory(stateRoot, rootIdentity);
+    } catch { throw new Error('Local chat provider admission failed.'); }
+  }
+  await check(); return Object.freeze({ check });
 }
 
 function safePath(value) {

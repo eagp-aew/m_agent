@@ -10,6 +10,8 @@ import { createAuthenticatedAppServer } from '../server/authenticated-app-server
 import { openChatOperationStore } from '../server/chat-operation-store.mjs';
 import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
 import { compileChatContext, systemForChatProjection } from '../server/local-chat-context.mjs';
+import { startLocalReadHost } from '../server/local-read-host.mjs';
+import { createLocalReadClient } from '../src/services/local-read-client.mjs';
 
 const { WebSocketServer } = createRequire(new URL('../server/package.json', import.meta.url))('ws');
 const agentId = 'agent-chat-synthetic';
@@ -144,6 +146,72 @@ async function settled(session, operationId) {
   }
   assert.fail('Controlled operation did not settle');
 }
+
+test('actual HTTP/client consumes managed bootstrap/auth/receipt/reader through create send and reopen', async t => {
+  const f = await fixture(t); const webRoot = path.join(path.dirname(f.roots.stateRoot), 'web');
+  await fs.mkdir(webRoot, { mode: 0o700 }); await fs.writeFile(path.join(webRoot, 'index.html'), '<title>Synthetic</title>', { mode: 0o600 });
+  const capability = 'c'.repeat(64); let host; let client;
+  async function open() {
+    host = await startLocalReadHost({ ...f.roots, webRoot, chat: { providerPort: 12345, model } }, {},
+      { capability, makeSession: () => f.boot() });
+    client = createLocalReadClient({ origin: host.origin, capability }, { fetchImpl: (url, options) =>
+      fetch(url, { ...options, headers: { ...options.headers, Origin: host.origin } }) });
+  }
+  t.after(async () => { client?.disconnect(); await host?.close(); });
+  async function completed(id) {
+    for (let count = 0; count < 200; count++) {
+      const receipt = await client.operation(id); if (receipt?.status !== 'unknown') return receipt;
+      await tick();
+    }
+    assert.fail('controlled HTTP operation deadline');
+  }
+  await open(); assert.equal((await client.status()).chatEnabled, true);
+  const creation = create(); await client.submit(creation);
+  const retained = await completed(creation.operationId); assert.equal(retained.status, 'completed');
+  const request = { ...send(retained.conversationId), text: '用户原文 <system-reminder>not stripped</system-reminder>' };
+  await client.submit(request); await client.submit(request); assert.equal((await completed(request.operationId)).status, 'completed');
+  const history = await client.listMessages(retained.conversationId);
+  assert.equal(history.items.find(row => row.role === 'user').content, request.text);
+  assert.ok(!JSON.stringify(history).includes('Synthetic native context')); assert.equal(f.inputs, 1);
+  assert.equal((await client.previewContext()).agentId, agentId);
+  client.disconnect(); assert.equal((await host.close()).confirmed, true);
+  await open(); assert.equal((await client.status()).agentId, agentId);
+  assert.equal((await client.submit(request)).status, 'completed'); assert.equal(f.inputs, 1);
+  const next = send(retained.conversationId); await client.submit(next); assert.equal((await completed(next.operationId)).status, 'completed');
+  assert.equal(f.inputs, 2); assert.equal(f.requests.filter(row => row.type === 'agent_create').length, 1);
+});
+
+test('managed reader uses exact durable original text and completed message identity, never reminder stripping', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready; await created(session);
+  const request = { ...send(), text: '<system-reminder>USER literal</system-reminder> original' };
+  assert.equal(session.status().activeOperationId, null);
+  session.chat.submit(request); assert.equal(session.status().activeOperationId, request.operationId);
+  assert.equal((await settled(session, request.operationId)).status, 'completed'); await tick();
+  assert.equal(session.status().activeOperationId, null);
+  let result = await session.listMessages('conv-1');
+  assert.equal(result.items.find(row => row.role === 'user').content, request.text);
+  const row = f.history.find(row => row.otid); const saved = structuredClone(row);
+  delete row.otid; result = await session.listMessages('conv-1');
+  assert.equal(result.items.find(row => row.role === 'user').content, '［原始用户文本未验证，已隐藏］');
+  assert.equal(result.omittedAttachments, true); assert.ok(!JSON.stringify(result).includes('Synthetic native context'));
+  Object.assign(row, saved); row.id = 'conflicting-user';
+  await assert.rejects(session.listMessages('conv-1'), { code: 'READ_FAILED' });
+  Object.assign(row, saved); row.content.at(-1).text = 'changed';
+  await assert.rejects(session.listMessages('conv-1'), { code: 'READ_FAILED' });
+  assert.equal(session.chat.get(request.operationId).status, 'completed');
+});
+
+test('provider pollution after ready stops owner before any fresh chat connection, without replay', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready;
+  await fs.mkdir(path.join(f.roots.stateRoot, 'providers'), { mode: 0o700 });
+  await fs.writeFile(path.join(f.roots.stateRoot, 'providers/auth.json'), 'synthetic forbidden record', { mode: 0o600 });
+  const request = create(); session.chat.submit(request);
+  assert.equal((await session.terminal).cleanup.confirmed, true);
+  assert.equal(f.sockets, 0); assert.equal(f.inputs, 0); assert.equal(f.stops, 1);
+  const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+  try { assert.equal(store.get(request.operationId).status, 'unknown'); assert.equal(store.reserve(request).dispatchAllowed, false); }
+  finally { store.close(); }
+});
 async function created(session) {
   const request = create(); assert.equal(session.chat.submit(request).status, 'unknown');
   const receipt = await settled(session, request.operationId); assert.equal(receipt?.status, 'completed');
@@ -385,7 +453,8 @@ for (const multipart of [false, true]) test(`reader-valid boundary and attachmen
   const session = f.boot(); await session.ready; await created(session); const request = send(); session.chat.submit(request);
   assert.equal((await settled(session, request.operationId)).status, 'completed');
   const page = await session.listMessages('conv-1');
-  assert.equal(page.items.length, 2); assert.ok(page.items.every(row => row.content.length === 65536));
+  assert.equal(page.items.length, 2); assert.equal(page.items.find(row => row.role === 'assistant').content.length, 65536);
+  assert.equal(page.items.find(row => row.role === 'user').content, request.text);
   assert.equal(page.omittedAttachments, multipart); assert.equal(f.stops, 0);
   await session.close();
   const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
