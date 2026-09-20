@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { types } from 'node:util';
+import { captureChatContext } from './local-chat-context.mjs';
 
 export const CHAT_OPERATIONS_FILE = 'operations.sqlite';
 const MAX_DATABASE_BYTES = 256 * 1024 * 1024;
@@ -60,11 +61,16 @@ function request(value) {
   const kind = Object.getOwnPropertyDescriptor(value, 'kind');
   check(kind && Object.hasOwn(kind, 'value') && ['create', 'send'].includes(kind.value));
   fields(value, kind.value === 'create' ? ['operationId', 'kind', 'title']
-    : ['operationId', 'kind', 'conversationId', 'text']);
+    : ['operationId', 'kind', 'conversationId', 'text', ...(Object.hasOwn(value, 'context') ? ['context'] : [])]);
   check(uuid(value.operationId));
   if (value.kind === 'create') return { operationId: value.operationId, kind: 'create', title: boundedText(value.title, 256) };
   check(entityId(value.conversationId));
-  return { operationId: value.operationId, kind: 'send', conversationId: value.conversationId, text: boundedText(value.text, 16384) };
+  let context;
+  if (Object.hasOwn(value, 'context')) {
+    try { context = captureChatContext(value.context); } catch { fail('INVALID'); }
+  }
+  return { operationId: value.operationId, kind: 'send', conversationId: value.conversationId, text: boundedText(value.text, 16384),
+    ...(context === undefined ? {} : { context }) };
 }
 function terminal(value) {
   fields(value, ['runId', 'turnId', 'stopReason', 'error']);

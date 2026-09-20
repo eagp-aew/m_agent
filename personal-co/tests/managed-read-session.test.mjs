@@ -150,7 +150,7 @@ test('chat configuration is roots-only opt-in, captured before awaits, and opens
   });
   chat.providerPort = 99999; chat.model = 'openai/forbidden'; await session.ready;
   assert.equal(typeof captured.makeSandbox, 'function');
-  assert.deepEqual(Object.keys(session.chat).sort(), ['get', 'listPending', 'recoverCreate', 'submit']);
+  assert.deepEqual(Object.keys(session.chat).sort(), ['get', 'listPending', 'previewContext', 'recoverCreate', 'submit']);
   assert.deepEqual(session.chat.listPending(), []); await session.close(); assert.equal(storeClosed, 1);
   assert.throws(() => createManagedReadSession({ ...config(), chat: { providerPort: 12345, model: 'lmstudio/x' } }), code('INVALID_CONFIG'));
   assert.throws(() => initializeManagedReadSession({ ...roots, chat: { providerPort: 12345, model: 'lmstudio/auto' } }), code('INVALID_CONFIG'));

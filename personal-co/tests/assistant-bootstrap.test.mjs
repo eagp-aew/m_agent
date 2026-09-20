@@ -104,6 +104,99 @@ test('existing canonical bootstrap admits real bound receipt database without re
   assert.equal(client.creates, 1);
 });
 
+test('bounded current canonical read requires successful resolve and preserves exact bytes digest and immutable data', async t => {
+  const f = await fixture(t); const client = nativeFixture(); const preparation = await prepareAssistantBootstrap(f.roots);
+  await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
+  await preparation.resolve(client);
+  const first = await preparation.readMemory(); const bytes = await fs.readFile(f.data);
+  assert.equal(first.digest, sha(bytes)); assert.equal(first.memory.agentId, agentId); assert.ok(Object.isFrozen(first.memory.blocks[0]));
+  const changed = JSON.parse(bytes); changed.blocks[1].value = 'Current synthetic context'; changed.revision++;
+  await fs.writeFile(f.data, JSON.stringify(changed));
+  const second = await preparation.readMemory(); assert.equal(second.memory.revision, 1); assert.notEqual(second.digest, first.digest);
+  // Same revision and content but changed bytes must still invalidate a preview.
+  const formatted = Buffer.from(JSON.stringify(changed, null, 2)); await fs.writeFile(f.data, formatted);
+  const third = await preparation.readMemory(); assert.equal(third.digest, sha(formatted)); assert.notEqual(third.digest, second.digest);
+  assert.equal(third.memory.revision, second.memory.revision);
+  // The actual canonical store preserves BOM for codec rejection. Bootstrap
+  // must not silently admit bytes that that owner cannot reopen.
+  await fs.writeFile(f.data, Buffer.concat([Buffer.from('\ufeff'), formatted]));
+  await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
+  await assert.rejects(openCanonicalMemoryStore({ directory: f.roots.protectedRoot, agentId }), { code: 'CORRUPT' });
+  await preparation.close(); await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
+});
+
+test('current canonical read revalidates policy, six block identity, Agent/runtime binding and private-file bounds', async t => {
+  for (const kind of ['policy', 'block-id', 'agent', 'binding', 'missing-block', 'permission', 'oversize']) {
+    const f = await fixture(t); const client = nativeFixture(); const preparation = await prepareAssistantBootstrap(f.roots);
+    await preparation.resolve(client);
+    const memory = JSON.parse(await fs.readFile(f.data, 'utf8'));
+    if (kind === 'policy') memory.blocks.find(row => row.label === 'PERSONA').value = 'Modified policy';
+    if (kind === 'block-id') memory.blocks[0].id = 'changed';
+    if (kind === 'agent') memory.agentId = 'foreign';
+    if (kind === 'binding') memory.runtimeBinding.stateRoot = '/private/tmp/foreign/state';
+    if (kind === 'missing-block') memory.blocks.pop();
+    await fs.writeFile(f.data, JSON.stringify(memory));
+    if (kind === 'permission') await fs.chmod(f.data, 0o644);
+    if (kind === 'oversize') await fs.truncate(f.data, 1048577);
+    await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
+    await preparation.close();
+  }
+});
+
+test('close drains an accepted canonical read and invalidates late delivery', async t => {
+  const f = await fixture(t); const gate = deferred(); const entered = deferred(); let block = false;
+  const io = faultIO(async (file, operation) => { if (block && file === f.data && operation === 'read') { entered.resolve(); await gate.promise; } });
+  const preparation = await prepareAssistantBootstrap(f.roots, {}, { io }); await preparation.resolve(nativeFixture()); block = true;
+  const reading = preparation.readMemory(); const rejected = assert.rejects(reading, { code: 'MEMORY_UNAVAILABLE' });
+  await entered.promise; let closed = false; const closing = preparation.close().then(() => { closed = true; });
+  await tick(); assert.equal(closed, false); gate.resolve(); await rejected; await closing;
+});
+
+test('uncertain canonical read handle close remains explicit in bootstrap cleanup', async t => {
+  const f = await fixture(t); let inject = false;
+  const io = faultIO(async (file, operation, _args, handle) => {
+    if (inject && file === f.data && operation === 'close') { await handle.close(); throw new Error('PRIVATE_CLOSE'); }
+  });
+  const preparation = await prepareAssistantBootstrap(f.roots, {}, { io }); await preparation.resolve(nativeFixture()); inject = true;
+  await assert.rejects(preparation.readMemory(), { code: 'MEMORY_UNAVAILABLE' });
+  await assert.rejects(preparation.close(), failure('CLEANUP_FAILED'));
+});
+
+for (const kind of ['close', 'read']) test(`managed acquisition canonical ${kind} fault preserves cleanup truth`, async t => {
+  const f = await fixture(t); await initialize(f, nativeFixture());
+  let diagnosticHandle; let acquisitionCode; let starts = 0;
+  const io = faultIO(async (file, operation, _args, handle) => {
+    if (file === f.data && operation === kind) { diagnosticHandle = handle; throw new Error('PRIVATE_CANONICAL_FAULT'); }
+  });
+  const roots = { ...f.roots, dependencyRoot: '/private/tmp/synthetic-dependencies/node_modules' };
+  const seams = {
+    makeAuth: async () => ({ launchSpec: {}, dispose: async () => {} }),
+    prepare: async (input, options) => {
+      try { return await prepareAssistantBootstrap(input, options, { io }); }
+      catch (error) { acquisitionCode = error.code; throw error; }
+    },
+    start: () => { starts++; assert.fail('Native start must not run after acquisition failure'); },
+  };
+  const session = initializeManagedReadSession(roots, {}, seams);
+  try {
+    await assert.rejects(session.ready, { code: 'STARTUP_FAILED' });
+    const terminal = await session.terminal;
+    const handleOpen = await diagnosticHandle.stat().then(() => true, () => false);
+    t.diagnostic(JSON.stringify({ acquisitionCode, handleOpen, terminal }));
+    assert.equal(starts, 0); assert.equal(handleOpen, kind === 'close');
+    assert.equal(terminal.cleanup.confirmed, kind !== 'close');
+    assert.equal(acquisitionCode, kind === 'close' ? 'CLEANUP_FAILED' : 'IO');
+    if (kind === 'close') {
+      assert.equal(terminal.phase, 'failed'); assert.ok(terminal.errors.includes('LATE_CLEANUP_FAILED'));
+      assert.throws(() => initializeManagedReadSession(roots, {}, seams), { code: 'STATE_IN_USE' });
+    } else {
+      assert.deepEqual(terminal.errors, []);
+      const next = initializeManagedReadSession(roots, {}, seams);
+      assert.equal((await next.close()).cleanup.confirmed, true);
+    }
+  } finally { await session.close(); await diagnosticHandle?.close(); }
+});
+
 test('receipt metadata admission rejects unsafe files, missing canonical, orphan journal and unknown sidecars', async t => {
   for (const kind of ['permissions', 'symlink', 'hardlink', 'directory', 'oversize', 'orphan', 'wal', 'shm', 'unknown', 'missing-canonical']) {
     const f = await fixture(t); const client = nativeFixture();

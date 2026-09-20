@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises';
 import { constants } from 'node:fs';
 import path from 'node:path';
-import { randomBytes } from 'node:crypto';
+import { createHash, randomBytes } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { openCanonicalMemoryStore, CANONICAL_MEMORY_FILE } from './canonical-memory-store.mjs';
 import { createMemoryBlocks, POLICY_MEMORY_LABELS } from '../src/domain/memory.mjs';
@@ -62,6 +62,7 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
   const lockToken = randomBytes(32).toString('hex');
   let stateStat; let protectedStat; let directory; let lock; let lockStat;
   let intent; let intentText; let intentStat; let fresh; let accepting = true; let task; let closing; let cleanupProblem = false;
+  let validated; let resolved = false; let readTail = Promise.resolve();
   const active = () => check(accepting && !signal?.aborted, 'ABORTED');
   function privateFile(stat, maxBytes) {
     check(stat.isFile() && stat.uid === uid && (stat.mode & 0o7777) === 0o600
@@ -84,8 +85,10 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
       check(bytesRead <= maxBytes && bytesRead === stat.size, 'UNSAFE_PATH');
       const after = await io.lstat(file); privateFile(after, maxBytes);
       check(same(stat, after) && stat.size === after.size && stat.mtimeMs === after.mtimeMs, 'UNSAFE_PATH');
-      return { stat, text: new TextDecoder('utf-8', { fatal: true }).decode(bytes.subarray(0, bytesRead)) };
-    } finally { await handle.close(); }
+      const content = bytes.subarray(0, bytesRead);
+      return { stat, text: new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(content),
+        digest: createHash('sha256').update(content).digest('hex') };
+    } finally { try { await handle.close(); } catch { cleanupProblem = true; fail('CLEANUP_FAILED'); } }
   }
   async function owner() {
     await checkDirectory(roots.stateRoot, stateStat); await checkDirectory(roots.protectedRoot, protectedStat);
@@ -144,6 +147,7 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
     await owner(); active();
   } catch (error) {
     try { await release(); } catch { fail('CLEANUP_FAILED'); }
+    check(!cleanupProblem, 'CLEANUP_FAILED');
     fail(['ABORTED', 'LOCKED', 'UNSAFE_PATH', 'LOCK_LOST', 'INVALID_INTENT', 'EXISTING_DATA'].includes(error.code) ? error.code : 'IO');
   }
   function agent(record, marker, expected) {
@@ -157,6 +161,14 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
     active(); const response = await client.request('agent_list', { query: { tags: [TAG], limit: 2 } }, { signal }); active();
     check(response?.success === true && Array.isArray(response.agents) && response.agents.length <= 2, 'AGENT_MISMATCH');
     return response.agents;
+  }
+  function validateMemory(memory, { agentId, runtimeBinding, defaults }) {
+    check(memory.agentId === agentId && isDeepStrictEqual(memory.runtimeBinding, runtimeBinding)
+      && memory.blocks.length === defaults.length && memory.blocks.every(block => {
+        const expected = defaults.find(item => item.label === block.label);
+        return expected && block.id === expected.id && block.readOnly === expected.readOnly && block.limit === expected.limit
+          && (!POLICY_MEMORY_LABELS.includes(block.label) || block.value === expected.value);
+      }), 'CANONICAL_MISMATCH');
   }
   async function resolve(client) {
     active(); await owner(); active();
@@ -206,12 +218,8 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
         memory = await store.initialize({ agentId, revision: 0, blocks: defaults, archive: [], runtimeBinding });
       }
       active();
-      check(isDeepStrictEqual(memory.runtimeBinding, runtimeBinding)
-        && memory.blocks.every(block => {
-          const expected = defaults.find(item => item.label === block.label);
-          return expected && block.id === expected.id && block.readOnly === expected.readOnly && block.limit === expected.limit
-            && (!POLICY_MEMORY_LABELS.includes(block.label) || block.value === expected.value);
-        }), 'CANONICAL_MISMATCH');
+      validated = { agentId, runtimeBinding, defaults };
+      validateMemory(memory, validated);
       await owner(); await checkIntent(); active();
       return Object.freeze({ agentId });
     } finally {
@@ -221,11 +229,25 @@ export async function prepareAssistantBootstrap(input, options = {}, { io = fs, 
   return Object.freeze({
     resolve(client) {
       if (task || !accepting) return Promise.reject(Object.assign(new Error('Assistant initialization failed.'), { code: 'ALREADY_ATTEMPTED' }));
-      task = resolve(client).catch(() => fail(signal?.aborted || !accepting ? 'ABORTED' : 'INITIALIZATION_FAILED'));
+      task = resolve(client).then(result => { resolved = true; return result; })
+        .catch(() => fail(signal?.aborted || !accepting ? 'ABORTED' : 'INITIALIZATION_FAILED'));
       return task;
+    },
+    readMemory() {
+      if (!resolved || !accepting || signal?.aborted) return Promise.reject(Object.assign(new Error('Assistant memory read unavailable.'), { code: 'MEMORY_UNAVAILABLE' }));
+      const reading = readTail.then(async () => {
+        active(); await owner(); await checkIntent(); active();
+        const record = await read(path.join(roots.protectedRoot, CANONICAL_MEMORY_FILE), MAX_CANONICAL_BYTES);
+        const memory = decodeAppServerMemory(record.text, validated.agentId);
+        validateMemory(memory, validated);
+        await owner(); await checkIntent(); active();
+        return Object.freeze({ memory, digest: record.digest });
+      }).catch(() => { throw Object.assign(new Error('Assistant memory read unavailable.'), { code: 'MEMORY_UNAVAILABLE' }); });
+      readTail = reading.catch(() => {}); return reading;
     },
     close() {
       if (!closing) { accepting = false; closing = Promise.resolve(task).catch(() => {}).then(async () => {
+        await readTail;
         await release(); check(!cleanupProblem, 'CLEANUP_FAILED');
       }); }
       return closing;

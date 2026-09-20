@@ -1,4 +1,5 @@
 import { isDeepStrictEqual } from 'node:util';
+import { captureContextQuery, previewChatContext, compileChatContext } from './local-chat-context.mjs';
 
 const error = code => Object.assign(new Error('Local chat operation failed.'), { code });
 const check = (value, code = 'UNCERTAIN') => { if (!value) throw error(code); };
@@ -55,14 +56,16 @@ function visibleText(row) {
   return output;
 }
 
-/** Host-private segment B. The managed owner supplies one exclusive bootstrap
+/** Host-private context admission. The managed owner supplies one exclusive bootstrap
  * lease, bound durable store, fresh authenticated channels and lifetime stop.
- * Fixed policy only: segment C must admit relevant/current canonical context
- * before browser exposure. No recovery sends, no delivery-cancellation option.
+ * Context is explicitly selected per message from a fresh canonical snapshot;
+ * no automatic freshness or truth assertion. No recovery sends or delivery
+ * cancellation option. HTTP/browser exposure is still a later integration.
  */
-export function createLocalChatOperations({ store, connect, agentId, model, stop, signal, operationMs = 180000 }) {
+export function createLocalChatOperations({ store, connect, readMemory, agentId, model, stop, signal, operationMs = 180000 }) {
   check(entity(agentId) && typeof model === 'string' && Number.isInteger(operationMs) && operationMs > 0 && operationMs <= 180000);
   let closed = false; let stopping = false; let busy = false; let task = Promise.resolve();
+  let previewing = false; let previewTask = Promise.resolve();
   function alive(channel) { check(!closed && !signal.aborted); channel?.assertHealthy(); }
   function stopOwner() {
     closed = true;
@@ -98,6 +101,19 @@ export function createLocalChatOperations({ store, connect, agentId, model, stop
     // never resolves; lifecycle owns bounded reconciliation and store disposal.
     const timer = setTimeout(stopOwner, operationMs);
     try {
+      let projection;
+      if (request.kind === 'send' && request.context !== undefined) {
+        let snapshot;
+        // Integrity/ownership failure is not an ordinary stale user selection:
+        // no native mutation happened, but ready authority must be revoked.
+        try { alive(); snapshot = await readMemory(); alive(); }
+        catch {
+          if (!closed && !signal.aborted) try { store.recordFailure({ operationId, source: 'predispatch' }); } catch { /* Do not dispatch. */ }
+          stopOwner(); return;
+        }
+        try { projection = compileChatContext(snapshot, agentId, request.context); }
+        catch { throw error('PREDISPATCH'); }
+      }
       alive(); channel = await connect();
       void channel.failed.then(stopOwner);
       alive(channel);
@@ -125,7 +141,7 @@ export function createLocalChatOperations({ store, connect, agentId, model, stop
         check(!rows.some(row => row.otid === operationId));
       }
       alive(); mutated = true;
-      safeAgent(await channel.prepareAgent(), agentId);
+      safeAgent(await channel.prepareAgent(projection), agentId);
       alive();
       if (request.kind === 'create') {
         const created = await channel.createConversation(request.title, operationTag);
@@ -157,6 +173,7 @@ export function createLocalChatOperations({ store, connect, agentId, model, stop
         check(replies.length >= 1 && replies.length <= 64 && replies.every(row => rows.indexOf(row) > userIndex)
           && replies.every(row => visibleText(row).length > 0)
           && rows.filter(row => row.otid === operationId).length === 1);
+        if (projection !== undefined) { alive(channel); safeAgent(await channel.clearContext(), agentId); }
         alive(channel); await channel.seal(); alive(); channel.assertSealed();
         store.completeSend({ operationId, conversationId: request.conversationId,
           userMessageId: users[0].id, assistantMessageIds: replies.map(row => row.id) });
@@ -182,6 +199,19 @@ export function createLocalChatOperations({ store, connect, agentId, model, stop
     catch (failure) { throw error(['CONFLICT', 'BUSY', 'INVALID', 'MISSING'].includes(failure?.code) ? failure.code : 'CHAT_UNAVAILABLE'); }
   };
   return Object.freeze({
+    previewContext(input = {}) {
+      let query;
+      try { alive(); check(!previewing, 'BUSY'); query = captureContextQuery(input); }
+      catch { return Promise.reject(error('INVALID_CONTEXT')); }
+      previewing = true;
+      previewTask = (async () => {
+        let snapshot;
+        try { snapshot = await readMemory(); alive(); }
+        catch { stopOwner(); throw error('CONTEXT_UNAVAILABLE'); }
+        return previewChatContext(snapshot, agentId, query);
+      })().finally(() => { previewing = false; });
+      void previewTask.catch(() => {}); return previewTask;
+    },
     submit(value) { return safeCall(() => {
       alive();
       // reserve is synchronous and is the only dispatch authority. Duplicate
@@ -199,6 +229,6 @@ export function createLocalChatOperations({ store, connect, agentId, model, stop
       if (record.status === 'unknown') launch(record, true);
       return record;
     }); },
-    close() { closed = true; return task; },
+    close() { closed = true; return Promise.allSettled([task, previewTask]).then(() => undefined); },
   });
 }

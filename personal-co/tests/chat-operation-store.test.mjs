@@ -66,6 +66,35 @@ test('same ID never reauthorizes across handles; changed fields conflict and glo
   assert.throws(() => reopened.reserve(send()), code('BUSY')); reopened.close();
 });
 
+test('optional context identity is immutable/durable with old no-context compatibility and no schema change', () => {
+  const directory = fixture(); let store = open(directory); const old = send(); store.reserve(old);
+  store.recordFailure({ operationId: old.operationId, source: 'predispatch' });
+  const input = { ...send(), context: { revision: 3, digest: 'a'.repeat(64), items: ['b'.repeat(64)] } };
+  const receipt = store.reserve(input); input.context.items[0] = 'c'.repeat(64);
+  assert.equal(receipt.record.request.context.items[0], 'b'.repeat(64));
+  assert.ok(Object.isFrozen(receipt.record.request.context.items));
+  for (const context of [undefined, { ...receipt.record.request.context, revision: 4 },
+    { ...receipt.record.request.context, digest: 'd'.repeat(64) }, { ...receipt.record.request.context, items: [] }]) {
+    const changed = { ...receipt.record.request }; if (context === undefined) delete changed.context; else changed.context = context;
+    assert.throws(() => store.reserve(changed), code('CONFLICT'));
+  }
+  store.close(); store = open(directory);
+  assert.equal(store.reserve(receipt.record.request).dispatchAllowed, false);
+  assert.equal(store.reserve(old).dispatchAllowed, false); assert.equal(Object.hasOwn(store.get(old.operationId).request, 'context'), false);
+  store.close();
+  seed(directory, db => { assert.equal(db.prepare('PRAGMA user_version').get().user_version, 1); });
+});
+
+test('receipt context never executes descriptors/proxies or admits raw context strings', () => {
+  const store = open(fixture()); const context = { revision: 1, digest: 'a'.repeat(64), items: [] }; let called = 0;
+  for (const value of [undefined, null, 'private', { ...context, system: 'private' }, { ...context, items: [,] },
+    { ...context, get digest() { called++; return 'a'.repeat(64); } },
+    new Proxy(context, { ownKeys() { called++; return []; } }),
+    { ...context, items: new Proxy([], { get() { called++; } }) }]) assert.throws(() => store.reserve({ ...send(), context: value }), code('INVALID'));
+  assert.throws(() => store.reserve({ ...create(), context }), code('INVALID'));
+  assert.equal(called, 0); assert.deepEqual(store.listPending(), []); store.close();
+});
+
 test('separate processes racing the same reservation receive exactly one dispatch grant', { timeout: 10000 }, async () => {
   const directory = fixture(); open(directory).close(); const input = send();
   const source = `import {openChatOperationStore} from ${JSON.stringify(moduleURL)};

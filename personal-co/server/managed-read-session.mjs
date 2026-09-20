@@ -62,8 +62,8 @@ export function createManagedReadSession(config, options = {}, seams = {}) {
  * Uses the same runtime owner; initialization adds a cooperative disk lock and
  * irreversible creation intent. Pending/ambiguous creation never auto-retries.
  * Optional trusted chat:{providerPort,model} enables host-private segment B.
- * Fixed protected policy only; selective canonical context admission (segment C)
- * is REQUIRED before HTTP/browser enablement. No arbitrary RPC/settings return.
+ * Explicit per-message canonical context preview/admission is host-private;
+ * HTTP/browser enablement remains separate. No arbitrary RPC/settings return.
  */
 export function initializeManagedReadSession(config, options = {}, seams = {}) {
   return managedSession(config, options, seams, true);
@@ -220,6 +220,7 @@ function managedSession(config, options, {
     if (chatConfig) {
       operationStore = openOperations({ directory: roots.protectedRoot, agentId });
       operations = createLocalChatOperations({ store: operationStore, agentId, model: chatConfig.model,
+        readMemory: () => preparation.readMemory(),
         signal: lifetime.signal, operationMs, stop: () => transition('CHAT_UNCERTAIN'),
         connect: () => auth.connectChat(endpoint, { agentId, stateRoot: roots.stateRoot, ...chatConfig }, { signal: lifetime.signal }) });
     }
@@ -241,6 +242,7 @@ function managedSession(config, options, {
   }
   return Object.freeze({ ready, terminal, status: () => Object.freeze({ phase, reason }),
     ...(chatConfig ? { chat: Object.freeze({
+      previewContext(input) { check(phase === 'ready', 'NOT_READY'); return operations.previewContext(input); },
       submit(value) { check(phase === 'ready', 'NOT_READY'); return operations.submit(value); },
       get(operationId) { check(phase === 'ready', 'NOT_READY'); return operations.get(operationId); },
       listPending() { check(phase === 'ready', 'NOT_READY'); return operations.listPending(); },

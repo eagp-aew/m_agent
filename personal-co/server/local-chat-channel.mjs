@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { RUNTIME_PIN } from './runtime-sandbox.mjs';
 import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
+import { systemForChatProjection } from './local-chat-context.mjs';
 
 const error = () => Object.assign(new Error('Local chat channel failed.'), { code: 'CHAT_CHANNEL_FAILED' });
 const check = value => { if (!value) throw error(); };
@@ -12,7 +13,7 @@ const events = new Set(['update_device_status', 'update_loop_status', 'update_qu
 
 /** Auth-owner internal constructor. Capability never crosses the returned
  * named-method surface. A fresh connection has one immutable Agent and at most
- * one conversation/input. No request(), context projection or caller settings.
+ * one conversation/input. No request(), raw system prompt or caller settings.
  * The caller MUST stop its owned runtime after any uncertain channel failure.
  */
 export function createLocalChatConnection(url, token, onClosed, {
@@ -23,6 +24,7 @@ export function createLocalChatConnection(url, token, onClosed, {
   check(Number.isInteger(turnMs) && turnMs > 0 && turnMs <= 120000);
   let socket; let dead = false; let opening = true; let pending; let current;
   let runtime; let created = false; let prepared = false; let started = false;
+  let contextual = false; let cleared = false;
   let frames = 0; let bytes = 0; let closed = false; let sealing = false; let sealed = false; let closeTimer;
   let resolveOpen; let rejectOpen; let resolveClosed; let resolveFailed;
   const opened = new Promise((resolve, reject) => { resolveOpen = resolve; rejectOpen = reject; });
@@ -148,9 +150,20 @@ export function createLocalChatConnection(url, token, onClosed, {
       return rpc('conversation_messages_list', { conversation_id: conversationId,
         query: { agent_id: agentId, limit: 20, order: 'desc', ...(before === undefined ? {} : { before }) } });
     },
-    async prepareAgent() {
+    async prepareAgent(projection) {
       check(!prepared); prepared = true;
-      await rpc('agent_update', { agent_id: agentId, body: { system: SYSTEM_PROMPT, model, tools: [] } });
+      const system = systemForChatProjection(projection); contextual = system !== SYSTEM_PROMPT;
+      await rpc('agent_update', { agent_id: agentId, body: { system, model, tools: [] } });
+      const agent = await client.readAgent();
+      check(agent?.id === agentId && agent.system === system && agent.model === model
+        && Array.isArray(agent.tools) && agent.tools.length === 0);
+      return agent;
+    },
+    async clearContext() {
+      check(prepared && contextual && !cleared && current?.accepted && current.terminal?.stopReason === 'end_turn'
+        && !current.terminal.error && current.runs.has(current.terminal.runId));
+      cleared = true;
+      await rpc('agent_update', { agent_id: agentId, body: { system: SYSTEM_PROMPT } });
       const agent = await client.readAgent();
       check(agent?.id === agentId && agent.system === SYSTEM_PROMPT && agent.model === model
         && Array.isArray(agent.tools) && agent.tools.length === 0);

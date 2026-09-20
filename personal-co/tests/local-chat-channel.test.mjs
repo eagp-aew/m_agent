@@ -4,6 +4,7 @@ import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { createAuthenticatedAppServer } from '../server/authenticated-app-server.mjs';
 import { SYSTEM_PROMPT } from '../src/domain/policy.mjs';
+import { previewChatContext, compileChatContext, systemForChatProjection } from '../server/local-chat-context.mjs';
 
 const roots = { stateRoot: '/private/tmp/personal-co-wp0051-channel/state' };
 const binding = { agentId: 'agent-1', stateRoot: roots.stateRoot, model: 'lmstudio/test', providerPort: 12345 };
@@ -63,6 +64,37 @@ test('fresh named channel preserves private bearer, two-socket limit, fixed star
   assert.ok(!sent.some(row => row.type === 'ack'));
   assert.ok(!JSON.stringify(chat).includes(f.sockets[1].options.headers.Authorization.slice(7)));
   await chat.close(); const next = await f.connect(); await next.close(); await read.close(); await f.auth.dispose();
+});
+
+test('channel accepts only host-built context, verifies projection and resets protected policy before seal', async () => {
+  const snapshot = { digest: 'a'.repeat(64), memory: { agentId: 'agent-1', revision: 0,
+    blocks: [{ id: 'block-1', label: 'CURRENT_CONTEXT', value: 'Untrusted selected excerpt' }], archive: [] } };
+  const preview = previewChatContext(snapshot, 'agent-1');
+  const projection = compileChatContext(snapshot, 'agent-1', { revision: 0, digest: snapshot.digest, items: [preview.items[0].id] });
+  let system = SYSTEM_PROMPT;
+  const f = await fixture((peer, request) => {
+    if (request.type === 'agent_update') system = request.body.system;
+    if (request.type === 'agent_retrieve') {
+      peer.emitFrame({ type: 'agent_retrieve_response', request_id: request.request_id, success: true,
+        agent: { id: 'agent-1', system, model: binding.model, tools: [] } }); return false;
+    }
+  });
+  try {
+    const chat = await f.connect(); await chat.prepareAgent(projection); assert.equal(system, systemForChatProjection(projection));
+    await assert.rejects(chat.clearContext()); await chat.start('conv-1'); await chat.input(randomUUID(), 'original');
+    await chat.clearContext(); assert.equal(system, SYSTEM_PROMPT); await assert.rejects(chat.clearContext());
+    await chat.seal(); chat.assertSealed();
+    assert.deepEqual(f.sockets[0].sent.filter(row => row.type === 'agent_update').map(row => row.body), [
+      { system: systemForChatProjection(projection), model: binding.model, tools: [] }, { system: SYSTEM_PROMPT },
+    ]);
+  } finally { await f.auth.dispose(); }
+  for (const value of ['raw prompt', { system: 'raw prompt' }, { ...projection }]) {
+    const bad = await fixture();
+    try {
+      const chat = await bad.connect(); await assert.rejects(chat.prepareAgent(value));
+      assert.ok(!bad.sockets[0].sent.some(row => row.type === 'agent_update'));
+    } finally { await bad.auth.dispose(); }
+  }
 });
 
 test('acceptance before terminal and run mapping also correlates', async () => {
