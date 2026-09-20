@@ -67,6 +67,16 @@ The browser host always forces `retainedOnly: true`. Only conversations tagged `
 
 Only `POST /api/local/status`, `/api/local/conversations` and `/api/local/messages` exist. Exact Host/Origin, header bearer, body/response limits and finite concurrency apply; no CORS, arbitrary RPC, browser-supplied paths or native credentials. The CSP permits self-hosted scripts/connections and the inline styles required by React Native Web, not inline scripts or frames. Static serving excludes source maps, dotfiles, metadata and path/link escapes. Limits: four concurrent HTTP requests, one active read and at most three waiting deliveries (canceled waiters never dispatch), 32 sockets, 4 KiB request body, 2 MiB response, 8 MiB asset, 10-second request and cleanup-reporting bounds; the underlying reader also retains its finite cursor/raw-row budgets. The host/module locks are cooperative and this is not production deployment.
 
+## Native governed-turn compatibility probe (not browser sending)
+
+`server/probe-local-chat-turn.mjs` is an import-side-effect-free, synthetic-only prerequisite for the future local chat path. Its guarded test is disabled by default (`WP0050_RUN_NATIVE=0`). Actual execution requires an independent review of the exact source/transitive digest and the explicit command in the WP0050 implementer report; do not enable it as an ordinary test or use real histories/provider credentials.
+
+The probe owns fresh retained private `/private/tmp/personal-co-wp0050-*` state, one local deterministic SSE provider and at most one native runtime at a time. It reuses the pinned sandbox, adding only its exact owned loopback provider port and `LMSTUDIO_BASE_URL`. It initializes the real six-block canonical store, derives bounded labelled context into the same native Agent's system/model, creates one intent-tagged retained conversation, and applies strict empty-tool/skill controls plus local-project reflection-off. Native MemFS remains enabled; the system/compiled prompt is a derived sensitive cache, not another source of memory truth.
+
+Acceptance is not completion: the probe requires matching input/run/terminal evidence, persisted exact user/assistant rows and unchanged canonical bytes. It deliberately measures same-runtime client-ID suppression and cross-restart duplicate persistence with synthetic IDs only; native in-memory dedupe is **not durable exactly-once delivery**. Its malicious synthetic tool call targets only an owned sandbox-writable canary; refusal requires an error tool result and unchanged canary/canonical bytes. Provider failures, unauthorized controls, timeout, socket loss or uncertain cleanup stop the journey without replay or weakened controls. No actual model output or teaching quality is measured.
+
+Limits include a 90-second journey cancellation deadline, 15-second acquisition/turn bounds, 5-second request bound, finite frame/byte/provider budgets and bounded cleanup reporting. Late acquisitions attempt their owned cleanup but retain an uncertainty result; unresolved filesystem IO is not proven canceled. Fixtures are retained, never erased for retry. This does not provide a production turn channel, durable operation receipts, context-retention governance, provider setup or chat UI.
+
 ## Run locally (legacy remote adapter)
 
 Requirements: Node.js 20+ and a reachable Letta server.

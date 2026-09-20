@@ -1,0 +1,63 @@
+task_id: WP-0050-local-conversation-turn
+status: ACCEPTED
+scope_type: implementation
+objective: "Prove the pinned native engine can complete a governed conversation turn using host canonical context, explicit no-tools/reflection controls and a synthetic local provider, before implementing browser writes."
+why: "Source mapping found runtime-derived tools, native MemFS, warmup, in-memory-only input dedupe and incompatible read-stream transport. This prerequisite advances the required real chat path; it does not replace the full assistant/chat UI or claim model quality."
+provenance: {created_at: "2026-09-19", created_by: codex-master, source: ["user:按照最新的开发要求完成assistant的开发", "user:后面所有东西都不需要我授权", "WP0049:03766465eb274fc882a704abe2584ac93955f891", ".ai/AGENT_REPORTS/WP-0050-explorer.md"], trust_level: repo_controlled}
+context_profile: full
+risk_class: native_chat_runtime_provider_context_privacy_probe
+fallback_verification: {allowed: false, reason: "Independent security review before actual native execution and final independent corroboration.", high_risk_requires_independent_verifier: true, allowed_evidence_type: VERIFIER_REPORT}
+execution_budget: {max_steps: 48, max_tool_calls: 280, trace_path: .ai/AGENT_REPORTS/WP-0050-verifier.md, cancellation: {owner: master, condition: "Unreviewed native/model execution, private credentials/data, provider spend, unowned endpoint, unexpected writes, deletion or budget exhaustion."}}
+budget_adjustment: "Master bounded extension before fix2/reverification: two independently diagnosed, distinct native-oracle defects require source-grounded repairs and renewed safety review. No scope expansion or repeated blind replay; preserve unchanged evidence and stop on budget exhaustion."
+module_outputs:
+  intake: "Previous turn PROGRESS: WP0049 delivered/remote verified. Full goal active; provider preference asked asynchronously, not a blocker for synthetic proof."
+  scope: "Three product/probe/test/docs paths only; one bounded native proof, no browser writes, dependency changes or production sandbox relaxation."
+  context: "Pinned0.32.5 mapping shows explicit tool filters/reflection scope and terminal+persistence correlation required; reuse existing sandbox/process/bootstrap/store."
+  routing: "One exact-file local implementer, no parallel writers/children. Source paths clean; main owns memory and safety review. Independent verifier before one guarded native journey."
+  verification: "Native-off synthetic protocol/provider/cleanup tests then frozen independent source/security review; main executes one native proof and reviewer corroborates artifacts/cleanup without replay."
+  integration: "Three verified product paths plus WP/reports only. Five mixed historical memory paths local; preserve all unrelated changes."
+  memory: "Record proven chat constraints and exact next production integration, especially durable receipt and derived context retention; no full-chat/provider-quality claim."
+allowed_files:
+  - personal-co/server/probe-local-chat-turn.mjs
+  - personal-co/tests/local-chat-turn-probe.test.mjs
+  - personal-co/README.md
+  - .ai/WORK_PACKAGES/WP-0050-local-conversation-turn.yaml
+  - .ai/AGENT_REPORTS/WP-0050-explorer.md
+  - .ai/AGENT_REPORTS/WP-0050-implementer.md
+  - .ai/AGENT_REPORTS/WP-0050-verifier.md
+  - .ai/AGENT_REPORTS/WP-0050-runtime.md
+  - .ai/AGENT_REPORTS/WP-0050-fixer.md
+  - .ai/PROJECT_STATE.md
+  - .ai/TASK_QUEUE.yaml
+  - .ai/MASTER_LEDGER.yaml
+  - .ai/DECISIONS.md
+  - .ai/INTEGRATION_LOG.md
+forbidden_files: ["All other repo writes; accepted auth/session/sandbox/process/bootstrap/store/codec/policy/browser/manifests untouched. No old states, real credentials/data, provider spending, broad network/home grants, global/local package installation, arbitrary caller-controlled RPC/proxy/native tools, deletion or batch cleanup."]
+generated_outputs: "Fresh private synthetic fixture under /private/tmp/personal-co-wp0050-* retained. Only exact existing reviewed dependency install read-only. Programmatic synthetic fixture files permitted; no manual shell writes. No existing runtime or user data."
+inputs: [.ai/AGENT_REPORTS/WP-0050-explorer.md, personal-co/server/runtime-sandbox.mjs, personal-co/server/runtime-process.mjs, personal-co/server/assistant-bootstrap.mjs, personal-co/server/canonical-memory-store.mjs, personal-co/server/authenticated-app-server.mjs]
+human_approval_required: false
+repair3_execution: "2026-09-19 continuation: previous turn PROGRESS; existing code/failure state revalidated. Assign sole fixer wp0046_fixer for next_repair_plan below, exact probe/tests/ownreport only, max40calls/10steps. Standing authorization explicitly covers third bounded repair. Complete source/lifecycle diagnosis already persisted; independent review required before fresh native."
+acceptance_record: "Final independent AC1-AC6 PASS,44controlled/32related/24eventorders/typecheck; actual reviewed native1/1 and finalartifact/policy/cleanupcorroboration PASS. Preaccept PASS after1mastermetadata correction. Threeproductrepairs understandingauthorization; previous3nativefails retained. AC7 memory/queue updated, scopedGitdelivery next; no fullassistant/modelquality/productionclaim."
+closure_record: "DONE audit additionally required2 accepted-table rows; second master metadata-only correction, totalfix5=3product+2metadata. Product freeze unchanged; no new native/suite replay. Final audit and scopedGit next."
+approval_note: "Standing authorization covers this named offline synthetic chat/security probe and verified Git delivery. Native execution only after frozen independent PASS, no paid/model/provider credentials. Product privacy confirmations not waived."
+repair_scope: "Fix1 TEST_EXPECTATION_BUG: pinned native prepends system-reminder text blocks to persisted user content; exact flattened equality falsely returns zero despite exact user tail and assistant reply. Correct probe oracle and native-shaped controlled fixture/regression only. Preserve exact otid/runtime, sentinel suffix, no canonical in user rows, reply counts, no retry and all safety grants. Fresh native only after renewed independent digest review."
+repair_scope_2: "Fix2 TEST_EXPECTATION_BUG: native LocalBackend runSeq resets each boot and fixed local-run- prefix permits cross-process runId reuse; probe inequality and mock global counter invalid. Model per-boot run IDs, keep per-live-channel correlation and exact persisted duplicate counts; no lifecycle/authority change. Standing authorization, renewed independent freeze review before fresh native."
+next_repair_plan: "Not assigned/executed yet. Third distinct failure IMPLEMENTATION_BUG: input legitimately spans multiple backendruns under one listenerlease. Replace single-run invariant with finite exact-current-client mapped runset and require correlated listenerterminal (either event order), not stream/backend completion. Malicious success must be no-error end_turn plus exact persisted refusal AND final synthetic reply and unchanged canonical/canary. Retain acceptance/request/runtime/client checks, duplicates/conflictingterminal/foreign/stale/unmatched/runsetoverflow regressions, no host retries and provider/frame/deadline bounds. max_turns2 stays configured but is not assumed effective callbound. Same probe/tests/fixer-report only; renewed independent freeze review before any native. Standing authorization covers third repair, but full source diagnosis changes approach after2 repairs, never blind replay."
+acceptance_criteria:
+  - "AC1: New import-side-effect-free bounded probe owns one fresh synthetic fixture/provider/runtime at a time and reuses accepted pin, createRuntimeSandbox, startOwned, bootstrap and canonical store where sufficient. Private separate browser-independent WS authority, only hardcoded needed native commands, no exported raw client/token/logs; no auto retry after ambiguous writes."
+  - "AC2: Bind owned synthetic provider literal127.0.0.1 dynamic port. Derive sandbox spec from unchanged baseline, adding only exact localhost provider-port outbound plus LMSTUDIO_BASE_URL; no other network/home/protected access. Provider serves bounded model discovery and deterministic SSE with fixed model/text; no Authorization credential expected, external forwarding or actual model call. Validate route/body/size/request counts and reject unexpected inference during startup."
+  - "AC3: Use real fresh singleton bootstrap/six-block canonical fixture. Host projects bounded labelled synthetic canonical values plus policy into exact Agent system/model, reads back; native protected path remains denied. Create named retained conversation with recorded unique intent/tag, never resend on ambiguous create. Start exact IDs, strict mode, tools/skills/external tools empty, max_turns2, disable_memory_guard:false, recover_approvals:false/wait_for_replay:true; set and read back reflection-off local_project only. Acknowledge native MemFS remains enabled and system/compiled prompt is derived sensitive cache."
+  - "AC4: One plain-text synthetic input carries stable client_message_id. Correlate accepted/run mapping/terminal by exact runtime and request/client/run IDs; bounded frames/bytes/time, reject foreign/malformed/unsolicited authority. Only report reply success after terminal AND persisted exact user/assistant readback, canonical bytes unchanged, snapshot present in provider system context and not user-history rows. Approval/control requests never authorize tool execution. Dropped/timeout/aborted ambiguous outcomes must not automatically resend."
+  - "AC5: Controlled tests cover acceptance-before-completion, ordering/foreign IDs/duplicates, malformed frames, provider errors/limits, cancellation/socket loss/no retry and cleanup failures. Actual guarded journey proves normal reply plus ordinary restart/readback same Agent/conversation, same-runtime client-ID dedupe versus explicitly measured cross-restart behavior, and malicious synthetic tool-call refusal/canonical protection (no real-data/tool grants). If exact native safety contract fails, record concrete evidence and stop; do not weaken it to pass."
+  - "AC6: Independent frozen source/transitive/build-free security review before native. Native off by default; require exact reviewed SHA256 environment guard over probe/tests/docs plus execution imports. Master runs one opt-in test, records only public IDs/hashes/PIDs/ports/booleans, retains fixtures; independent final corroboration without replay. No live-model quality/production readiness claim."
+  - "AC7: Independent AC mapping, targeted/related validation and preaccept PASS; update project memory/decision/queue, scoped commit/push. Record remaining required production turn channel, durable operation receipts, canonical projection governance, provider setup, UI and full assistant requirements. Stop after verified scope; do not mark overall goal complete."
+validation_commands:
+  - "WP0050_RUN_NATIVE=0 node --test personal-co/tests/local-chat-turn-probe.test.mjs"
+  - "WP0048_RUN_NATIVE=0 node --test personal-co/tests/assistant-bootstrap.test.mjs personal-co/tests/canonical-memory-store.test.mjs personal-co/tests/runtime-sandbox.test.mjs"
+  - "cd personal-co && npm run typecheck"
+  - "git diff --check"
+  - "Frozen independently reviewed exact native command supplied in implementer report; main only, no other native probes/reinstall."
+  - "python3 -B scripts/validate_protocol.py"
+rollback_plan: "Probe opt-in only, existing product paths unchanged except docs. Close only owned resources, retain all synthetic state, no deletion/recovery replay or production changes."
+pre_spawn_checklist: {task: "Bounded synthetic-provider governed native turn proof", why: "Implementation alongside main security/protocol planning", route: "Single implementer then independent verifier", context: "WP/source mapping and narrow reused host modules", writable: "Three exact product paths plus own report", forbidden: "All other writes/native before review/real credentials/network/private data/deletion", output: "Common14 with exact hashes/native command/controlled results", stop: "Scope/safety mismatch/budget/native pressure", verification: "Native-off tests then independent security/native/final corroboration", approval: "Standing authorization, no children"}
+output_required: [task_id, agent_role, status, one_sentence_result, files_read, files_changed, commands_run, tests_run, evidence, risks, assumptions, recommended_next_action, child_agent_requests, child_report_bundle]
