@@ -47,7 +47,7 @@ test('optional chat preserves baseline sandbox exactly except literal loopback p
   const config = captureLocalChatConfig({ model: 'lmstudio/synthetic/model', providerPort: 12345 });
   const derived = deriveLocalChatSandbox(base, config);
   assert.ok(Object.isFrozen(config));
-  assert.equal(derived.profile, `${base.profile}(allow network-outbound (remote ip "127.0.0.1:12345"))\n`
+  assert.equal(derived.profile, `${base.profile}(allow network-outbound (remote tcp "localhost:12345"))\n`
     + `(deny file-read-data (subpath "${roots.stateRoot}/providers"))\n(deny file-write* (subpath "${roots.stateRoot}/providers"))\n`);
   assert.deepEqual(derived.args, ['-p', derived.profile, ...base.args.slice(2)]);
   assert.deepEqual(derived.options, { ...base.options, env: { ...base.options.env, LMSTUDIO_BASE_URL: 'http://127.0.0.1:12345/v1', LETTA_DISABLE_MODS: '1' } });

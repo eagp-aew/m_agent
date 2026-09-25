@@ -6,19 +6,24 @@ const check = (value, code = 'UNCERTAIN') => { if (!value) throw error(code); };
 const entity = value => typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.exec(value)?.[0] === value && value !== 'default';
 const messageId = value => typeof value === 'string' && value !== 'default'
   && /^[A-Za-z0-9][A-Za-z0-9_-]{0,127}(?::(?:assistant|reasoning):(?:0|[1-9][0-9]{0,5})|:tool:[^\x00-\x1f\x7f\u2028\u2029]{1,128}:request)?$/.exec(value)?.[0] === value;
-const emptySettings = value => value === undefined || value === null
-  || (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0);
-function safeAgent(agent, agentId) {
-  check(agent?.id === agentId && Array.isArray(agent.tags) && agent.tags.includes('personal-co-v1'));
-  check(emptySettings(agent.model_settings), 'PREDISPATCH');
+function nativeSettings(value, defaults) {
+  if (value === undefined || value === null) return true;
+  if (typeof value !== 'object' || Array.isArray(value)) return false;
+  const keys = Object.keys(value);
+  return keys.length === 0 || (keys.length === 1 && keys[0] === 'provider_type' && value.provider_type === defaults.provider_type)
+    || isDeepStrictEqual(value, defaults);
 }
-function ownConversation(row, agentId, model, expectedId) {
+function safeAgent(agent, agentId, defaults) {
+  check(agent?.id === agentId && Array.isArray(agent.tags) && agent.tags.includes('personal-co-v1'));
+  check(nativeSettings(agent.model_settings, defaults), 'PREDISPATCH');
+}
+function ownConversation(row, agentId, model, expectedId, defaults) {
   check(entity(row?.id) && (!expectedId || row.id === expectedId) && row.agent_id === agentId
     && (row.hidden === undefined || row.hidden === false) && Array.isArray(row.tags)
     && row.tags.length <= 32 && row.tags.every(tag => typeof tag === 'string' && tag.length <= 256)
     && row.tags.includes('personal-co-retained-v1') && !row.tags.includes('privacy:temporary')
     && !row.tags.includes('privacy:excluded'), 'PREDISPATCH');
-  check(row.model === model && emptySettings(row.model_settings), 'PREDISPATCH');
+  check(row.model === model && nativeSettings(row.model_settings, defaults), 'PREDISPATCH');
   return row;
 }
 function page(response, agentId, conversationId) {
@@ -117,23 +122,24 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
       alive(); channel = await connect();
       void channel.failed.then(stopOwner);
       alive(channel);
+      const defaults = await channel.readModelDefaults(); alive(channel);
       if (recovery) {
         const rows = await channel.listConversations();
         check(Array.isArray(rows) && rows.length < 100 && rows.every(row => row?.agent_id === agentId && entity(row.id))
           && new Set(rows.map(row => row.id)).size === rows.length);
         const found = rows.filter(row => Array.isArray(row.tags) && row.tags.includes(operationTag));
         check(found.length === 1);
-        const row = ownConversation(await channel.readConversation(found[0].id), agentId, model, found[0].id);
+        const row = ownConversation(await channel.readConversation(found[0].id), agentId, model, found[0].id, defaults);
         check(row.summary === request.title && row.tags.length === 2 && row.tags.includes(operationTag));
         alive(channel); await channel.seal(); alive(); channel.assertSealed();
         store.completeCreate({ operationId, conversationId: row.id, operationTag }); completed = true;
         return;
       }
-      const agent = await channel.readAgent(); safeAgent(agent, agentId);
+      const agent = await channel.readAgent(); safeAgent(agent, agentId, defaults);
       let baseline;
       if (request.kind === 'send') {
         check(agent.model === model, 'PREDISPATCH');
-        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId);
+        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId, defaults);
         const response = await channel.history(request.conversationId);
         const rows = page(response, agentId, request.conversationId);
         baseline = rows[0] ?? null;
@@ -141,17 +147,17 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
         check(!rows.some(row => row.otid === operationId));
       }
       alive(); mutated = true;
-      safeAgent(await channel.prepareAgent(projection), agentId);
+      safeAgent(await channel.prepareAgent(projection), agentId, defaults);
       alive();
       if (request.kind === 'create') {
         const created = await channel.createConversation(request.title, operationTag);
         check(entity(created?.id));
-        const row = ownConversation(await channel.readConversation(created.id), agentId, model, created.id);
+        const row = ownConversation(await channel.readConversation(created.id), agentId, model, created.id, defaults);
         check(row.summary === request.title && row.tags.length === 2 && row.tags.includes(operationTag));
         alive(channel); await channel.seal(); alive(); channel.assertSealed();
         store.completeCreate({ operationId, conversationId: row.id, operationTag });
       } else {
-        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId);
+        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId, defaults);
         alive();
         await channel.start(request.conversationId);
         alive();
@@ -163,7 +169,7 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
           throw error('UNCERTAIN');
         }
         const rows = await interval(channel, request.conversationId, baseline);
-        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId);
+        ownConversation(await channel.readConversation(request.conversationId), agentId, model, request.conversationId, defaults);
         const users = rows.filter(row => row.message_type === 'user_message');
         check(users.length === 1 && users[0].otid === operationId && originalUser(users[0].content, request.text));
         visibleText(users[0]);
@@ -173,7 +179,7 @@ export function createLocalChatOperations({ store, connect, readMemory, agentId,
         check(replies.length >= 1 && replies.length <= 64 && replies.every(row => rows.indexOf(row) > userIndex)
           && replies.every(row => visibleText(row).length > 0)
           && rows.filter(row => row.otid === operationId).length === 1);
-        if (projection !== undefined) { alive(channel); safeAgent(await channel.clearContext(), agentId); }
+        if (projection !== undefined) { alive(channel); safeAgent(await channel.clearContext(), agentId, defaults); }
         alive(channel); await channel.seal(); alive(); channel.assertSealed();
         store.completeSend({ operationId, conversationId: request.conversationId,
           userMessageId: users[0].id, assistantMessageIds: replies.map(row => row.id) });

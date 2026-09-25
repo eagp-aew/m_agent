@@ -24,7 +24,7 @@ export function createLocalChatConnection(url, token, onClosed, {
   check(Number.isInteger(turnMs) && turnMs > 0 && turnMs <= 120000);
   let socket; let dead = false; let opening = true; let pending; let current;
   let runtime; let created = false; let prepared = false; let started = false;
-  let contextual = false; let cleared = false;
+  let contextual = false; let cleared = false; let defaultsRead = false;
   let frames = 0; let bytes = 0; let closed = false; let sealing = false; let sealed = false; let closeTimer;
   let resolveOpen; let rejectOpen; let resolveClosed; let resolveFailed;
   const opened = new Promise((resolve, reject) => { resolveOpen = resolve; rejectOpen = reject; });
@@ -137,6 +137,36 @@ export function createLocalChatConnection(url, token, onClosed, {
       check(info.backend === 'local' && info.letta_code_version === RUNTIME_PIN.version && info.protocol_version === 1
         && info.capabilities?.agent_management === true && info.capabilities?.conversation_management === true
         && info.capabilities?.runtime_start === true);
+    },
+    async readModelDefaults() {
+      check(!defaultsRead && !prepared && !created && !started); defaultsRead = true;
+      const admit = value => { if (!value) throw Object.assign(error(), { code: 'PREDISPATCH' }); };
+      const handle = value => typeof value === 'string' && value.length > 0 && value.length <= 256;
+      let refreshed;
+      // The pinned headless runtime can return mixed availability/catalog state
+      // during forced discovery. Await its full refresh barrier before reading
+      // the settled snapshot. Invalid refresh evidence must never fall back to cache.
+      for (const force of [true, false]) {
+        const result = await rpc('list_models', { force });
+        admit(Array.isArray(result.entries) && result.entries.length <= 512
+          && result.entries.every(entry => object(entry) && handle(entry.handle))
+          && Array.isArray(result.available_handles) && result.available_handles.length <= 512
+          && result.available_handles.every(handle) && (force || result.available_handles.includes(model)));
+        const matches = result.entries.filter(entry => entry.handle === model); admit(matches.length > 0);
+        let defaults;
+        for (const entry of matches) {
+          const args = entry.updateArgs;
+          admit(object(args) && args.provider_type === 'lmstudio_openai'
+            && Number.isInteger(args.context_window) && args.context_window > 0 && args.context_window <= 128000
+            && args.max_output_tokens === Math.min(32000, args.context_window));
+          const projected = { provider_type: args.provider_type, context_window_limit: args.context_window, max_tokens: args.max_output_tokens };
+          admit(defaults === undefined || isDeepStrictEqual(defaults, projected)); defaults = projected;
+        }
+        if (force) refreshed = defaults;
+        else admit(isDeepStrictEqual(refreshed, defaults));
+      }
+      // Catalog reasoning/tool options are not settings or write-body authority.
+      return Object.freeze(refreshed);
     },
     async readAgent() { return (await rpc('agent_retrieve', { agent_id: agentId })).agent; },
     async readConversation(conversationId) {

@@ -22,12 +22,17 @@ const create = () => ({ kind: 'create', operationId: randomUUID(), title: 'Retai
 const send = (conversationId = 'conv-1') => ({ kind: 'send', operationId: randomUUID(), conversationId, text: 'Original private user text' });
 const digest = value => createHash('sha256').update(value).digest('hex');
 
-async function fixture(t, initialMode = 'normal', project = () => {}) {
+async function fixture(t, initialMode = 'normal', project = () => {}, contextWindow = 128000) {
   const root = await fs.realpath(await fs.mkdtemp('/private/tmp/personal-co-wp0051-composed-'));
   const roots = { dependencyRoot: '/private/tmp/synthetic-install/node_modules', stateRoot: path.join(root, 'state'), protectedRoot: path.join(root, 'protected') };
   await fs.mkdir(roots.stateRoot, { mode: 0o700 }); await fs.mkdir(roots.protectedRoot, { mode: 0o700 });
   let agent; let mode = initialMode; let stopCount = 0; let inputs = 0; let chatSockets = 0; let baselineRead = false;
   let expectedSystem = SYSTEM_PROMPT; let lastInputId;
+  const defaults = { provider_type: 'lmstudio_openai', context_window_limit: contextWindow, max_tokens: Math.min(32000, contextWindow) };
+  let catalog = { available_handles: [model], entries: [{ handle: model, updateArgs: { provider_type: defaults.provider_type,
+    context_window: contextWindow, max_output_tokens: defaults.max_tokens, parallel_tool_calls: true, reasoning_effort: 'high' } }] };
+  let settingsChange = () => {};
+  let catalogRead;
   const conversations = []; const history = []; const requests = []; const authDigests = [];
   let session;
   const server = createServer(); const wss = new WebSocketServer({ noServer: true });
@@ -38,13 +43,18 @@ async function fixture(t, initialMode = 'normal', project = () => {}) {
   const info = { backend: 'local', letta_code_version: '0.32.5', protocol_version: 1,
     capabilities: { agent_management: true, conversation_management: true, memory_management: true, runtime_start: true, split_channels: false } };
   wss.on('connection', peer => {
-    let runtime;
+    let runtime; let catalogReads = 0;
     const emit = frame => { if (peer.readyState === 1) peer.send(JSON.stringify(frame)); };
     peer.on('message', bytes => {
       const request = JSON.parse(bytes.toString()); requests.push(request);
       let result = {};
       if (request.type === 'app_server_info') result = info;
-      else if (request.type === 'agent_create') { agent = { id: agentId, ...request.body, model: 'unselected', model_settings: {} }; result = { agent }; }
+      else if (request.type === 'list_models') {
+        assert.ok(++catalogReads <= 2); assert.equal(request.force, catalogReads === 1);
+        if (catalogRead) { if (catalogRead(request, emit, peer) === false) return; }
+        result = catalog;
+      }
+      else if (request.type === 'agent_create') { agent = { id: agentId, ...request.body, model: 'local/default', model_settings: { provider_type: 'lmstudio_openai' } }; result = { agent }; }
       else if (request.type === 'agent_list') result = { agents: agent ? [agent] : [] };
       else if (request.type === 'agent_retrieve') result = { agent };
       else if (request.type === 'agent_update') {
@@ -55,13 +65,18 @@ async function fixture(t, initialMode = 'normal', project = () => {}) {
           if (['reset-lost', 'reset-hold'].includes(mode)) return;
         }
         Object.assign(agent, request.body);
+        agent.model_settings = { ...defaults }; settingsChange(resetting ? 'reset' : 'prepare', agent);
         if (resetting && mode === 'reset-mismatch') agent.system = 'PRIVATE_INVALID_RESET';
         result = { agent };
       }
       else if (request.type === 'conversation_create') {
-        const row = { id: `conv-${conversations.length + 1}`, ...request.body }; conversations.push(row); result = { conversation: row };
+        const row = { id: `conv-${conversations.length + 1}`, ...request.body, model_settings: { provider_type: 'lmstudio_openai' } };
+        settingsChange('create', row); conversations.push(row); result = { conversation: row };
         if (mode === 'lost-create') return;
-      } else if (request.type === 'conversation_retrieve') result = { conversation: conversations.find(row => row.id === request.conversation_id) };
+      } else if (request.type === 'conversation_retrieve') {
+        const row = conversations.find(row => row.id === request.conversation_id);
+        settingsChange(runtime ? 'posthistory' : 'conversation', row); result = { conversation: row };
+      }
       else if (request.type === 'conversation_list') result = { conversations };
       else if (request.type === 'conversation_messages_list') {
         if (!runtime) baselineRead = true;
@@ -133,6 +148,9 @@ async function fixture(t, initialMode = 'normal', project = () => {}) {
   });
   t.diagnostic(`Retained synthetic fixture: ${root}`);
   return { boot, roots, history, conversations, requests, authDigests,
+    defaults, get catalog() { return catalog; }, set catalog(value) { catalog = value; },
+    set settingsChange(value) { settingsChange = value; },
+    set catalogRead(value) { catalogRead = value; },
     get agent() { return agent; }, get inputs() { return inputs; }, get stops() { return stopCount; }, get sockets() { return chatSockets; },
     set expectedSystem(value) { expectedSystem = value; },
     set mode(value) { mode = value; } };
@@ -232,6 +250,162 @@ async function contextFixture(f, session) {
   f.expectedSystem = systemForChatProjection(compileChatContext({ memory, digest: preview.digest }, agentId, context));
   return { file, memory, preview, context };
 }
+
+for (const contextWindow of [128000, 8192]) test(`native defaults ${contextWindow} survive create selected reset contextless and reopen`, async t => {
+  const f = await fixture(t, 'normal', () => {}, contextWindow); let session = f.boot(); await session.ready;
+  assert.equal(f.agent.model, 'local/default'); assert.deepEqual(f.agent.model_settings, { provider_type: 'lmstudio_openai' });
+  await created(session); assert.deepEqual(f.agent.model_settings, f.defaults);
+  assert.deepEqual(f.conversations[0].model_settings, { provider_type: 'lmstudio_openai' });
+  const { context } = await contextFixture(f, session); const selected = { ...send(), context };
+  session.chat.submit(selected); assert.equal((await settled(session, selected.operationId)).status, 'completed');
+  assert.equal(f.agent.system, SYSTEM_PROMPT); assert.deepEqual(f.agent.model_settings, f.defaults);
+  f.conversations[0].model_settings = { ...f.defaults };
+  f.expectedSystem = SYSTEM_PROMPT; const plain = send(); session.chat.submit(plain);
+  assert.equal((await settled(session, plain.operationId)).status, 'completed');
+  assert.equal(f.requests.filter(row => row.type === 'list_models').length, 6);
+  const firstCatalog = f.requests.findIndex(row => row.type === 'list_models');
+  assert.ok(firstCatalog < f.requests.findIndex(row => row.type === 'agent_update'));
+  assert.ok(f.requests.filter(row => row.type === 'agent_update' || row.type === 'conversation_create').every(row =>
+    !Object.hasOwn(row.body, 'model_settings') && !Object.hasOwn(row.body, 'updateArgs') && !Object.hasOwn(row.body, 'parallel_tool_calls')));
+  await session.close(); session = f.boot(); await session.ready;
+  assert.equal(session.chat.submit(selected).status, 'completed'); assert.equal(f.inputs, 2);
+  assert.equal(f.requests.filter(row => row.type === 'list_models').length, 6);
+  const next = send(); session.chat.submit(next); assert.equal((await settled(session, next.operationId)).status, 'completed');
+  assert.equal(f.requests.filter(row => row.type === 'list_models').length, 8); assert.equal(f.stops, 1);
+});
+
+for (const owner of ['agent', 'conversation']) test(`native settings reject ${owner} overrides before mutation and never redispatch failed UUIDs`, async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready; await created(session);
+  const row = owner === 'agent' ? f.agent : f.conversations[0];
+  const invalid = [false, [], 'lmstudio_openai', { provider_type: 'openai' },
+    { provider_type: 'lmstudio_openai', max_tokens: 32000 }, { context_window_limit: 128000, max_tokens: 32000 },
+    { ...f.defaults, temperature: 0 }, { ...f.defaults, headers: {} }, { ...f.defaults, parallel_tool_calls: false },
+    { ...f.defaults, context_window_limit: 8192, max_tokens: 8192 }, { ...f.defaults, max_tokens: 8192 },
+    { ...f.defaults, context_window_limit: 128000.5 }, { ...f.defaults, max_tokens: '32000' }];
+  for (const value of invalid) {
+    row.model_settings = value;
+    const mutations = f.requests.filter(request => request.type === 'agent_update').length;
+    const request = send(); session.chat.submit(request); const result = await settled(session, request.operationId);
+    assert.equal(result.status, 'failed'); assert.equal(result.failure, 'predispatch_rejected');
+    assert.equal(f.requests.filter(request => request.type === 'agent_update').length, mutations);
+    const count = f.requests.length; row.model_settings = { ...f.defaults };
+    assert.equal(session.chat.submit(request).status, 'failed'); await tick(); assert.equal(f.requests.length, count);
+  }
+  assert.equal(f.inputs, 0); assert.equal(f.stops, 0); assert.equal(session.status().phase, 'ready');
+});
+
+test('absent null empty and singleton native settings remain admitted', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready; await created(session);
+  for (const value of [undefined, null, {}, { provider_type: 'lmstudio_openai' }]) {
+    f.agent.model_settings = value; f.conversations[0].model_settings = value;
+    const request = send(); session.chat.submit(request); assert.equal((await settled(session, request.operationId)).status, 'completed');
+  }
+  assert.equal(f.inputs, 4); assert.equal(f.stops, 0);
+});
+
+test('cold managed catalog waits for settled admission before mutation or completion', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready;
+  const pending = [];
+  f.catalogRead = (request, emit) => {
+    pending.push(() => emit({ type: 'list_models_response', request_id: request.request_id, success: true,
+      ...f.catalog, ...(request.force ? { available_handles: [] } : {}) })); return false;
+  };
+  const request = create(); session.chat.submit(request);
+  for (let count = 0; count < 30 && pending.length < 1; count++) await tick();
+  assert.equal(pending.length, 1); await tick();
+  assert.equal(session.chat.get(request.operationId).status, 'unknown');
+  assert.ok(!f.requests.some(row => row.type === 'agent_update'));
+  pending[0]();
+  for (let count = 0; count < 30 && pending.length < 2; count++) await tick();
+  assert.equal(pending.length, 2); await tick();
+  assert.equal(session.chat.get(request.operationId).status, 'unknown');
+  assert.ok(!f.requests.some(row => row.type === 'agent_update'));
+  pending[1](); assert.equal((await settled(session, request.operationId)).status, 'completed');
+  const count = f.requests.length; assert.equal(session.chat.submit(request).status, 'completed'); await tick();
+  assert.equal(f.requests.length, count);
+});
+
+for (const force of [true, false]) for (const fault of ['transport', 'timeout', 'abort']) {
+  test(`managed catalog ${fault} at force=${force} stops owner and cannot replay UUID`, async t => {
+    const f = await fixture(t); const session = f.boot(); await session.ready;
+    let reached = false;
+    f.catalogRead = (request, _emit, peer) => {
+      if (request.force !== force) return;
+      reached = true;
+      if (fault === 'transport') peer.terminate();
+      return false;
+    };
+    const request = create(); session.chat.submit(request);
+    for (let count = 0; count < 30 && !reached; count++) await tick();
+    assert.equal(reached, true);
+    if (fault === 'abort') await session.close();
+    assert.equal((await session.terminal).cleanup.confirmed, true); assert.equal(f.stops, 1);
+    assert.equal(f.requests.filter(row => row.type === 'list_models').length, force ? 1 : 2);
+    assert.ok(!f.requests.some(row => ['agent_update', 'conversation_create', 'input'].includes(row.type)));
+    const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+    try { assert.equal(store.get(request.operationId).status, 'unknown'); assert.equal(store.reserve(request).dispatchAllowed, false); }
+    finally { store.close(); }
+  });
+}
+
+test('missing malformed or conflicting catalog stays predispatch failed without repeated discovery', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready; const original = structuredClone(f.catalog);
+  for (const mutate of [value => { value.available_handles = []; }, value => { delete value.entries[0].updateArgs.context_window; },
+    value => { value.entries.push({ ...value.entries[0], updateArgs: { provider_type: 'lmstudio_openai', context_window: 8192, max_output_tokens: 8192 } }); }]) {
+    f.catalog = structuredClone(original); mutate(f.catalog);
+    const request = create(); session.chat.submit(request); const result = await settled(session, request.operationId);
+    assert.equal(result.status, 'failed'); assert.equal(result.failure, 'predispatch_rejected');
+    const count = f.requests.length; f.catalog = structuredClone(original);
+    assert.equal(session.chat.submit(request).status, 'failed'); await tick(); assert.equal(f.requests.length, count);
+  }
+  assert.ok(!f.requests.some(request => ['agent_update', 'conversation_create', 'input'].includes(request.type)));
+  assert.equal(f.requests.filter(request => request.type === 'list_models').length, 4);
+  assert.equal(f.stops, 0); await created(session);
+});
+
+for (const phase of ['prepare', 'create', 'posthistory', 'reset']) test(`native settings tamper at ${phase} stays unknown and stops after mutation`, async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready;
+  let request;
+  if (['posthistory', 'reset'].includes(phase)) {
+    await created(session); request = send();
+    if (phase === 'reset') request.context = (await contextFixture(f, session)).context;
+  } else request = create();
+  f.settingsChange = (at, row) => { if (at === phase) row.model_settings = { ...f.defaults, max_tokens: 8192 }; };
+  session.chat.submit(request); assert.equal((await session.terminal).cleanup.confirmed, true); assert.equal(f.stops, 1);
+  assert.equal(f.inputs, ['posthistory', 'reset'].includes(phase) ? 1 : 0);
+  const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+  try { assert.equal(store.get(request.operationId).status, 'unknown'); assert.equal(store.reserve(request).dispatchAllowed, false); }
+  finally { store.close(); }
+});
+
+test('catalog snapshot is frozen through posthistory rather than refreshed to accept changed settings', async t => {
+  const f = await fixture(t); const session = f.boot(); await session.ready; await created(session);
+  f.settingsChange = (at, row) => {
+    if (at !== 'posthistory') return;
+    f.catalog.entries[0].updateArgs.context_window = 8192; f.catalog.entries[0].updateArgs.max_output_tokens = 8192;
+    row.model_settings = { provider_type: 'lmstudio_openai', context_window_limit: 8192, max_tokens: 8192 };
+  };
+  const request = send(); session.chat.submit(request); assert.equal((await session.terminal).cleanup.confirmed, true);
+  assert.equal(f.requests.filter(row => row.type === 'list_models').length, 4); assert.equal(f.inputs, 1);
+  const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+  try { assert.equal(store.get(request.operationId).status, 'unknown'); } finally { store.close(); }
+});
+
+for (const tampered of [false, true]) test(`native hot defaults recovery uses one two-phase catalog without creation (${tampered})`, async t => {
+  const f = await fixture(t, 'lost-create', () => {}, 8192); let session = f.boot(); await session.ready;
+  const request = create(); session.chat.submit(request); await session.terminal;
+  f.conversations[0].model_settings = { ...f.defaults, ...(tampered ? { max_tokens: 4096 } : {}) };
+  f.mode = 'normal'; session = f.boot(); await session.ready;
+  const before = f.requests.length; session.chat.recoverCreate(request.operationId);
+  if (tampered) {
+    assert.equal((await session.terminal).cleanup.confirmed, true);
+    const store = openChatOperationStore({ directory: f.roots.protectedRoot, agentId });
+    try { assert.equal(store.get(request.operationId).status, 'unknown'); } finally { store.close(); }
+  } else assert.equal((await settled(session, request.operationId)).status, 'completed');
+  const recovery = f.requests.slice(before); assert.deepEqual(recovery.filter(row => row.type === 'list_models').map(row => row.force), [true, false]);
+  assert.ok(recovery.findIndex(row => row.type === 'list_models') < recovery.findIndex(row => row.type === 'conversation_list'));
+  assert.equal(f.requests.filter(row => row.type === 'conversation_create').length, 1); assert.equal(f.inputs, 0);
+});
 
 test('managed explicit context reads canonical preview, projects selected evidence only, resets before completion and preserves receipt identity', async t => {
   const f = await fixture(t); let session = f.boot(); await session.ready; await created(session);

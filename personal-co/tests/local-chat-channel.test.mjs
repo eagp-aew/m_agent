@@ -11,6 +11,9 @@ const binding = { agentId: 'agent-1', stateRoot: roots.stateRoot, model: 'lmstud
 const runtime = { agent_id: 'agent-1', conversation_id: 'conv-1' };
 const info = { backend: 'local', letta_code_version: '0.32.5', protocol_version: 1,
   capabilities: { agent_management: true, conversation_management: true, memory_management: true, runtime_start: true, split_channels: false } };
+const catalog = (context = 128000) => ({ available_handles: [binding.model], entries: [{ handle: binding.model,
+  updateArgs: { provider_type: 'lmstudio_openai', context_window: context, max_output_tokens: Math.min(32000, context),
+    parallel_tool_calls: true, reasoning_effort: 'none' } }] });
 async function fixture(change = () => {}, limits = {}) {
   const sockets = [];
   class Peer extends EventEmitter {
@@ -25,7 +28,7 @@ async function fixture(change = () => {}, limits = {}) {
       const request = JSON.parse(payload); this.sent.push(request); callback?.();
       queueMicrotask(() => {
         if (change(this, request) === false) return;
-        let value = request.type === 'app_server_info' ? info
+        let value = request.type === 'list_models' ? catalog() : request.type === 'app_server_info' ? info
           : request.type === 'runtime_start' ? { runtime, execution_settings: request.execution_settings, created: { agent: false, conversation: false } }
             : request.type === 'set_reflection_settings' ? { scope: 'local_project' }
               : request.type === 'get_reflection_settings' ? { reflection_settings: { agent_id: 'agent-1', trigger: 'off', step_count: 25, merge: 'explicit' } }
@@ -41,7 +44,118 @@ async function fixture(change = () => {}, limits = {}) {
   }
   const auth = await createAuthenticatedAppServer(roots, { makeSandbox: async () => ({ args: [], options: {} }),
     WebSocketImpl: Peer, requestMs: 30, handshakeMs: 30, turnMs: 30, ...limits });
-  return { auth, sockets, connect: () => auth.connectChat('ws://127.0.0.1:12345/ws', binding) };
+  return { auth, sockets, connect: options => auth.connectChat('ws://127.0.0.1:12345/ws', binding, options) };
+}
+
+test('cold catalog waits for both ordered responses before mutation', async () => {
+  const pending = [];
+  const f = await fixture((peer, request) => {
+    if (request.type !== 'list_models') return;
+    pending.push(() => peer.emitFrame({ type: 'list_models_response', request_id: request.request_id,
+      success: true, ...catalog(), ...(request.force ? { available_handles: [] } : {}) })); return false;
+  }, { requestMs: 1000 });
+  try {
+    const chat = await f.connect(); let completed = false;
+    const reading = chat.readModelDefaults(); void reading.catch(() => {});
+    const preparing = reading.then(async defaults => { completed = true; await chat.prepareAgent(); return defaults; });
+    void preparing.catch(() => {});
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(pending.length, 1); assert.equal(completed, false);
+    assert.ok(!f.sockets[0].sent.some(row => row.type === 'agent_update'));
+    pending[0](); await new Promise(resolve => setImmediate(resolve));
+    assert.equal(pending.length, 2); assert.equal(completed, false);
+    assert.ok(!f.sockets[0].sent.some(row => row.type === 'agent_update'));
+    pending[1](); assert.ok(Object.isFrozen(await preparing));
+    assert.deepEqual(f.sockets[0].sent.filter(row => row.type === 'list_models').map(row => row.force), [true, false]);
+    await assert.rejects(chat.readModelDefaults());
+  } finally { await f.auth.dispose(); }
+});
+
+for (const context of [128000, 8192]) test(`catalog defaults ${context} are exact immutable projections read only once`, async () => {
+  const value = catalog(context); value.entries.push({ ...value.entries[0], id: 'reasoning-variant',
+    updateArgs: { ...value.entries[0].updateArgs, reasoning_effort: 'high' } });
+  const f = await fixture((peer, request) => {
+    if (request.type !== 'list_models') return;
+    peer.emitFrame({ type: 'list_models_response', request_id: request.request_id, success: true, ...value }); return false;
+  });
+  try {
+    const chat = await f.connect(); assert.equal(typeof chat.readModelDefaults, 'function');
+    const defaults = await chat.readModelDefaults();
+    assert.deepEqual(defaults, { provider_type: 'lmstudio_openai', context_window_limit: context, max_tokens: Math.min(32000, context) });
+    assert.ok(Object.isFrozen(defaults));
+    await assert.rejects(chat.readModelDefaults()); await chat.prepareAgent();
+    const requests = f.sockets[0].sent.filter(row => row.type === 'list_models'); assert.equal(requests.length, 2);
+    for (const request of requests) assert.deepEqual(Object.keys(request).sort(), ['force', 'request_id', 'type']);
+    assert.deepEqual(requests.map(row => row.force), [true, false]);
+    assert.deepEqual(f.sockets[0].sent.find(row => row.type === 'agent_update').body, { system: SYSTEM_PROMPT, model: binding.model, tools: [] });
+  } finally { await f.auth.dispose(); }
+});
+
+for (const phase of [true, false]) for (const [kind, change] of [
+  ['missing handles', value => { delete value.available_handles; }],
+  ['null handles', value => { value.available_handles = null; }],
+  ['unavailable model', value => { value.available_handles = ['lmstudio/other']; }],
+  ['invalid handle', value => { value.available_handles.push(null); }],
+  ['too many handles', value => { value.available_handles = Array(513).fill(binding.model); }],
+  ['missing entries', value => { delete value.entries; }],
+  ['no matching entry', value => { value.entries[0].handle = 'lmstudio/other'; }],
+  ['malformed entry', value => { value.entries.push(null); }],
+  ['too many entries', value => { value.entries = Array(513).fill(value.entries[0]); }],
+  ['missing defaults', value => { delete value.entries[0].updateArgs; }],
+  ['wrong provider', value => { value.entries[0].updateArgs.provider_type = 'openai'; }],
+  ['oversized context', value => { value.entries[0].updateArgs.context_window = 128001; }],
+  ['fractional context', value => { value.entries[0].updateArgs.context_window = 8192.5; }],
+  ['zero context', value => { value.entries[0].updateArgs.context_window = 0; }],
+  ['wrong output', value => { value.entries[0].updateArgs.max_output_tokens = 8192; }],
+  ['conflicting variants', value => { value.entries.push({ ...value.entries[0], updateArgs: {
+    provider_type: 'lmstudio_openai', context_window: 8192, max_output_tokens: 8192 } }); }],
+]) test(`catalog rejects ${kind} at force=${phase} before any mutation`, async () => {
+  const value = catalog(); change(value);
+  const f = await fixture((peer, request) => {
+    if (request.type !== 'list_models') return;
+    peer.emitFrame({ type: 'list_models_response', request_id: request.request_id, success: true,
+      ...(request.force === phase || kind === 'unavailable model' ? value : catalog()) }); return false;
+  });
+  try {
+    const chat = await f.connect(); await assert.rejects(chat.readModelDefaults(), { code: 'PREDISPATCH' });
+    chat.assertHealthy(); assert.ok(!f.sockets[0].sent.some(row => row.type === 'agent_update'));
+    assert.equal(f.sockets[0].sent.filter(row => row.type === 'list_models').length, phase && kind !== 'unavailable model' ? 1 : 2);
+    await assert.rejects(chat.readModelDefaults());
+  } finally { await f.auth.dispose(); }
+});
+
+test('settled catalog rejects valid but changed defaults without a third read', async () => {
+  const f = await fixture((peer, request) => {
+    if (request.type !== 'list_models') return;
+    peer.emitFrame({ type: 'list_models_response', request_id: request.request_id, success: true,
+      ...catalog(request.force ? 128000 : 8192) }); return false;
+  });
+  try {
+    const chat = await f.connect(); await assert.rejects(chat.readModelDefaults(), { code: 'PREDISPATCH' });
+    assert.equal(f.sockets[0].sent.filter(row => row.type === 'list_models').length, 2);
+    assert.ok(!f.sockets[0].sent.some(row => row.type === 'agent_update'));
+  } finally { await f.auth.dispose(); }
+});
+
+for (const phase of [true, false]) for (const fault of ['failed', 'transport', 'timeout', 'abort']) {
+  test(`catalog ${fault} at force=${phase} stops without fallback or replay`, async () => {
+    const controller = new AbortController();
+    const f = await fixture((peer, request) => {
+      if (request.type !== 'list_models' || request.force !== phase) return;
+      if (fault === 'failed') peer.emitFrame({ type: 'list_models_response', request_id: request.request_id, success: false,
+        ...catalog(), error: 'PRIVATE_FAILURE' });
+      if (fault === 'transport') peer.emit('error', new Error('PRIVATE_FAILURE'));
+      if (fault === 'abort') controller.abort();
+      return false;
+    });
+    try {
+      const chat = await f.connect({ signal: controller.signal });
+      await assert.rejects(chat.readModelDefaults(), { code: 'CHAT_CHANNEL_FAILED' }); await chat.failed;
+      await assert.rejects(chat.readModelDefaults());
+      assert.equal(f.sockets[0].sent.filter(row => row.type === 'list_models').length, phase ? 1 : 2);
+      assert.ok(!f.sockets[0].sent.some(row => row.type === 'agent_update'));
+    } finally { await f.auth.dispose(); }
+  });
 }
 
 test('fresh named channel preserves private bearer, two-socket limit, fixed startup and one input', async () => {

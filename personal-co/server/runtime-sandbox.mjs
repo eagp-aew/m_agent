@@ -32,7 +32,7 @@ export function deriveLocalChatSandbox(base, input) {
   requireValue(base.command === '/usr/bin/sandbox-exec' && base.args[0] === '-p' && base.args[1] === base.profile, 'invalid_chat_base');
   const stateRoot = base.roots?.stateRoot;
   safePath(stateRoot);
-  const profile = `${base.profile}(allow network-outbound (remote ip "127.0.0.1:${providerPort}"))\n`
+  const profile = `${base.profile}(allow network-outbound (remote tcp "localhost:${providerPort}"))\n`
     + `(deny file-read-data (subpath "${stateRoot}/providers"))\n(deny file-write* (subpath "${stateRoot}/providers"))\n`;
   return Object.freeze({ ...base, profile, profileSha256: sha256(profile),
     args: Object.freeze(['-p', profile, ...base.args.slice(2)]),
